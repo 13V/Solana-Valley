@@ -53,6 +53,23 @@ const ROCKS: Array<[number, number]> = [
 const POND = { x0: 25, y0: 14, w: 3, h: 2 };
 const CABIN = { cx: 3, baseY: 3 };
 
+const SAVE_KEY = 'solana-valley:save';
+const SAVE_VERSION = 2;
+
+type SaveData = {
+  v: number;
+  coins: number;
+  selected: string;
+  selectedSeed: string | null;
+  seeds: Record<string, number>;
+  harvest: Record<string, number>;
+  shopStock: Record<string, number>;
+  timeMs: number;
+  restockMs: number;
+  tiles: Array<[number, number, number]>; // x, y, wetRemainingMs (tilled implied)
+  crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean }>;
+};
+
 export class FarmScene extends Phaser.Scene {
   private tiles: Tile[][] = [];
   private ground: Phaser.GameObjects.Image[][] = [];
@@ -68,6 +85,7 @@ export class FarmScene extends Phaser.Scene {
   private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private highlight!: Phaser.GameObjects.Image;
   private ambient!: Phaser.GameObjects.Rectangle;
+  private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
   private facing: Dir = 'down';
   private faceLeft = false;
   private pointerInside = false;
@@ -83,6 +101,7 @@ export class FarmScene extends Phaser.Scene {
   private restockMs = RESTOCK_MS;
   private growthMult = 1;
   private forcedMutation: Mutation | null = null;
+  private persist = true;
   private unsubs: Array<() => void> = [];
 
   constructor() {
@@ -102,6 +121,28 @@ export class FarmScene extends Phaser.Scene {
     this.player.body!.setSize(10, 8).setOffset(7, 19);
     this.physics.add.collider(this.player, this.obstacles);
     this.createAnims();
+
+    // Fireflies drift in at night.
+    this.fireflies = this.add
+      .particles(0, 0, 'p_bit', {
+        tint: [0xfff3a0, 0xfff7c8, 0xd6ff9a],
+        x: { min: 0, max: GAME_WIDTH },
+        y: { min: GAME_HEIGHT * 0.15, max: GAME_HEIGHT },
+        lifespan: 2800,
+        frequency: 200,
+        scale: { start: 1.4, end: 0 },
+        alpha: { start: 0.9, end: 0 },
+        speed: { min: 4, max: 16 },
+        blendMode: 'ADD',
+        emitting: false,
+      })
+      .setDepth(89500);
+
+    this.add
+      .image(0, 0, 'vignette')
+      .setOrigin(0, 0)
+      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDepth(88000);
 
     this.ambient = this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0a1430, 1)
@@ -130,6 +171,7 @@ export class FarmScene extends Phaser.Scene {
     this.input.on('gameout', () => (this.pointerInside = false));
 
     this.shopStock = rollShop();
+    if (this.persist) this.loadSave();
 
     this.unsubs.push(
       bus.on('ui:selectTool', (id) => this.setTool(id)),
@@ -142,6 +184,18 @@ export class FarmScene extends Phaser.Scene {
       this.unsubs.forEach((u) => u());
       this.unsubs = [];
     });
+
+    if (this.persist) {
+      this.time.addEvent({ delay: 8000, loop: true, callback: () => this.saveState() });
+      const onHide = () => this.saveState();
+      window.addEventListener('visibilitychange', onHide);
+      window.addEventListener('pagehide', onHide);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        window.removeEventListener('visibilitychange', onHide);
+        window.removeEventListener('pagehide', onHide);
+        this.saveState();
+      });
+    }
 
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.emitClock() });
     this.time.addEvent({
@@ -200,6 +254,16 @@ export class FarmScene extends Phaser.Scene {
 
     const mut = params.get('mut');
     this.forcedMutation = mut && MUTATION_BY_ID[mut] ? MUTATION_BY_ID[mut] : null;
+
+    const timeRaw = params.get('time');
+    if (timeRaw !== null) {
+      const t = Number(timeRaw);
+      if (Number.isFinite(t) && t >= 0 && t < 1) this.timeMs = DAY_LENGTH_MS * t;
+    }
+
+    if (params.has('reset')) localStorage.removeItem(SAVE_KEY);
+    // Don't load/save during scripted/dev sessions so demos stay deterministic.
+    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset'].some((k) => params.has(k));
   }
 
   private createAnims() {
@@ -406,11 +470,18 @@ export class FarmScene extends Phaser.Scene {
     crop.stage = STAGES - 1;
     crop.mutation = this.forcedMutation ?? pickMutation();
     crop.wetAtMature = this.isWet(crop.tx, crop.ty);
+    this.applyMatureVisuals(crop, true);
+  }
+
+  // Sprite tint + glow + sparkle for a mature crop. Shared by fresh maturity
+  // and save-restore (announce = show the "ready" toast).
+  private applyMatureVisuals(crop: Crop, announce: boolean) {
+    const m = crop.mutation;
+    if (!m) return;
     crop.sprite.setTexture(`crop_${crop.plant.id}_${STAGES - 1}`);
 
     const cx = crop.tx * TILE + TILE / 2;
     const cy = crop.ty * TILE + TILE / 2;
-    const m = crop.mutation;
     const rank = rarityRank(crop.plant.rarity);
     const special = m.id !== 'normal' || rank >= 3;
 
@@ -448,8 +519,10 @@ export class FarmScene extends Phaser.Scene {
         })
         .setDepth(this.cropDepth(crop.ty) + 1);
 
-      const label = m.id !== 'normal' ? `${m.name} ` : '';
-      this.toast(`✨ ${label}${crop.plant.name} is ready!`);
+      if (announce) {
+        const label = m.id !== 'normal' ? `${m.name} ` : '';
+        this.toast(`✨ ${label}${crop.plant.name} is ready!`);
+      }
     }
   }
 
@@ -583,6 +656,99 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // ---- persistence (localStorage) ----------------------------------------
+
+  private saveState() {
+    const tiles: SaveData['tiles'] = [];
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const t = this.tiles[y][x];
+        if (t.tilled) tiles.push([x, y, Math.max(0, t.wetUntil - this.time.now)]);
+      }
+    }
+    const crops: SaveData['crops'] = [];
+    for (const c of this.crops.values()) {
+      crops.push({
+        x: c.tx, y: c.ty, p: c.plant.id, g: Math.round(c.grownMs),
+        m: c.mature, mut: c.mutation?.id ?? null, wet: c.wetAtMature,
+      });
+    }
+    const data: SaveData = {
+      v: SAVE_VERSION,
+      coins: this.coins,
+      selected: this.selected,
+      selectedSeed: this.selectedSeed,
+      seeds: this.seeds,
+      harvest: this.harvestInv,
+      shopStock: this.shopStock,
+      timeMs: this.timeMs,
+      restockMs: this.restockMs,
+      tiles,
+      crops,
+    };
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch {
+      // storage may be unavailable (private mode); ignore
+    }
+  }
+
+  private loadSave(): boolean {
+    let data: SaveData;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      data = JSON.parse(raw) as SaveData;
+    } catch {
+      return false;
+    }
+    if (!data || data.v !== SAVE_VERSION) return false;
+
+    this.coins = data.coins ?? this.coins;
+    this.seeds = data.seeds ?? this.seeds;
+    this.harvestInv = data.harvest ?? {};
+    this.shopStock = data.shopStock ?? this.shopStock;
+    this.timeMs = data.timeMs ?? this.timeMs;
+    this.restockMs = data.restockMs ?? RESTOCK_MS;
+    this.selected = data.selected ?? 'hoe';
+    this.selectedSeed = data.selectedSeed ?? null;
+
+    for (const [x, y, wetRemaining] of data.tiles ?? []) {
+      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) continue;
+      this.tiles[y][x].tilled = true;
+      if (wetRemaining > 0) {
+        this.tiles[y][x].wetUntil = this.time.now + wetRemaining;
+        this.wetTiles.add(this.key(x, y));
+      }
+      this.setGroundTexture(x, y);
+    }
+
+    for (const c of data.crops ?? []) {
+      const plant = PLANT_BY_ID[c.p];
+      if (!plant || !this.inBounds(c.x, c.y)) continue;
+      const sprite = this.add
+        .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, `crop_${plant.id}_0`)
+        .setDepth(this.cropDepth(c.y) - 1);
+      const crop: Crop = {
+        plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,
+        mature: false, mutation: null, wetAtMature: false, sprite,
+      };
+      this.crops.set(this.key(c.x, c.y), crop);
+      if (c.m) {
+        crop.mature = true;
+        crop.stage = STAGES - 1;
+        crop.mutation = MUTATION_BY_ID[c.mut ?? 'normal'] ?? MUTATION_BY_ID.normal;
+        crop.wetAtMature = c.wet;
+        this.applyMatureVisuals(crop, false);
+      } else {
+        const ns = Math.min(STAGES - 1, Math.floor((c.g / (plant.growthSeconds * 1000)) * (STAGES - 1)));
+        crop.stage = ns;
+        crop.sprite.setTexture(`crop_${plant.id}_${ns}`);
+      }
+    }
+    return true;
+  }
+
   private toast(msg: string) {
     bus.emit('toast', msg);
   }
@@ -707,9 +873,11 @@ export class FarmScene extends Phaser.Scene {
     this.timeMs += delta;
     this.restockMs -= delta;
     if (this.restockMs <= 0) this.restock();
-    const { color, alpha } = this.ambientFor((this.timeMs % DAY_LENGTH_MS) / DAY_LENGTH_MS);
+    const frac = (this.timeMs % DAY_LENGTH_MS) / DAY_LENGTH_MS;
+    const { color, alpha } = this.ambientFor(frac);
     this.ambient.setFillStyle(color);
     this.ambient.setAlpha(alpha);
+    this.fireflies.emitting = frac < 0.3 || frac >= 0.82;
 
     // tile cursor
     const p = this.input.activePointer;

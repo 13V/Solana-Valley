@@ -410,5 +410,17 @@ export class BootScene extends Phaser.Scene {
     this.drawStar(g, 4, 4, 4, 4, 1.6, 0xffffff);
     g.generateTexture('p_star', 8, 8);
     g.destroy();
+
+    // Vignette (5:3 like the screen), stretched at runtime — darkens edges.
+    g = this.gfx();
+    const vw = 160;
+    const vh = 96;
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60;
+      g.lineStyle(5, 0x000000, Math.pow(t, 3) * 0.55);
+      g.strokeEllipse(vw / 2, vh / 2, vw * t * 1.18, vh * t * 1.18);
+    }
+    g.generateTexture('vignette', vw, vh);
+    g.destroy();
   }
 }
