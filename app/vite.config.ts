@@ -12,4 +12,22 @@ export default defineConfig({
     }),
   ],
   server: { port: 5173 },
+  build: {
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        // Split the big vendor libs into their own cacheable chunks.
+        manualChunks: {
+          phaser: ['phaser'],
+          solana: [
+            '@solana/web3.js',
+            '@solana/wallet-adapter-base',
+            '@solana/wallet-adapter-react',
+            '@solana/wallet-adapter-react-ui',
+            '@solana/wallet-adapter-wallets',
+          ],
+        },
+      },
+    },
+  },
 });

@@ -5,7 +5,7 @@ import { useGameState, useClock } from './useGameState';
 
 const PHASE_ICON: Record<string, string> = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'help' | null;
 
 export function Hud({
   panel,
@@ -38,6 +38,9 @@ export function Hud({
         </button>
         <button className={`btn ${panel === 'bag' ? 'active' : ''}`} onClick={() => onToggle('bag')}>
           🎒 Harvest
+        </button>
+        <button className={`btn ${panel === 'help' ? 'active' : ''}`} onClick={() => onToggle('help')}>
+          ?
         </button>
       </div>
       <div className="hud-right">

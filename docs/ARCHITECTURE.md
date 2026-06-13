@@ -53,7 +53,9 @@ Two runtimes share one screen:
 - **`EventBus`** (`app/src/game/EventBus.ts`) is a small typed emitter connecting
   them:
   - Game → UI: `state` (full `UiState` snapshot), `toast` (transient message).
-  - UI → Game: `ui:selectTool`, `ui:buySeed`, `ui:sellCrop`, `ui:endDay`.
+  - Game → UI also: `clock` (day / time-of-day / restock countdown, ~1Hz).
+  - UI → Game: `ui:selectTool`, `ui:selectSeed`, `ui:buySeed`, `ui:sellStack`,
+    `ui:sellAll`.
 
 The overlay is `pointer-events: none` except on its own controls, so clicks fall
 through to the Phaser canvas everywhere else.
@@ -64,19 +66,23 @@ through to the Phaser canvas everywhere else.
 app/src/
 ├── game/
 │   ├── createGame.ts      # Phaser.Game config + scene registration
-│   ├── constants.ts       # grid size, crop/tool defs, economy tuning
-│   ├── types.ts           # UiState (the snapshot shape)
+│   ├── economy.ts         # plants, rarity tiers, mutations, value + shop rolls
+│   ├── constants.ts       # grid, timing, palette, tools
+│   ├── types.ts           # UiState / ClockState (UI snapshot shapes)
 │   ├── EventBus.ts        # typed Phaser ↔ React bridge
 │   └── scenes/
 │       ├── BootScene.ts   # generates all textures procedurally, then starts Farm
-│       └── FarmScene.ts   # gameplay: input, tools, crops, day cycle, economy
+│       └── FarmScene.ts   # gameplay: growth, economy, day/night, FX, save/load
 ├── ui/
 │   ├── App.tsx            # mounts Phaser into a div; lays out the overlay
-│   ├── Hud.tsx            # day, coins, wallet, Sleep/Shop buttons
-│   ├── Hotbar.tsx         # tool/seed selection
-│   ├── Shop.tsx           # buy seeds / sell produce
+│   ├── Hud.tsx            # clock, coins, wallet, panel buttons
+│   ├── Hotbar.tsx         # hoe / watering can / selected-seed
+│   ├── Shop.tsx           # rarity-colored seed shop with restock timer
+│   ├── SeedsPanel.tsx     # choose which owned seed to plant
+│   ├── BagPanel.tsx       # harvest stacks (mutation + value), sell / sell-all
+│   ├── HelpPanel.tsx      # how-to-play (shown on first visit)
 │   ├── Toasts.tsx         # transient notifications
-│   └── useGameState.ts    # subscribes a component to `state` snapshots
+│   └── useGameState.ts    # `useGameState` + `useClock` hooks (with state cache)
 └── chain/
     ├── WalletProvider.tsx # Connection + Wallet + Modal providers (devnet)
     └── useSolBalance.ts   # live SOL balance for the connected wallet
@@ -84,12 +90,22 @@ app/src/
 
 ## Gameplay model (current)
 
-- The world is a `GRID_W × GRID_H` grid of `Tile { tilled, watered }`.
-- Crops live in a `Map<"x,y", Crop>` where `Crop { cropId, daysWatered, mature }`.
-- **Day cycle:** "Sleep" advances watered, immature crops by one growth day, then
-  dries all soil. A crop matures when `daysWatered >= daysToGrow`.
-- Crop definitions (cost / sell / days / color) live in `constants.ts` — add a
-  crop there and it shows up in the hotbar, shop, and texture generation.
+- The world is a `GRID_W × GRID_H` grid of `Tile { tilled, wetUntil, obstacle }`.
+- Crops live in a `Map<"x,y", Crop>`. Each `update(dt)` advances `grownMs` by the
+  frame delta (×2 while the tile is wet); a crop matures when it reaches its
+  `growthSeconds`. On maturity it rolls a mutation and gains glow/sparkle FX.
+- **Day/night** is a continuous clock (`timeMs`); an ambient overlay tints the
+  scene by time of day. The shop restocks on a timer.
+- **Economy data** (plants, rarity tiers, mutations, value math, shop rolls)
+  lives in `economy.ts` — add a plant there and it flows through the shop, seed
+  picker, growth, harvest, and texture generation automatically.
+- **Persistence:** `FarmScene` autosaves the full farm (tiles, crops with their
+  mutation, seeds, harvest, coins, shop, time) to `localStorage` and restores it
+  on load. Dev URL params disable this so demos stay deterministic.
+
+> Anti-cheat reminder: growth and harvest mutations are rolled client-side today.
+> Before any real on-chain value is minted, this must move behind an on-chain
+> "planted-at-slot" record or a trusted oracle (ROADMAP M2).
 
 ## Solana integration (current vs planned)
 

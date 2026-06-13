@@ -7,12 +7,18 @@ import { Hotbar } from './Hotbar';
 import { Shop } from './Shop';
 import { SeedsPanel } from './SeedsPanel';
 import { BagPanel } from './BagPanel';
+import { HelpPanel } from './HelpPanel';
 import { Toasts } from './Toasts';
+
+const HELP_SEEN_KEY = 'solana-valley:seen-help';
 
 export function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<ReturnType<typeof createGame> | null>(null);
-  const [panel, setPanel] = useState<Panel>(null);
+  // Show the how-to-play panel automatically on a player's first visit.
+  const [panel, setPanel] = useState<Panel>(() =>
+    localStorage.getItem(HELP_SEEN_KEY) ? null : 'help',
+  );
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -25,6 +31,10 @@ export function App() {
 
   const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));
   const close = () => setPanel(null);
+  const closeHelp = () => {
+    localStorage.setItem(HELP_SEEN_KEY, '1');
+    setPanel(null);
+  };
 
   return (
     <WalletProvider>
@@ -35,6 +45,7 @@ export function App() {
           {panel === 'shop' && <Shop onClose={close} />}
           {panel === 'seeds' && <SeedsPanel onClose={close} />}
           {panel === 'bag' && <BagPanel onClose={close} />}
+          {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           <Hotbar />
           <Toasts />
         </div>
