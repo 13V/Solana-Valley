@@ -1,0 +1,19 @@
+{
+  "name": "solana-valley",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A Stardew Valley-style farming game on the Solana blockchain.",
+  "workspaces": [
+    "app"
+  ],
+  "overrides": {
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "build": "npm run build --workspace app",
+    "preview": "npm run preview --workspace app",
+    "typecheck": "npm run typecheck --workspace app"
+  }
+}
