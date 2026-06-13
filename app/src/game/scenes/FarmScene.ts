@@ -14,13 +14,25 @@ import {
 } from '../constants';
 import { bus } from '../EventBus';
 
-type Tile = { tilled: boolean; watered: boolean };
+type Tile = { tilled: boolean; watered: boolean; obstacle: boolean };
 type Crop = {
   cropId: string;
   daysWatered: number;
   mature: boolean;
   sprite: Phaser.GameObjects.Image;
 };
+type Dir = 'down' | 'up' | 'side';
+
+// Fixed decoration layout. Kept away from the central spawn so there's open
+// farmland in the middle.
+const TREES: Array<[number, number]> = [
+  [8, 3], [12, 6], [21, 4], [26, 7], [6, 13], [23, 15], [18, 2], [3, 12],
+];
+const ROCKS: Array<[number, number]> = [
+  [10, 9], [24, 11], [15, 3], [19, 13], [5, 6],
+];
+const POND: { x0: number; y0: number; w: number; h: number } = { x0: 25, y0: 14, w: 3, h: 2 };
+const CABIN = { cx: 3, baseY: 3, tilesW: 3 }; // 3 tiles wide, base on row 3
 
 // The authoritative game world. Owns all farm state and exposes it to the UI
 // through the EventBus. Real-time movement + tool use here is fully off-chain;
@@ -29,11 +41,15 @@ export class FarmScene extends Phaser.Scene {
   private tiles: Tile[][] = [];
   private ground: Phaser.GameObjects.Image[][] = [];
   private crops = new Map<string, Crop>();
+  private obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private highlight!: Phaser.GameObjects.Image;
+  private facing: Dir = 'down';
+  private faceLeft = false;
+  private pointerInside = false;
 
   private inventory: Record<string, number> = { parsnip_seed: 5 };
   private coins = STARTING_COINS;
@@ -47,13 +63,17 @@ export class FarmScene extends Phaser.Scene {
 
   create() {
     this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.obstacles = this.physics.add.staticGroup();
     this.buildWorld();
+    this.placeDecorations();
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player');
+    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player_down_0');
     this.player.setCollideWorldBounds(true);
-    this.player.setDepth(10);
+    this.player.body!.setSize(10, 8).setOffset(7, 19); // collide on the feet only
+    this.physics.add.collider(this.player, this.obstacles);
+    this.createAnims();
 
-    this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(20);
+    this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(100000);
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
@@ -77,6 +97,10 @@ export class FarmScene extends Phaser.Scene {
       this.useToolAt(Math.floor(p.worldX / TILE), Math.floor(p.worldY / TILE));
     });
 
+    // Only show the tile cursor while the mouse is actually over the game.
+    this.input.on('pointermove', () => (this.pointerInside = true));
+    this.input.on('gameout', () => (this.pointerInside = false));
+
     // UI intents -> scene actions.
     this.unsubs.push(
       bus.on('ui:selectTool', (id) => this.setTool(id)),
@@ -92,17 +116,84 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  private createAnims() {
+    const make = (key: string, dir: Dir) => {
+      if (this.anims.exists(key)) return;
+      this.anims.create({
+        key,
+        frames: [0, 1, 2, 3].map((n) => ({ key: `player_${dir}_${n}` })),
+        frameRate: 8,
+        repeat: -1,
+      });
+    };
+    make('walk-down', 'down');
+    make('walk-up', 'up');
+    make('walk-side', 'side');
+  }
+
   private buildWorld() {
     for (let y = 0; y < GRID_H; y++) {
       this.tiles[y] = [];
       this.ground[y] = [];
       for (let x = 0; x < GRID_W; x++) {
-        this.tiles[y][x] = { tilled: false, watered: false };
+        this.tiles[y][x] = { tilled: false, watered: false, obstacle: false };
+        const variant = (x * 7 + y * 13) % 3;
         this.ground[y][x] = this.add
-          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'grass')
+          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, `grass${variant}`)
           .setDepth(0);
       }
     }
+  }
+
+  private placeDecorations() {
+    // Pond (ground-level water tiles + colliders).
+    for (let dy = 0; dy < POND.h; dy++) {
+      for (let dx = 0; dx < POND.w; dx++) {
+        const tx = POND.x0 + dx;
+        const ty = POND.y0 + dy;
+        const cx = tx * TILE + TILE / 2;
+        const cy = ty * TILE + TILE / 2;
+        this.add.image(cx, cy, 'water').setDepth(1);
+        this.tiles[ty][tx].obstacle = true;
+        this.addCollider(cx, cy, TILE, TILE);
+      }
+    }
+
+    // Cabin.
+    const cabinX = CABIN.cx * TILE + TILE / 2;
+    const cabinBase = (CABIN.baseY + 1) * TILE;
+    this.add.image(cabinX, cabinBase, 'cabin').setOrigin(0.5, 1).setDepth(cabinBase);
+    for (let ty = CABIN.baseY - 1; ty <= CABIN.baseY; ty++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const tx = CABIN.cx + dx;
+        if (this.inBounds(tx, ty)) this.tiles[ty][tx].obstacle = true;
+      }
+    }
+    this.addCollider(cabinX, cabinBase - 13, 84, 26);
+
+    // Rocks.
+    for (const [tx, ty] of ROCKS) {
+      const cx = tx * TILE + TILE / 2;
+      const cy = ty * TILE + TILE / 2;
+      this.add.image(cx, cy, 'rock').setDepth(cy + 8);
+      this.tiles[ty][tx].obstacle = true;
+      this.addCollider(cx, cy + 4, 22, 12);
+    }
+
+    // Trees (origin bottom-center; collide at the trunk only).
+    for (const [tx, ty] of TREES) {
+      const cx = tx * TILE + TILE / 2;
+      const baseY = ty * TILE + TILE;
+      this.add.image(cx, baseY, 'tree').setOrigin(0.5, 1).setDepth(baseY);
+      this.tiles[ty][tx].obstacle = true;
+      this.addCollider(cx, baseY - 6, 14, 10);
+    }
+  }
+
+  // Invisible static collision box, sized from the 1x1 'pixel' texture.
+  private addCollider(cx: number, cy: number, w: number, h: number) {
+    const box = this.obstacles.create(cx, cy, 'pixel') as Phaser.Physics.Arcade.Sprite;
+    box.setVisible(false).setDisplaySize(w, h).refreshBody();
   }
 
   private key(x: number, y: number): string {
@@ -121,14 +212,16 @@ export class FarmScene extends Phaser.Scene {
 
   private setGroundTexture(x: number, y: number) {
     const t = this.tiles[y][x];
-    const key = t.watered ? 'soil_wet' : t.tilled ? 'soil' : 'grass';
-    this.ground[y][x].setTexture(key);
+    if (t.watered) this.ground[y][x].setTexture('soil_wet');
+    else if (t.tilled) this.ground[y][x].setTexture('soil');
+    else this.ground[y][x].setTexture(`grass${(x * 7 + y * 13) % 3}`);
   }
 
   private useToolAt(tx: number, ty: number) {
     if (!this.inBounds(tx, ty) || !this.inRange(tx, ty)) return;
-
     const tile = this.tiles[ty][tx];
+    if (tile.obstacle) return;
+
     const crop = this.crops.get(this.key(tx, ty));
 
     // A mature crop is harvested by any interaction.
@@ -160,9 +253,10 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
     const cropId = SEED_TO_CROP[seedId];
+    const baseY = ty * TILE + TILE;
     const sprite = this.add
       .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, `crop_${cropId}_0`)
-      .setDepth(5);
+      .setDepth(baseY - 1);
     this.crops.set(this.key(tx, ty), { cropId, daysWatered: 0, mature: false, sprite });
     this.inventory[seedId] -= 1;
     this.emitState();
@@ -262,14 +356,30 @@ export class FarmScene extends Phaser.Scene {
 
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
-    if (vx < 0) this.player.setFlipX(true);
-    else if (vx > 0) this.player.setFlipX(false);
 
-    // Tile highlight under the cursor: white if reachable, red if out of range.
+    if (vx !== 0 || vy !== 0) {
+      if (vx !== 0) {
+        this.facing = 'side';
+        this.faceLeft = vx < 0;
+      } else {
+        this.facing = vy < 0 ? 'up' : 'down';
+      }
+      this.player.setFlipX(this.facing === 'side' && this.faceLeft);
+      this.player.anims.play(`walk-${this.facing}`, true);
+    } else {
+      this.player.anims.stop();
+      this.player.setTexture(`player_${this.facing}_0`);
+      this.player.setFlipX(this.facing === 'side' && this.faceLeft);
+    }
+
+    // y-sort the player against trees/rocks/crops by its feet position.
+    this.player.setDepth(this.player.y + 14);
+
+    // Tile highlight under the cursor: white if reachable, red if too far.
     const p = this.input.activePointer;
     const tx = Math.floor(p.worldX / TILE);
     const ty = Math.floor(p.worldY / TILE);
-    if (this.inBounds(tx, ty)) {
+    if (this.pointerInside && this.inBounds(tx, ty)) {
       this.highlight
         .setVisible(true)
         .setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)

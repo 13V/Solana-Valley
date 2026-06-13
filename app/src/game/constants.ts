@@ -9,10 +9,16 @@ export const REACH = 2; // how many tiles away the player can act, in tiles
 export const STARTING_COINS = 500;
 
 export const COLORS = {
-  grass: 0x5a9e4b,
-  grassAlt: 0x66ad55,
+  grass: 0x5fa64d,
+  grassDark: 0x4d8a3e,
+  grassLight: 0x79c161,
   soil: 0x7a5230,
-  soilWet: 0x5a3a20,
+  soilDark: 0x5e3f24,
+  soilWet: 0x533620,
+  soilWetDark: 0x3d2716,
+  water: 0x3b82c4,
+  waterLight: 0x63a6e0,
+  waterDark: 0x2c66a0,
 };
 
 export type CropDef = {
