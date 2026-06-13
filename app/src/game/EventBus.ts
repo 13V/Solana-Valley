@@ -1,21 +1,24 @@
-import type { UiState } from './types';
+import type { UiState, ClockState } from './types';
 
 // Typed pub/sub bridge between the Phaser game (authoritative state) and the
-// React UI overlay. The game emits `state`/`toast`; the UI emits `ui:*` intents.
+// React UI overlay. The game emits `state`/`clock`/`toast`; the UI emits
+// `ui:*` intents.
 export interface GameEvents {
   state: UiState;
+  clock: ClockState;
   toast: string;
-  'ui:selectTool': string; // hotbar slot id
-  'ui:endDay': void;
-  'ui:buySeed': string; // crop id
-  'ui:sellCrop': string; // crop id
+  'ui:selectTool': string; // 'hoe' | 'can' | 'seed'
+  'ui:selectSeed': string; // plant id -> also switches to the seed tool
+  'ui:buySeed': string; // plant id
+  'ui:sellStack': string; // harvest stack key
+  'ui:sellAll': void;
 }
 
 type Handler<T> = (payload: T) => void;
 
 class EventBus {
-  // Internally untyped (Handler<unknown>) so a single map can hold handlers for
-  // every event; the public methods restore full type safety per event key.
+  // Internally untyped so a single map can hold handlers for every event; the
+  // public methods restore full type safety per event key.
   private handlers = new Map<keyof GameEvents, Set<Handler<unknown>>>();
 
   on<K extends keyof GameEvents>(event: K, handler: Handler<GameEvents[K]>): () => void {

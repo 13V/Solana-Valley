@@ -1,6 +1,6 @@
 :root {
-  --panel: rgba(20, 28, 22, 0.85);
-  --panel-border: #2f4a32;
+  --panel: rgba(20, 28, 22, 0.9);
+  --panel-border: #3c5a3a;
   --accent: #7bd66a;
   --gold: #ffd66b;
   --text: #eaf3e6;
@@ -14,7 +14,7 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #11160f;
+  background: #0d120b;
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -32,7 +32,7 @@ body {
   border: 2px solid var(--panel-border);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.6);
   max-width: 100%;
 }
 
@@ -46,7 +46,6 @@ body {
   image-rendering: pixelated;
 }
 
-/* Overlay: transparent to clicks except on its own controls. */
 .overlay {
   position: absolute;
   inset: 0;
@@ -84,6 +83,7 @@ body {
   padding: 6px 10px;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .badge.coins {
@@ -99,6 +99,7 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -111,8 +112,13 @@ body {
 }
 
 .btn.sm {
-  padding: 4px 8px;
+  padding: 4px 9px;
   font-size: 12px;
+}
+
+.btn.gold {
+  color: var(--gold);
+  border-color: var(--gold);
 }
 
 .btn:disabled {
@@ -132,8 +138,8 @@ body {
 
 .slot {
   position: relative;
-  width: 92px;
-  height: 56px;
+  width: 104px;
+  height: 60px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
@@ -143,7 +149,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   padding: 4px;
 }
 
@@ -152,8 +158,7 @@ body {
 }
 
 .slot.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(123, 214, 106, 0.4) inset;
+  box-shadow: 0 0 0 2px rgba(123, 214, 106, 0.5) inset;
 }
 
 .slot-key {
@@ -162,6 +167,11 @@ body {
   left: 5px;
   font-size: 10px;
   opacity: 0.6;
+}
+
+.slot-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .slot-label {
@@ -173,65 +183,152 @@ body {
 .slot-count {
   position: absolute;
   bottom: 2px;
-  right: 5px;
+  right: 6px;
   font-size: 11px;
   color: var(--gold);
   font-weight: 700;
 }
 
-/* Shop */
-.shop {
+/* Panels (shop / seeds / harvest) */
+.panel {
   position: absolute;
-  top: 50px;
+  top: 52px;
   left: 50%;
   transform: translateX(-50%);
-  width: 460px;
-  max-width: 92%;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  backdrop-filter: blur(2px);
-}
-
-.shop-head {
+  width: 520px;
+  max-width: 94%;
+  max-height: 78%;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  background: linear-gradient(180deg, #2a3a2a, #1b261b);
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--panel-border);
 }
 
-.shop h3 {
-  margin: 2px 0 6px;
+.panel-head h3 {
+  margin: 0;
+  font-size: 15px;
 }
 
-.shop table {
-  width: 100%;
-  border-collapse: collapse;
+.panel-head .muted {
+  flex: 1;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.x {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.x:hover {
+  opacity: 1;
+}
+
+.rows {
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid #888;
+  border-radius: 8px;
+}
+
+.row.sel {
+  background: rgba(123, 214, 106, 0.14);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.row-name {
+  flex: 1;
+  font-weight: 600;
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.shop th,
-.shop td {
-  text-align: left;
-  padding: 6px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+.rarity {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.shop-actions {
+.rarity-line {
   display: flex;
   gap: 6px;
 }
 
-.muted {
+.row-meta {
   font-size: 11px;
   opacity: 0.7;
-  margin: 0 0 8px;
+  white-space: nowrap;
+}
+
+.stock {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 34px;
+  text-align: right;
+}
+
+.stock.out {
+  opacity: 0.4;
+}
+
+.mut {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.mut.wet {
+  color: #7fb8ff;
+}
+
+.empty {
+  padding: 28px 24px;
+  text-align: center;
+  opacity: 0.7;
+  font-size: 13px;
 }
 
 /* Toasts */
 .toasts {
   position: absolute;
-  bottom: 76px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -241,9 +338,9 @@ body {
 }
 
 .toast {
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.78);
   border: 1px solid var(--panel-border);
-  padding: 6px 12px;
+  padding: 6px 13px;
   border-radius: 999px;
   font-size: 13px;
   animation: toast-in 0.2s ease;
@@ -260,7 +357,7 @@ body {
   }
 }
 
-/* Wallet adapter button sizing */
+/* Wallet adapter button */
 .wallet-adapter-button {
   height: 34px !important;
   font-size: 13px !important;

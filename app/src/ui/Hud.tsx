@@ -1,19 +1,23 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSolBalance } from '../chain/useSolBalance';
-import { useGameState } from './useGameState';
-import { bus } from '../game/EventBus';
+import { useGameState, useClock } from './useGameState';
+
+const PHASE_ICON: Record<string, string> = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
+
+export type Panel = 'shop' | 'seeds' | 'bag' | null;
 
 export function Hud({
-  shopOpen,
-  onToggleShop,
+  panel,
+  onToggle,
 }: {
-  shopOpen: boolean;
-  onToggleShop: () => void;
+  panel: Panel;
+  onToggle: (p: Exclude<Panel, null>) => void;
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
-  const { coins, day } = useGameState();
+  const { coins } = useGameState();
+  const { day, clock, phase } = useClock();
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
@@ -22,13 +26,18 @@ export function Hud({
   return (
     <div className="hud">
       <div className="hud-left">
-        <span className="badge">Day {day}</span>
-        <span className="badge coins">🪙 {coins}</span>
-        <button className="btn" onClick={() => bus.emit('ui:endDay', undefined)}>
-          Sleep ▸ Next Day
+        <span className="badge">
+          {PHASE_ICON[phase]} Day {day} · {clock}
+        </span>
+        <span className="badge coins">🪙 {coins.toLocaleString()}</span>
+        <button className={`btn ${panel === 'shop' ? 'active' : ''}`} onClick={() => onToggle('shop')}>
+          🛒 Shop
         </button>
-        <button className={`btn ${shopOpen ? 'active' : ''}`} onClick={onToggleShop}>
-          Shop
+        <button className={`btn ${panel === 'seeds' ? 'active' : ''}`} onClick={() => onToggle('seeds')}>
+          🌱 Seeds
+        </button>
+        <button className={`btn ${panel === 'bag' ? 'active' : ''}`} onClick={() => onToggle('bag')}>
+          🎒 Harvest
         </button>
       </div>
       <div className="hud-right">

@@ -1,24 +1,31 @@
-import { HOTBAR } from '../game/constants';
+import { TOOLS } from '../game/constants';
+import { PLANT_BY_ID, RARITY } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 
 export function Hotbar() {
-  const { selected, inventory } = useGameState();
+  const { selected, selectedSeed, seeds } = useGameState();
+  const seedPlant = selectedSeed ? PLANT_BY_ID[selectedSeed] : null;
+  const seedCount = selectedSeed ? seeds[selectedSeed] ?? 0 : 0;
 
   return (
     <div className="hotbar">
-      {HOTBAR.map((slot, i) => {
-        const count = slot.kind === 'seed' ? inventory[slot.id] ?? 0 : null;
+      {TOOLS.map((tool, i) => {
+        const isSeed = tool.id === 'seed';
+        const label = isSeed && seedPlant ? seedPlant.name : tool.label;
+        const accent = isSeed && seedPlant ? RARITY[seedPlant.rarity].css : undefined;
         return (
           <button
-            key={slot.id}
-            className={`slot ${selected === slot.id ? 'selected' : ''}`}
-            onClick={() => bus.emit('ui:selectTool', slot.id)}
-            title={slot.label}
+            key={tool.id}
+            className={`slot ${selected === tool.id ? 'selected' : ''}`}
+            style={accent ? { borderColor: accent } : undefined}
+            onClick={() => bus.emit('ui:selectTool', tool.id)}
+            title={label}
           >
             <span className="slot-key">{i + 1}</span>
-            <span className="slot-label">{slot.label}</span>
-            {count !== null && <span className="slot-count">{count}</span>}
+            <span className="slot-icon">{isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}</span>
+            <span className="slot-label">{label}</span>
+            {isSeed && <span className="slot-count">{seedCount}</span>}
           </button>
         );
       })}

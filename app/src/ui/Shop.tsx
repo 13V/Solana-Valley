@@ -1,61 +1,46 @@
-import { CROP_LIST } from '../game/constants';
-import { useGameState } from './useGameState';
+import { PLANTS, RARITY } from '../game/economy';
+import { useGameState, useClock } from './useGameState';
 import { bus } from '../game/EventBus';
 
-export function Shop({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { coins, inventory } = useGameState();
-  if (!open) return null;
+export function Shop({ onClose }: { onClose: () => void }) {
+  const { coins, shop } = useGameState();
+  const { restockIn } = useClock();
+  const stockById: Record<string, number> = Object.fromEntries(shop.map((s) => [s.plantId, s.stock]));
+  const mm = String(Math.floor(restockIn / 60)).padStart(2, '0');
+  const ss = String(restockIn % 60).padStart(2, '0');
 
   return (
-    <div className="shop">
-      <div className="shop-head">
-        <h3>General Store</h3>
-        <button className="btn sm" onClick={onClose}>
-          ✕
-        </button>
+    <div className="panel">
+      <div className="panel-head">
+        <h3>🛒 Seed Shop</h3>
+        <span className="muted">restock in {mm}:{ss}</span>
+        <button className="x" onClick={onClose}>✕</button>
       </div>
-      <p className="muted">
-        Coins are an off-chain placeholder for the on-chain $VALLEY SPL token (see roadmap).
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Crop</th>
-            <th>Seed</th>
-            <th>Sells</th>
-            <th>Have</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {CROP_LIST.map((c) => (
-            <tr key={c.id}>
-              <td>{c.name}</td>
-              <td>
-                {c.seedCost}🪙 · {c.daysToGrow}d
-              </td>
-              <td>{c.sellPrice}🪙</td>
-              <td>{inventory[c.produceId] ?? 0}</td>
-              <td className="shop-actions">
-                <button
-                  className="btn sm"
-                  disabled={coins < c.seedCost}
-                  onClick={() => bus.emit('ui:buySeed', c.id)}
-                >
-                  Buy seed
-                </button>
-                <button
-                  className="btn sm"
-                  disabled={(inventory[c.produceId] ?? 0) <= 0}
-                  onClick={() => bus.emit('ui:sellCrop', c.id)}
-                >
-                  Sell
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="rows">
+        {PLANTS.map((p) => {
+          const stock = stockById[p.id] ?? 0;
+          const r = RARITY[p.rarity];
+          const afford = coins >= p.seedCost;
+          return (
+            <div className="row" key={p.id} style={{ borderLeftColor: r.css }}>
+              <span className="dot" style={{ background: r.css, color: r.css }} />
+              <span className="row-name">
+                {p.name}
+                <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>
+              </span>
+              <span className="row-meta">{p.growthSeconds}s · {p.baseValue.toLocaleString()}🪙</span>
+              <span className={`stock ${stock > 0 ? '' : 'out'}`}>{stock > 0 ? `×${stock}` : '—'}</span>
+              <button
+                className="btn sm"
+                disabled={stock <= 0 || !afford}
+                onClick={() => bus.emit('ui:buySeed', p.id)}
+              >
+                {p.seedCost.toLocaleString()}🪙
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
