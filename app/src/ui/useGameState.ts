@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bus } from '../game/EventBus';
 import type { UiState, ClockState } from '../game/types';
+import { EMPTY_SKILLS } from '../game/skills';
 
 const initialState: UiState = {
   coins: 0,
@@ -22,6 +23,7 @@ const initialState: UiState = {
     discoveredMutations: [],
     achievements: [],
   },
+  skills: { ...EMPTY_SKILLS },
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };

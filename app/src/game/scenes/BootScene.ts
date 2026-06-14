@@ -176,6 +176,32 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('raindrop', 2, 9);
     g.destroy();
 
+    // A tiny side-on fish silhouette (white, so it can be tinted to the catch's
+    // colour) for the fishing catch popup. Body is an ellipse + a triangle tail.
+    g = this.gfx();
+    g.fillStyle(0xffffff, 1);
+    g.fillEllipse(11, 8, 16, 9);
+    g.beginPath();
+    g.moveTo(3, 8);
+    g.lineTo(0, 3);
+    g.lineTo(0, 13);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0x223044, 1);
+    g.fillCircle(15, 6, 1.3); // eye
+    g.generateTexture('p_fish', 20, 16);
+    g.destroy();
+
+    // A small lily-pad fallback in case the waterobj sheet is unavailable.
+    g = this.gfx();
+    g.fillStyle(0x3f8f4a, 1);
+    g.fillCircle(7, 7, 6.5);
+    g.fillStyle(0x2b6e38, 1);
+    g.slice(7, 7, 6.5, Phaser.Math.DegToRad(255), Phaser.Math.DegToRad(285), false);
+    g.fillPath();
+    g.generateTexture('lilypad', 14, 14);
+    g.destroy();
+
     g = this.gfx();
     const vw = 160;
     const vh = 96;

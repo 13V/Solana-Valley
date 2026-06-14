@@ -1,3 +1,5 @@
+import type { Skills } from './skills';
+
 // A seed offer in the shop's current stock.
 export type ShopEntry = { plantId: string; stock: number };
 
@@ -25,6 +27,7 @@ export type UiState = {
   shop: ShopEntry[]; // full catalog with current stock
   animalCounts: Record<string, number>; // animal id -> owned count
   progress: Progress;
+  skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
 };
 
 // Lightweight time/restock state, emitted about once per second.

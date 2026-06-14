@@ -51,6 +51,25 @@ import {
   type Homestead,
   type Rect,
 } from '../plots';
+import {
+  EMPTY_SKILLS,
+  skillLevel,
+  type SkillId,
+  type Skills,
+  SKILL_BY_ID,
+  farmingGrowthMult,
+  farmingValueMult,
+  ranchingValueMult,
+  ranchingSpeedMult,
+  breedingCapBonus,
+  breedingSpeedMult,
+  fishingLuck,
+  fishingValueMult,
+  foragingLuck,
+  foragingValueMult,
+} from '../skills';
+import { catchFish, fishXp } from '../fishing';
+import { pickForage, forageXp, type Forage } from '../forage';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -92,7 +111,15 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 8;
+
+// A gatherable forage node sitting on open grass.
+type ForageNode = {
+  forage: Forage;
+  tx: number;
+  ty: number;
+  sprite: Phaser.GameObjects.Image;
+};
 
 type SaveData = {
   v: number;
@@ -116,6 +143,7 @@ type SaveData = {
   discMutations: string[];
   achievements: string[];
   animals: Record<string, number>;
+  skills: Skills;
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -167,6 +195,16 @@ export class FarmScene extends Phaser.Scene {
   private gateOpen = false;
   private animalCounts: Record<string, number> = {};
 
+  // skill progression (xp per skill)
+  private skills: Skills = { ...EMPTY_SKILLS };
+
+  // fishing
+  private pond!: Rect; // pond rect in tile coords (inclusive)
+  private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
+  private casting = false; // only one cast at a time
+  // foraging
+  private forageNodes: ForageNode[] = [];
+
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
   private restockMs = RESTOCK_MS;
   private growthMult = 1;
@@ -186,6 +224,9 @@ export class FarmScene extends Phaser.Scene {
     this.createAnims();
     this.buildWorld();
     this.buildPaths();
+    // Reserve the pond's tiles (flagged obstacle) before scattering decorations
+    // so nothing spawns on the water.
+    this.buildPond();
     this.placeDecorations();
     this.buildFences();
     this.buildPlots();
@@ -290,14 +331,24 @@ export class FarmScene extends Phaser.Scene {
     // Browsers suspend audio until a user gesture; resume on first input.
     this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      // Gathering interactions take priority over the held tool so clicking the
+      // pond fishes (never tills/plants) and clicking a node forages.
       if (this.tryCollectAnimal(p.worldX, p.worldY)) return;
-      this.useToolAt(Math.floor(p.worldX / TILE), Math.floor(p.worldY / TILE));
+      if (this.tryForage(p.worldX, p.worldY)) return;
+      const tx = Math.floor(p.worldX / TILE);
+      const ty = Math.floor(p.worldY / TILE);
+      if (this.tryFish(tx, ty)) return;
+      this.useToolAt(tx, ty);
     });
     this.input.on('pointermove', () => (this.pointerInside = true));
     this.input.on('gameout', () => (this.pointerInside = false));
 
     this.shopStock = rollShop(levelInfo(this.xp).level);
     if (this.persist) this.loadSave();
+
+    // Scatter forage nodes across the open world (after any save load so they
+    // never land on restored crops).
+    this.spawnForageNodes(Phaser.Math.Between(8, 12));
 
     this.unsubs.push(
       bus.on('ui:selectTool', (id) => this.setTool(id)),
@@ -349,6 +400,10 @@ export class FarmScene extends Phaser.Scene {
       selectedSeed: this.selectedSeed,
       crops: this.crops.size,
       growthMult: this.growthMult,
+      skills: { ...this.skills },
+      pond: this.pond,
+      forageNodes: this.forageNodes.map((n) => ({ id: n.forage.id, tx: n.tx, ty: n.ty })),
+      casting: this.casting,
       sample: sample
         ? { id: sample.plant.id, stage: sample.stage, mature: sample.mature, grownMs: Math.round(sample.grownMs) }
         : null,
@@ -1092,6 +1147,7 @@ export class FarmScene extends Phaser.Scene {
       this.discoveredMutations.add(m.id);
     }
     this.gainXp(harvestXp(crop.plant.baseValue));
+    this.addSkillXp('farming', harvestXp(value)); // Farming skill grows per harvest
     this.checkAchievements();
 
     const label = m.id !== 'normal' ? `${m.name} ` : '';
@@ -1161,7 +1217,12 @@ export class FarmScene extends Phaser.Scene {
     const count = this.harvestInv[key] ?? 0;
     if (count <= 0) return;
     const [plantId, mutId, wet] = key.split('|');
-    const value = Math.round(cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count * marketBonus(this.upgrades.market));
+    const value = Math.round(
+      cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') *
+        count *
+        marketBonus(this.upgrades.market) *
+        farmingValueMult(skillLevel(this.skills.farming)),
+    );
     delete this.harvestInv[key];
     this.coins += value;
     this.earned += value;
@@ -1177,7 +1238,7 @@ export class FarmScene extends Phaser.Scene {
       const [plantId, mutId, wet] = key.split('|');
       total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
     }
-    total = Math.round(total * marketBonus(this.upgrades.market));
+    total = Math.round(total * marketBonus(this.upgrades.market) * farmingValueMult(skillLevel(this.skills.farming)));
     if (total <= 0) {
       this.toast('Nothing to sell');
       return;
@@ -1216,6 +1277,28 @@ export class FarmScene extends Phaser.Scene {
       this.toast(`⭐ Level ${after}!`);
       this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
     }
+  }
+
+  // Award XP to one of the five skills. Detects a level-up (compares the skill
+  // level before/after), celebrating it with a toast, a particle burst over the
+  // player and a chime. Always re-emits state so the Skills panel stays current.
+  private addSkillXp(id: SkillId, xp: number) {
+    if (xp <= 0) return;
+    const def = SKILL_BY_ID[id];
+    const before = skillLevel(this.skills[id]);
+    this.skills[id] = (this.skills[id] ?? 0) + xp;
+    const after = skillLevel(this.skills[id]);
+    if (after > before) {
+      sfx.play('levelup');
+      this.toast(`${def.icon} ${def.name} reached Lv ${after}!`);
+      this.burst(this.player.x, this.player.y - 16, 'p_star', {
+        speed: { min: 40, max: 110 },
+        lifespan: 850,
+        scale: { start: 1.2, end: 0 },
+        tint: [0xfff3a0, 0xffe066, 0xffffff],
+      }, 14);
+    }
+    this.emitState();
   }
 
   private checkAchievements() {
@@ -1290,9 +1373,11 @@ export class FarmScene extends Phaser.Scene {
       sprite: s,
       type: def.id,
       color,
-      layAt: this.time.now + def.layMs / this.growthMult,
+      layAt: this.time.now + def.layMs / this.growthMult / ranchingSpeedMult(skillLevel(this.skills.ranching)),
       nextWander: this.time.now + 1500 + Math.random() * 3000,
-      breedAt: def.breeding ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult : undefined,
+      breedAt: def.breeding
+        ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult / breedingSpeedMult(skillLevel(this.skills.breeding))
+        : undefined,
     });
   }
 
@@ -1311,7 +1396,7 @@ export class FarmScene extends Phaser.Scene {
       type: def.id,
       color,
       baby: true,
-      growUpAt: this.time.now + def.breeding.growMs / this.growthMult,
+      growUpAt: this.time.now + def.breeding.growMs / this.growthMult / breedingSpeedMult(skillLevel(this.skills.breeding)),
       layAt: Infinity,
       nextWander: this.time.now + 1000 + Math.random() * 2500,
     });
@@ -1347,18 +1432,22 @@ export class FarmScene extends Phaser.Scene {
     for (const a of this.animals) {
       if (a.product && Phaser.Math.Distance.Between(wx, wy, a.product.x, a.product.y) < 30) {
         const def = ANIMAL_BY_ID[a.type];
+        const ranchLvl = skillLevel(this.skills.ranching);
         a.product.destroy();
         a.product = undefined;
-        a.layAt = this.time.now + def.layMs / this.growthMult;
-        this.coins += def.productValue;
-        this.earned += def.productValue;
+        // Ranching speed shortens the time to the next product.
+        a.layAt = this.time.now + def.layMs / this.growthMult / ranchingSpeedMult(ranchLvl);
+        const value = Math.round(def.productValue * ranchingValueMult(ranchLvl));
+        this.coins += value;
+        this.earned += value;
         this.gainXp(def.xp);
+        this.addSkillXp('ranching', Math.max(3, Math.round(def.xp))); // Ranching skill
         this.checkAchievements();
         sfx.play('sell');
         this.burst(a.sprite.x, a.sprite.y - 10, 'p_star', {
           speed: { min: 30, max: 80 }, lifespan: 600, scale: { start: 1, end: 0 }, tint: 0xfff3a0,
         }, 6);
-        this.toast(`Collected ${def.productName} (+${def.productValue}🪙)`);
+        this.toast(`Collected ${def.productName} (+${value}🪙)`);
         this.emitState();
         return true;
       }
@@ -1393,7 +1482,7 @@ export class FarmScene extends Phaser.Scene {
         }
         if (a.product) a.product.setPosition(a.sprite.x, a.sprite.y + def.productOffsetY);
         if (def.breeding && a.breedAt !== undefined && time >= a.breedAt) {
-          a.breedAt = time + (def.breeding.ms * (0.7 + Math.random() * 0.6)) / this.growthMult;
+          a.breedAt = time + (def.breeding.ms * (0.7 + Math.random() * 0.6)) / this.growthMult / breedingSpeedMult(skillLevel(this.skills.breeding));
           breeders.push(a);
         }
       }
@@ -1410,9 +1499,11 @@ export class FarmScene extends Phaser.Scene {
     if (!def.breeding) return;
     if ((this.animalCounts[a.type] ?? 0) < 2) return; // needs a pair
     const herd = this.animals.filter((x) => x.type === a.type).length; // adults + babies
-    if (herd >= def.breeding.cap) return;
+    // Breeding skill raises the herd cap.
+    if (herd >= def.breeding.cap + breedingCapBonus(skillLevel(this.skills.breeding))) return;
     this.spawnBaby(def, a.sprite.x + (Math.random() * 2 - 1) * 16, a.sprite.y + 10);
     this.burst(a.sprite.x, a.sprite.y - 8, 'p_star', { speed: { min: 20, max: 50 }, lifespan: 600, scale: { start: 0.8, end: 0 }, tint: 0xffc6e0 }, 5);
+    this.addSkillXp('breeding', 8); // Breeding skill: a baby was born
     this.toast(`🐣 A baby ${def.name.toLowerCase()} was born!`);
   }
 
@@ -1425,8 +1516,210 @@ export class FarmScene extends Phaser.Scene {
     this.animalCounts[a.type] = (this.animalCounts[a.type] ?? 0) + 1;
     this.spawnAnimal(def, x, y);
     this.burst(x, y - 10, 'p_star', { speed: { min: 30, max: 70 }, lifespan: 700, scale: { start: 1, end: 0 }, tint: 0xfff3a0 }, 7);
+    this.addSkillXp('breeding', 12); // Breeding skill: a baby matured
     this.toast(`✨ A baby ${def.name.toLowerCase()} grew into an adult!`);
     this.emitState();
+  }
+
+  // ---- fishing ------------------------------------------------------------
+
+  // A small pond of animated water just outside the player's homestead. Every
+  // water tile is flagged obstacle + given a collider so the player can't walk
+  // onto it (and clicks route to fishing). Lily pads add a little life.
+  private buildPond() {
+    // 4×3 water rect on open grass directly below the player's homestead, an
+    // easy walk from the spawn point at the crop bed's gate.
+    this.pond = { x0: 6, y0: 16, x1: 9, y1: 18 };
+    const p = this.pond;
+    for (let y = p.y0; y <= p.y1; y++) {
+      for (let x = p.x0; x <= p.x1; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const cx = x * TILE + TILE / 2;
+        const cy = y * TILE + TILE / 2;
+        const w = this.add.image(cx, cy, 'water', 0).setScale(2).setDepth(4);
+        if (this.anims.exists('water-anim')) {
+          // ParticleEmitter-free way to animate a static image: a sprite plays it.
+          w.destroy();
+          this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(4).play('water-anim');
+        }
+        this.tiles[y][x].obstacle = true;
+        this.tiles[y][x].tilled = false;
+        this.pondTiles.add(this.key(x, y));
+        this.addCollider(cx, cy, TILE * 2, TILE * 2);
+      }
+    }
+    // A soft rim so the pond reads as inset rather than pasted on.
+    this.add
+      .rectangle((p.x0) * TILE, (p.y0) * TILE, (p.x1 - p.x0 + 1) * TILE, (p.y1 - p.y0 + 1) * TILE)
+      .setOrigin(0, 0)
+      .setStrokeStyle(3, 0x2c66a0, 0.6)
+      .setDepth(4.5);
+    // A couple of lily pads from the waterobj sheet (fallback to a drawn pad).
+    const padKey = this.textures.exists('waterobj') ? 'waterobj' : 'lilypad';
+    const pads: Array<[number, number, number]> = [
+      [p.x0, p.y0, 0],
+      [p.x1, p.y0 + 1, 1],
+      [p.x0 + 1, p.y1, 2],
+    ];
+    for (const [tx, ty, frame] of pads) {
+      const cx = tx * TILE + TILE / 2;
+      const cy = ty * TILE + TILE / 2;
+      const pad = this.add.image(cx, cy, padKey, padKey === 'waterobj' ? frame : 0).setScale(2).setDepth(5);
+      this.tweens.add({
+        targets: pad, y: cy + 2, duration: 1800 + Math.random() * 800,
+        yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    }
+  }
+
+  private isPondTile(tx: number, ty: number): boolean {
+    return this.pondTiles.has(this.key(tx, ty));
+  }
+
+  // Click a water tile within reach → cast. Returns true if the click was a
+  // fishing attempt (so it doesn't fall through to the tool logic).
+  private tryFish(tx: number, ty: number): boolean {
+    if (!this.isPondTile(tx, ty)) return false;
+    if (this.casting) return true; // a cast is already in progress; swallow the click
+    if (!this.inRange(tx, ty)) {
+      this.toast('🎣 Move closer to the water to cast.');
+      return true;
+    }
+    this.startCast(tx, ty);
+    return true;
+  }
+
+  private startCast(tx: number, ty: number) {
+    this.casting = true;
+    const cx = tx * TILE + TILE / 2;
+    const cy = ty * TILE + TILE / 2;
+    sfx.play('water');
+    // A bobber on the water + expanding ripple while we wait for a bite.
+    const bobber = this.add.image(cx, cy - 2, 'p_droplet').setScale(2.4).setDepth(99980).setTint(0xff4d4d);
+    this.tweens.add({ targets: bobber, y: cy + 2, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    const ripple = this.add.image(cx, cy, 'glow').setScale(0.4).setAlpha(0.5).setDepth(99979).setTint(0x9fd4ff);
+    this.tweens.add({ targets: ripple, scale: 1.1, alpha: 0, duration: 1200, repeat: -1 });
+
+    this.time.delayedCall(1200, () => {
+      bobber.destroy();
+      ripple.destroy();
+      const lvl = skillLevel(this.skills.fishing);
+      const f = catchFish(fishingLuck(lvl));
+      const coins = Math.round(f.value * fishingValueMult(lvl));
+      this.coins += coins;
+      this.earned += coins;
+      this.addSkillXp('fishing', fishXp(f));
+      sfx.play('sell');
+      // A brief fish popup that arcs up out of the water, tinted to the catch.
+      const fish = this.add.image(cx, cy - 6, 'p_fish').setScale(2.4).setDepth(99990).setTint(f.tint);
+      this.tweens.add({
+        targets: fish, y: cy - 40, scale: 3, duration: 700, ease: 'Back.out',
+        onComplete: () => this.tweens.add({ targets: fish, alpha: 0, y: cy - 56, duration: 500, onComplete: () => fish.destroy() }),
+      });
+      this.burst(cx, cy - 4, 'p_droplet', {
+        speed: { min: 40, max: 110 }, angle: { min: 220, max: 320 }, lifespan: 600,
+        scale: { start: 1.4, end: 0 }, gravityY: 240,
+      }, 10);
+      this.toast(`🎣 Caught a ${f.name}! +${coins}🪙`);
+      this.casting = false;
+      this.checkAchievements();
+      this.emitState();
+    });
+  }
+
+  // ---- foraging -----------------------------------------------------------
+
+  // True if a tile is open grass suitable for a forage node (or the pond): not
+  // an obstacle/structure, not inside any homestead, not on the player's plot or
+  // pond, and free of crops.
+  private isOpenGrass(tx: number, ty: number): boolean {
+    return (
+      this.inBounds(tx, ty) &&
+      !this.tiles[ty][tx].obstacle &&
+      !this.inAnyHomestead(tx, ty) &&
+      !isInMyPlot(tx, ty) &&
+      !this.isPondTile(tx, ty) &&
+      !this.crops.has(this.key(tx, ty))
+    );
+  }
+
+  // Find a random open-grass tile not already holding a forage node.
+  private randomForageSpot(): { tx: number; ty: number } | null {
+    for (let guard = 0; guard < 400; guard++) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2);
+      const ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (!this.isOpenGrass(tx, ty)) continue;
+      if (this.forageNodes.some((n) => n.tx === tx && n.ty === ty)) continue;
+      return { tx, ty };
+    }
+    return null;
+  }
+
+  // Scatter the initial forage nodes around the open world.
+  private spawnForageNodes(count: number) {
+    for (let i = 0; i < count; i++) this.spawnForageNode();
+  }
+
+  private spawnForageNode() {
+    const spot = this.randomForageSpot();
+    if (!spot) return;
+    const lvl = skillLevel(this.skills.foraging);
+    const forage = pickForage(foragingLuck(lvl));
+    const cx = spot.tx * TILE + TILE / 2;
+    const cy = spot.ty * TILE + TILE / 2;
+    const sprite = this.add
+      .image(cx, cy, forage.sheet, forage.frame)
+      .setScale(2)
+      .setDepth(this.cropDepth(spot.ty));
+    // A soft glow halo so the node reads as collectible, plus a gentle sway.
+    const glow = this.add
+      .image(cx, cy - 2, 'glow')
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(Phaser.Display.Color.HexStringToColor(forage.css).color)
+      .setScale(0.5)
+      .setAlpha(0.4)
+      .setDepth(this.cropDepth(spot.ty) - 1);
+    this.tweens.add({ targets: glow, alpha: 0.7, scale: 0.62, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.tweens.add({ targets: sprite, angle: { from: -4, to: 4 }, duration: 1600 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // Stash the glow on the sprite so we can tear both down together.
+    (sprite as Phaser.GameObjects.Image & { _glow?: Phaser.GameObjects.Image })._glow = glow;
+    this.forageNodes.push({ forage, tx: spot.tx, ty: spot.ty, sprite });
+  }
+
+  // Click a forage node within reach → gather it. Returns true if a node was
+  // clicked (so the tool logic is skipped). The node respawns elsewhere later.
+  private tryForage(wx: number, wy: number): boolean {
+    for (let i = 0; i < this.forageNodes.length; i++) {
+      const n = this.forageNodes[i];
+      if (Phaser.Math.Distance.Between(wx, wy, n.sprite.x, n.sprite.y) >= 26) continue;
+      if (!this.inRange(n.tx, n.ty)) {
+        this.toast('🍄 Move closer to gather that.');
+        return true;
+      }
+      const lvl = skillLevel(this.skills.foraging);
+      const coins = Math.round(n.forage.value * foragingValueMult(lvl));
+      this.coins += coins;
+      this.earned += coins;
+      this.addSkillXp('foraging', forageXp(n.forage));
+      sfx.play('sell');
+      const cx = n.sprite.x;
+      const cy = n.sprite.y;
+      this.burst(cx, cy - 6, 'p_star', {
+        speed: { min: 30, max: 90 }, lifespan: 700, scale: { start: 1, end: 0 },
+        tint: Phaser.Display.Color.HexStringToColor(n.forage.css).color,
+      }, 9);
+      this.toast(`🍄 Foraged ${n.forage.name}! +${coins}🪙`);
+      const glow = (n.sprite as Phaser.GameObjects.Image & { _glow?: Phaser.GameObjects.Image })._glow;
+      glow?.destroy();
+      n.sprite.destroy();
+      this.forageNodes.splice(i, 1);
+      this.checkAchievements();
+      this.emitState();
+      // Respawn a fresh node somewhere open after a short delay.
+      this.time.delayedCall(Phaser.Math.Between(45_000, 90_000), () => this.spawnForageNode());
+      return true;
+    }
+    return false;
   }
 
   // ---- persistence (localStorage) ----------------------------------------
@@ -1467,6 +1760,7 @@ export class FarmScene extends Phaser.Scene {
       discMutations: [...this.discoveredMutations],
       achievements: [...this.achievements],
       animals: this.animalCounts,
+      skills: this.skills,
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1503,6 +1797,7 @@ export class FarmScene extends Phaser.Scene {
     this.discoveredPlants = new Set(data.discPlants ?? []);
     this.discoveredMutations = new Set(data.discMutations ?? []);
     this.achievements = new Set(data.achievements ?? []);
+    this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.animalCounts = data.animals ?? {};
     for (const [type, count] of Object.entries(this.animalCounts)) {
       const adef = ANIMAL_BY_ID[type];
@@ -1585,6 +1880,7 @@ export class FarmScene extends Phaser.Scene {
         discoveredMutations: [...this.discoveredMutations],
         achievements: [...this.achievements],
       },
+      skills: { ...this.skills },
     });
   }
 
@@ -1718,7 +2014,7 @@ export class FarmScene extends Phaser.Scene {
     for (const crop of this.crops.values()) {
       if (crop.mature) continue;
       const wet = this.isWet(crop.tx, crop.ty);
-      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth);
+      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth) * farmingGrowthMult(skillLevel(this.skills.farming));
       const total = crop.plant.growthSeconds * 1000;
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
