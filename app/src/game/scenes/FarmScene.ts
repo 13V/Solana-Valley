@@ -143,6 +143,8 @@ export class FarmScene extends Phaser.Scene {
   private discoveredMutations = new Set<string>();
   private achievements = new Set<string>();
   private animals: Animal[] = [];
+  private gate?: Phaser.GameObjects.Sprite;
+  private gateOpen = false;
   private animalCounts: Record<string, number> = {};
 
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
@@ -569,6 +571,15 @@ export class FarmScene extends Phaser.Scene {
     this.encloseRegion(5, 6, 10, 10, { left: true, right: true, bottom: true });
     // Orchard: full rectangle with a gap in the bottom edge for an entrance.
     this.encloseRegion(18, 3, 26, 8, { top: true, bottom: true, left: true, right: true, gap: [22, 8] });
+
+    // A gate in the orchard entrance that swings open as the farmer approaches.
+    const gx = 22 * TILE + TILE / 2;
+    const gy = 8 * TILE + TILE / 2;
+    if (!this.anims.exists('gate-open')) {
+      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
+      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
+    }
+    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
   }
 
   private encloseRegion(
@@ -1344,6 +1355,18 @@ export class FarmScene extends Phaser.Scene {
       this.player.anims.play(`idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
+
+    // Swing the orchard gate open when the farmer is near.
+    if (this.gate) {
+      const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.gate.x, this.gate.y) < 56;
+      if (near && !this.gateOpen) {
+        this.gateOpen = true;
+        this.gate.play('gate-open');
+      } else if (!near && this.gateOpen) {
+        this.gateOpen = false;
+        this.gate.play('gate-close');
+      }
+    }
 
     this.updateAnimals(time);
 
