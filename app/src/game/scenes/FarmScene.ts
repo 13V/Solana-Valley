@@ -202,7 +202,7 @@ export class FarmScene extends Phaser.Scene {
     this.add
       .tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M, 'grass', 0)
       .setTileScale(2, 2)
-      .setDepth(-10);
+      .setDepth(-10000);
 
     // Camera follows the player around the larger world (bounds include the backdrop).
     this.cameras.main.setBounds(-M, -M, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M);
@@ -614,35 +614,64 @@ export class FarmScene extends Phaser.Scene {
     this.add.image(picX, picY, 'picnic').setScale(1.8).setDepth(2);
     this.add.image(picX + 16, picY - 4, 'basket').setScale(1.7).setDepth(3);
 
-    // Scatter flowers / bushes on open grass.
+    // ---- nature: dense greenery across the open grass -----------------------
+    const free = (tx: number, ty: number) =>
+      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle && !isInMyPlot(tx, ty) && !this.inNeighborPlot(tx, ty);
+
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
-    let placed = 0;
-    let guard = 0;
-    while (placed < 22 && guard++ < 400) {
-      const tx = Phaser.Math.Between(1, GRID_W - 2);
-      const ty = Phaser.Math.Between(1, GRID_H - 2);
-      if (this.tiles[ty][tx].obstacle || isInMyPlot(tx, ty)) continue;
-      this.add
-        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[placed % decoFrames.length])
-        .setScale(2)
-        .setDepth(2);
+    let placed = 0, guard = 0;
+    while (placed < 48 && guard++ < 800) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (!free(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[placed % decoFrames.length]).setScale(2).setDepth(2);
       placed++;
     }
 
-    // Scatter premium mushrooms / stones / flowers for extra life.
     const mfsFrames = [0, 3, 12, 15, 25, 36, 48, 52];
-    let m = 0;
-    let mg = 0;
-    while (m < 16 && mg++ < 300) {
-      const tx = Phaser.Math.Between(1, GRID_W - 2);
-      const ty = Phaser.Math.Between(1, GRID_H - 2);
-      if (this.tiles[ty][tx].obstacle || isInMyPlot(tx, ty)) continue;
-      this.add
-        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[m % mfsFrames.length])
-        .setScale(2)
-        .setDepth(3);
+    let m = 0, mg = 0;
+    while (m < 28 && mg++ < 500) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (!free(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[m % mfsFrames.length]).setScale(2).setDepth(3);
       m++;
     }
+
+    // Premium berry bushes & shrubs for colour (from the trees/bushes sheet).
+    const bushFrames = [36, 37, 38, 39, 40, 48, 49, 50, 51];
+    let b = 0, bg = 0;
+    while (b < 20 && bg++ < 400) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (!free(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', bushFrames[b % bushFrames.length]).setScale(2).setDepth(ty * TILE + TILE);
+      b++;
+    }
+
+    // A leafy tree-line framing the world out in the backdrop grass.
+    const treePics = ['tree', 'tree_apple'];
+    for (let i = 0; i < 30; i++) {
+      const out = Phaser.Math.Between(80, 380);
+      let x: number, y: number;
+      switch (i % 4) {
+        case 0: x = Phaser.Math.Between(-240, WORLD_WIDTH + 240); y = -out; break;
+        case 1: x = Phaser.Math.Between(-240, WORLD_WIDTH + 240); y = WORLD_HEIGHT + out; break;
+        case 2: x = -out; y = Phaser.Math.Between(-240, WORLD_HEIGHT + 240); break;
+        default: x = WORLD_WIDTH + out; y = Phaser.Math.Between(-240, WORLD_HEIGHT + 240); break;
+      }
+      this.add.image(x, y, 'biome', treePics[i % 2]).setOrigin(0.5, 1).setScale(2).setDepth(y);
+    }
+
+    // A boat moored on the pond, and potted plants flanking the cabin.
+    this.add.image((HOME.pond.x0 + 1.4) * TILE, (HOME.pond.y0 + 0.8) * TILE, 'boats', 0).setScale(1.15).setDepth((HOME.pond.y0 + 1) * TILE);
+    this.add.image((HOME.houseCx - 1) * TILE, (HOME.houseBaseRow + 1) * TILE, 'furniture', 12).setScale(2).setDepth((HOME.houseBaseRow + 1) * TILE);
+    this.add.image((HOME.houseCx + 1) * TILE, (HOME.houseBaseRow + 1) * TILE, 'furniture', 13).setScale(2).setDepth((HOME.houseBaseRow + 1) * TILE);
+  }
+
+  // True if a tile sits inside any neighbour plot's interior (keep decor out of them).
+  private inNeighborPlot(tx: number, ty: number): boolean {
+    for (const n of NEIGHBORS) {
+      if (tx >= n.px && tx < n.px + n.pw && ty >= n.py && ty < n.py + n.ph) return true;
+    }
+    return false;
   }
 
   private addCollider(cx: number, cy: number, w: number, h: number) {
