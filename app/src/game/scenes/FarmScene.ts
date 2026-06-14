@@ -453,6 +453,24 @@ export class FarmScene extends Phaser.Scene {
       });
     });
 
+    // Water well (left of the cabin).
+    const wellX = 2 * TILE + TILE / 2;
+    const wellY = 7 * TILE;
+    this.add.image(wellX, wellY, 'well').setScale(2).setDepth(wellY + 24);
+    for (const [ox, oy] of [[1, 6], [2, 6], [1, 7], [2, 7]] as Array<[number, number]>) {
+      if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    }
+    this.addCollider(wellX, wellY, 44, 38);
+
+    // Chicken coop above the animal pen.
+    const coopX = 8 * TILE;
+    const coopBase = 6 * TILE;
+    this.add.image(coopX, coopBase, 'coop', 'coop').setOrigin(0.5, 1).setScale(2).setDepth(coopBase);
+    for (let oy = 4; oy <= 5; oy++) {
+      for (let ox = 6; ox <= 9; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    }
+    this.addCollider(coopX, coopBase - 18, 110, 30);
+
     // Scatter flowers / bushes on open grass.
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let placed = 0;
@@ -466,6 +484,21 @@ export class FarmScene extends Phaser.Scene {
         .setScale(2)
         .setDepth(2);
       placed++;
+    }
+
+    // Scatter premium mushrooms / stones / flowers for extra life.
+    const mfsFrames = [0, 3, 12, 15, 25, 36, 48, 52];
+    let m = 0;
+    let mg = 0;
+    while (m < 12 && mg++ < 200) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2);
+      const ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (this.tiles[ty][tx].obstacle) continue;
+      this.add
+        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[m % mfsFrames.length])
+        .setScale(2)
+        .setDepth(3);
+      m++;
     }
   }
 

@@ -21,8 +21,11 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('eggitem', `${A}eggitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('cow', `${A}cow.png`, { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('milkitem', `${A}milkitem.png`, { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('mfs', `${A}mfs.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
+    this.load.image('coop', `${A}coop.png`);
+    this.load.image('well', `${A}well.png`);
   }
 
   create() {
@@ -58,6 +61,8 @@ export class BootScene extends Phaser.Scene {
 
     // House: chimney + walls + window block from the modular house sheet.
     this.textures.get('house').add('cottage', 0, 0, 0, 48, 64);
+    // A complete chicken coop (orange roof) from the modular coop sheet.
+    this.textures.get('coop').add('coop', 0, 64, 0, 64, 80);
   }
 
   private makeUtilTextures() {
