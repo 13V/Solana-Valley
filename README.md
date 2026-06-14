@@ -3,6 +3,17 @@
 A cozy farming game in the spirit of **Stardew Valley**, with a **"Grow a
 Garden"**-style rare-crop economy — built to run on the **Solana** blockchain.
 
+## ▶️ Play
+
+- **Online:** https://13v.github.io/solana-valley/ (auto-deployed via GitHub Pages)
+- **Locally:**
+  ```bash
+  git clone https://github.com/13V/Solana-Valley.git
+  cd Solana-Valley
+  npm install
+  npm run dev --workspace app   # then open the printed http://localhost:5173
+  ```
+
 Real-time farming runs in the browser (fast and free); the plan is for
 **ownership and currency to live on-chain** — land/items as NFTs, an in-game SPL
 token, and a player marketplace.
