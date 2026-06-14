@@ -2,37 +2,40 @@
 
 ## Art — Sprout Lands (Cup Nooble)
 
-The game's pixel-art visuals (ground, water, character, trees, house, and other
-decorations) come from the **free Sprout Lands asset pack** by **Cup Nooble**:
+> **Some or all of the art assets in this project are made by Cup Nooble**
+> (the *Sprout Lands* asset packs), used under the Sprout Lands license.
 
-- https://cupnooble.itch.io/sprout-lands-asset-pack
+- Base art (ground, water, character, trees, house, decorations):
+  https://cupnooble.itch.io/sprout-lands-asset-pack
+- UI (panel frames, buttons, chips, icons):
+  **Sprout Lands UI Pack — Premium** — https://cupnooble.itch.io/sprout-lands-ui-pack
 
-**These assets are NOT committed to this repository.** Cup Nooble's free license
-permits using the pack in games but restricts redistributing the pack itself, so
-the art is downloaded on demand by [`scripts/fetch-assets.mjs`](scripts/fetch-assets.mjs)
-into `app/public/assets/sprout/` (which is git-ignored). The script currently
-pulls from a public GitHub mirror
-([`perquis/sprout_lands`](https://github.com/perquis/sprout_lands)) for
-convenience.
+These assets are included in this repository under the terms below. They live in
+`app/public/assets/sprout/` (base) and `app/public/assets/sprout-ui/` (premium UI).
 
-If you plan to distribute or sell this game, please review Cup Nooble's license
-and obtain the assets from the official itch.io page above. Consider supporting
-the artist by buying the premium pack.
+### License terms (per Cup Nooble's `read_me.txt`)
 
-## UI — Sprout Lands UI Pack (Premium, Cup Nooble)
+- ✅ Usable in **commercial and non-commercial** projects.
+- ✅ Assets may be **modified**.
+- ✅ **Open-source projects may include** the assets, provided this credit note +
+  the licensing terms are included (this file).
+- ❌ You may **not redistribute or resell the asset pack itself** (even modified)
+  as an asset pack on other platforms.
+- ❌ **Not allowed for anything to do with NFTs or AI training.**
+- Credit is required: *Assets — From: Sprout Lands — By: Cup Nooble.*
 
-The interface (panel frames, buttons, chips, hotbar slots) is skinned with the
-**Sprout Lands UI Pack — Premium** by **Cup Nooble**, used under a purchased
-license:
+For different terms, Cup Nooble invites contact (Discord: `cup_nooble`).
 
-- https://cupnooble.itch.io/sprout-lands-ui-pack
+> ⚠️ **Project note:** Solana Valley is a blockchain game. The current build uses
+> wallet connect + off-chain coins (no NFTs), which is fine. However, the license
+> forbids use **"for anything to do with NFTs."** Any future feature that turns
+> land or items into **NFTs** (see `docs/ROADMAP.md` M2/M3) would **not** be
+> permitted with these assets — you'd need custom licensing from Cup Nooble or
+> separate art for those features. A fungible SPL token ($VALLEY) is not an NFT,
+> but treat the NFT roadmap items as blocked on this until licensing is sorted.
 
-Like the base art, these files are **not committed** to the repo (the license
-restricts redistribution). They live in the git-ignored
-`app/public/assets/sprout-ui/` directory. The UI skin only activates if those
-assets are present (see the `ui-skin` probe in `app/src/ui/App.tsx`); otherwise
-the game falls back to the built-in CSS theme. Each developer must supply their
-own licensed copy of the pack.
+## Original work
 
-Crop sprites and all visual effects (particles, glow, vignette, day/night
-tint) are generated procedurally in code and are original to this project.
+Crop sprites and all visual effects (particles, glow, vignette, day/night tint)
+and sound effects are generated procedurally in code and are original to this
+project.

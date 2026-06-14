@@ -5,10 +5,8 @@ node_modules/
 dist/
 app/dist/
 
-# third-party art fetched by scripts/fetch-assets.mjs (not redistributed here)
-app/public/assets/sprout/
-# premium Sprout Lands UI pack (licensed per-user; not redistributed here)
-app/public/assets/sprout-ui/
+# Sprout Lands art (base + premium UI) is included under license with credit
+# in CREDITS.md (Cup Nooble's license permits open-source inclusion).
 
 # logs / env
 *.log

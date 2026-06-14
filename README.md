@@ -12,9 +12,9 @@ token, and a player marketplace.
 > devnet. The on-chain program (token / land / marketplace) is the next
 > milestone — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-Visuals use the cozy **Sprout Lands** pixel-art pack by Cup Nooble (fetched on
-demand, not committed — see [CREDITS](CREDITS.md)); crops and all effects
-(particles, glow, day/night) are generated procedurally in code.
+Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
+(included under license — see [CREDITS](CREDITS.md)); crops and all effects
+(particles, glow, day/night, sound) are generated procedurally in code.
 
 ---
 
@@ -74,13 +74,15 @@ demand, not committed — see [CREDITS](CREDITS.md)); crops and all effects
 ## Getting started
 
 ```bash
-npm install      # also fetches the Sprout Lands art (postinstall)
+npm install
 npm run dev      # http://localhost:5173
 ```
 
-> The pixel-art pack is downloaded by `scripts/fetch-assets.mjs` into the
-> git-ignored `app/public/assets/sprout/` (run `npm run assets` to fetch
-> manually). See [CREDITS.md](CREDITS.md) for licensing.
+> The Sprout Lands art (base + premium UI) is included in `app/public/assets/`
+> under Cup Nooble's license, with attribution in [CREDITS.md](CREDITS.md).
+> `scripts/fetch-assets.mjs` can re-fetch the base pack if needed. **Note:** the
+> license forbids use in anything NFT-related — see CREDITS before building the
+> on-chain NFT roadmap items.
 
 Other scripts:
 
