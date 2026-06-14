@@ -18,6 +18,7 @@ const FILES = {
   'house.png': 'Tilesets/Wooden House.png',
   'character.png': 'Characters/Basic Charakter Spritesheet/Basic Charakter Spritesheet.png',
   'actions.png': 'Characters/Basic Charakter Actions/Basic Charakter Actions.png',
+  'tools.png': 'Characters/Tools/Tools.png',
   'plants.png': 'Objects/Basic Plants/Basic Plants.png',
   'biome.png': 'Objects/Basic Grass Biom things/Basic Grass Biom things 1.png',
   'paths.png': 'Objects/Paths/Paths.png',
