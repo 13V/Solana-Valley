@@ -5,7 +5,7 @@ Garden"**-style rare-crop economy — built to run on the **Solana** blockchain.
 
 ## ▶️ Play
 
-- **Online:** https://13v.github.io/solana-valley/ (auto-deployed via GitHub Pages)
+- **Online:** https://13v.github.io/Solana-Valley/ (auto-deployed via GitHub Pages)
 - **Locally:**
   ```bash
   git clone https://github.com/13V/Solana-Valley.git
