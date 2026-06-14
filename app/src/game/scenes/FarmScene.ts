@@ -2002,7 +2002,9 @@ export class FarmScene extends Phaser.Scene {
     }
 
     for (const [x, y, wetRemaining] of data.tiles ?? []) {
-      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) continue;
+      // Drop tilled tiles saved outside the (possibly relocated) farm so an old
+      // save never leaves stray dirt patches in the new world.
+      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !isInMyPlot(x, y)) continue;
       this.tiles[y][x].tilled = true;
       if (wetRemaining > 0) {
         this.tiles[y][x].wetUntil = this.time.now + wetRemaining;
@@ -2017,7 +2019,8 @@ export class FarmScene extends Phaser.Scene {
 
     for (const c of data.crops ?? []) {
       const plant = PLANT_BY_ID[c.p];
-      if (!plant || !this.inBounds(c.x, c.y)) continue;
+      // Likewise ignore crops saved outside the current farm bounds.
+      if (!plant || !this.inBounds(c.x, c.y) || !isInMyPlot(c.x, c.y)) continue;
       const sprite = this.add
         .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
