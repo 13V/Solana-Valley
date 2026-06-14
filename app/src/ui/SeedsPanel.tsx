@@ -11,7 +11,7 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
       <div className="panel-head">
         <h3>🌱 Your Seeds</h3>
         <span className="muted">click to plant with the seed tool</span>
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       {owned.length === 0 ? (
         <p className="empty">No seeds yet — buy some at the shop.</p>
@@ -22,7 +22,7 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className={`row ${selectedSeed === p.id ? 'sel' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <img className="crop-ico-sm" src={`/assets/crops/seed_${p.id}.png`} alt="" />
+                <img className="crop-ico-sm" src={`assets/crops/seed_${p.id}.png`} alt="" />
                 <span className="row-name">
                   {p.name}
                   <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>

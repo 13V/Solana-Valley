@@ -37,7 +37,7 @@ export function App() {
   useEffect(() => {
     const img = new Image();
     img.onload = () => document.documentElement.classList.add('ui-skin');
-    img.src = '/assets/sprout-ui/ui_panel.png';
+    img.src = 'assets/sprout-ui/ui_panel.png';
   }, []);
 
   const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));

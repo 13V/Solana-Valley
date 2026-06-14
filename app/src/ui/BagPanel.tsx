@@ -22,7 +22,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
             Sell all (+{total.toLocaleString()}🪙)
           </button>
         )}
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       {rows.length === 0 ? (
         <p className="empty">Nothing harvested yet. Plant a seed, water it, and wait for it to grow!</p>
@@ -33,7 +33,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className="row" key={k} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <img className="crop-ico-sm" src={`/assets/crops/${plant.id}.png`} alt="" />
+                <img className="crop-ico-sm" src={`assets/crops/${plant.id}.png`} alt="" />
                 <span className="row-name">
                   {plant.name}
                   <span className="rarity-line">

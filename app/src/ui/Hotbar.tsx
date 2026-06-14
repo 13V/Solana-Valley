@@ -28,9 +28,9 @@ export function Hotbar() {
               src={
                 isSeed
                   ? seedPlant
-                    ? `/assets/crops/seed_${seedPlant.id}.png`
-                    : '/assets/sprout-ui/tool_seed.png'
-                  : `/assets/sprout-ui/${tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`
+                    ? `assets/crops/seed_${seedPlant.id}.png`
+                    : 'assets/sprout-ui/tool_seed.png'
+                  : `assets/sprout-ui/${tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`
               }
               alt={isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}
             />

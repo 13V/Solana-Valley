@@ -14,7 +14,7 @@ export function Shop({ onClose }: { onClose: () => void }) {
       <div className="panel-head">
         <h3>🛒 Seed Shop</h3>
         <span className="muted">restock in {mm}:{ss}</span>
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="rows">
         {PLANTS.map((p) => {
@@ -25,7 +25,7 @@ export function Shop({ onClose }: { onClose: () => void }) {
           return (
             <div className={`row ${locked ? 'locked' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
               <span className="dot" style={{ background: r.css, color: r.css }} />
-              <img className="crop-ico-sm" src={`/assets/crops/seed_${p.id}.png`} alt="" />
+              <img className="crop-ico-sm" src={`assets/crops/seed_${p.id}.png`} alt="" />
               <span className="row-name">
                 {p.name}
                 <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>

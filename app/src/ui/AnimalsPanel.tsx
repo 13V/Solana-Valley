@@ -11,7 +11,7 @@ export function AnimalsPanel({ onClose }: { onClose: () => void }) {
         <h3>🐔 Ranch &amp; Orchard</h3>
         <span className="muted">they produce goods over time — click them to collect</span>
         <button className="x" onClick={onClose}>
-          <img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" />
+          <img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" />
         </button>
       </div>
       <div className="rows">

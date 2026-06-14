@@ -11,7 +11,7 @@ export function UpgradesPanel({ onClose }: { onClose: () => void }) {
       <div className="panel-head">
         <h3>⬆️ Upgrades</h3>
         <span className="muted">permanent boosts</span>
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="rows">
         {UPGRADES.map((u) => {

@@ -3,7 +3,7 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
     <div className="panel help">
       <div className="panel-head">
         <h3>🌱 Welcome to Solana Valley</h3>
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="help-body">
         <p>You've been given <b>★ Your Plot</b> in a valley of 20 — farm it, chase rare crops and lucky mutations, and build your fortune.</p>

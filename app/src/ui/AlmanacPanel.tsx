@@ -17,7 +17,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
         <span className="muted">
           {dp.size}/{PLANTS.length} plants · {ach.size}/{ACHIEVEMENTS.length} achievements
         </span>
-        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="alm-body">
         <h4>Plants — {plantPct}% discovered</h4>
@@ -31,7 +31,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
                 key={p.id}
                 style={found ? { borderColor: r.css } : undefined}
               >
-                {found && <img className="crop-ico" src={`/assets/crops/${p.id}.png`} alt="" />}
+                {found && <img className="crop-ico" src={`assets/crops/${p.id}.png`} alt="" />}
                 <span className="alm-name">{found ? p.name : '???'}</span>
                 {found && <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>}
               </div>

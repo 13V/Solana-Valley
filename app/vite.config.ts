@@ -5,6 +5,9 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 // @solana/web3.js and the wallet adapters expect Node globals (Buffer, process)
 // that don't exist in the browser, so we polyfill them for the client bundle.
 export default defineConfig({
+  // Relative base so the built bundle works whether served from a domain root
+  // (local preview) or a subpath (GitHub Pages project site).
+  base: './',
   plugins: [
     react(),
     nodePolyfills({

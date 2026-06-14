@@ -9,9 +9,9 @@ import { sfx } from '../game/audio';
 // (no clean pixel match in the pack). `emoji` doubles as the img alt text.
 const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   dawn: { emoji: '🌅' },
-  day: { emoji: '☀️', img: '/assets/sprout-ui/phase_sun.png' },
+  day: { emoji: '☀️', img: 'assets/sprout-ui/phase_sun.png' },
   dusk: { emoji: '🌇' },
-  night: { emoji: '🌙', img: '/assets/sprout-ui/phase_moon.png' },
+  night: { emoji: '🌙', img: 'assets/sprout-ui/phase_moon.png' },
 };
 
 export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'almanac' | 'help' | null;
@@ -19,13 +19,13 @@ export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'almanac
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
 const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; label: string }> = [
-  { id: 'shop', emoji: '🛒', img: '/assets/sprout-ui/btn_shop.png', label: 'Shop' },
-  { id: 'seeds', emoji: '🌱', img: '/assets/sprout-ui/btn_seeds.png', label: 'Seeds' },
-  { id: 'bag', emoji: '🎒', img: '/assets/sprout-ui/btn_bag.png', label: 'Harvest' },
-  { id: 'animals', emoji: '🐔', img: '/assets/sprout-ui/icon_chicken.png', label: 'Animals' },
-  { id: 'upgrades', emoji: '⬆️', img: '/assets/sprout-ui/btn_upgrades.png', label: 'Upgrades' },
+  { id: 'shop', emoji: '🛒', img: 'assets/sprout-ui/btn_shop.png', label: 'Shop' },
+  { id: 'seeds', emoji: '🌱', img: 'assets/sprout-ui/btn_seeds.png', label: 'Seeds' },
+  { id: 'bag', emoji: '🎒', img: 'assets/sprout-ui/btn_bag.png', label: 'Harvest' },
+  { id: 'animals', emoji: '🐔', img: 'assets/sprout-ui/icon_chicken.png', label: 'Animals' },
+  { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/btn_upgrades.png', label: 'Upgrades' },
   { id: 'almanac', emoji: '📖', label: 'Almanac' },
-  { id: 'help', emoji: '❔', img: '/assets/sprout-ui/btn_help.png', label: 'Help' },
+  { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 
 export function Hud({
@@ -58,11 +58,11 @@ export function Hud({
           Day {day} · {clock}
         </span>
         <span className="badge coins">
-          <img className="hud-icon" src="/assets/sprout-ui/icon_coin.png" alt="🪙" />
+          <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
           {coins.toLocaleString()}
         </span>
         <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
-          <img className="hud-icon" src="/assets/sprout-ui/icon_star.png" alt="⭐" /> Lv {progress.level}
+          <img className="hud-icon" src="assets/sprout-ui/icon_star.png" alt="⭐" /> Lv {progress.level}
           <span className="xpbar"><span className="xpfill" style={{ width: `${xpPct}%` }} /></span>
         </span>
       </div>
@@ -89,7 +89,7 @@ export function Hud({
         >
           <img
             className="btn-ico"
-            src={`/assets/sprout-ui/btn_sound_${muted ? 'off' : 'on'}.png`}
+            src={`assets/sprout-ui/btn_sound_${muted ? 'off' : 'on'}.png`}
             alt={muted ? '🔇' : '🔊'}
           />
         </button>

@@ -52,7 +52,7 @@ const tree = (
   productName: name.replace(' Tree', ''), productValue, layMs, xp,
   sheet: `tree_${id}`, idleFrames: [0], walkFrames: [0], scale: 2, originY: 0.92, stationary: true,
   productSheet: `fruit_${id}`, productFrame: 0, productOffsetY: -52,
-  icon: `/assets/sprout-ui/icon_fruit_${id}.png`,
+  icon: `assets/sprout-ui/icon_fruit_${id}.png`,
 });
 
 export const ANIMALS: AnimalDef[] = [
@@ -62,7 +62,7 @@ export const ANIMALS: AnimalDef[] = [
     sheet: 'chick_white', idleFrames: [0, 1, 2, 3], walkFrames: [16, 17, 18, 19, 20, 21, 22, 23],
     scale: 2.4, originY: 0.72, stationary: false,
     productSheet: 'eggitem', productFrame: 0, productOffsetY: -20, productScale: 1.4,
-    icon: '/assets/sprout-ui/icon_chicken.png',
+    icon: 'assets/sprout-ui/icon_chicken.png',
     colorways: ['chick_white', 'chick_brown', 'chick_green', 'chick_red', 'chick_blue'], rareColor: 'chick_blue',
     breeding: {
       cap: 10, ms: 70_000, growMs: 80_000, babyScale: 1.7,
@@ -76,7 +76,7 @@ export const ANIMALS: AnimalDef[] = [
     sheet: 'cow_light', idleFrames: [0, 1, 2], walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
     scale: 1.7, originY: 0.78, stationary: false,
     productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
-    icon: '/assets/sprout-ui/icon_cow.png',
+    icon: 'assets/sprout-ui/icon_cow.png',
     colorways: ['cow_light', 'cow_brown', 'cow_green', 'cow_pink', 'cow_purple'], rareColor: 'cow_purple',
     breeding: {
       cap: 8, ms: 95_000, growMs: 110_000, babyScale: 1.15,
