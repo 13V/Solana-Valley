@@ -40,7 +40,7 @@ import {
   type UpgradeId,
   type Upgrades,
 } from '../progression';
-import { ANIMAL_BY_ID } from '../animals';
+import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -75,7 +75,7 @@ type Animal = {
   type: string;
   layAt: number;
   nextWander: number;
-  egg?: Phaser.GameObjects.Image;
+  product?: Phaser.GameObjects.Image;
 };
 
 const SAVE_KEY = 'solana-valley:save';
@@ -346,11 +346,13 @@ export class FarmScene extends Phaser.Scene {
         this.anims.create({ key, frames: this.anims.generateFrameNumbers('actions', { frames }), frameRate: 8, repeat: 0 });
       }
     }
-    if (!this.anims.exists('chicken-idle')) {
-      this.anims.create({ key: 'chicken-idle', frames: this.anims.generateFrameNumbers('chicken', { frames: [0, 1] }), frameRate: 3, repeat: -1 });
-    }
-    if (!this.anims.exists('chicken-walk')) {
-      this.anims.create({ key: 'chicken-walk', frames: this.anims.generateFrameNumbers('chicken', { frames: [4, 5, 6, 7] }), frameRate: 6, repeat: -1 });
+    for (const a of ANIMALS) {
+      if (!this.anims.exists(`${a.id}-idle`)) {
+        this.anims.create({ key: `${a.id}-idle`, frames: this.anims.generateFrameNumbers(a.sheet, { frames: a.idleFrames }), frameRate: 3, repeat: -1 });
+      }
+      if (!this.anims.exists(`${a.id}-walk`)) {
+        this.anims.create({ key: `${a.id}-walk`, frames: this.anims.generateFrameNumbers(a.sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+      }
     }
   }
 
@@ -872,13 +874,13 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- animals ------------------------------------------------------------
 
-  private spawnChicken(x: number, y: number) {
-    const s = this.add.sprite(x, y, 'chicken', 0).setScale(2).setDepth(y + 14);
-    s.play('chicken-idle');
+  private spawnAnimal(def: AnimalDef, x: number, y: number) {
+    const s = this.add.sprite(x, y, def.sheet, def.idleFrames[0]).setScale(def.scale).setDepth(y + 14);
+    s.play(`${def.id}-idle`);
     this.animals.push({
       sprite: s,
-      type: 'chicken',
-      layAt: this.time.now + ANIMAL_BY_ID.chicken.layMs / this.growthMult,
+      type: def.id,
+      layAt: this.time.now + def.layMs / this.growthMult,
       nextWander: this.time.now + 1500 + Math.random() * 3000,
     });
   }
@@ -896,22 +898,23 @@ export class FarmScene extends Phaser.Scene {
     }
     this.coins -= def.cost;
     this.animalCounts[id] = (this.animalCounts[id] ?? 0) + 1;
-    this.spawnChicken(
+    this.spawnAnimal(
+      def,
       Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
       Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
     );
     sfx.play('buy');
-    this.toast(`Bought a ${def.name}! It roams the pen and lays ${def.productName.toLowerCase()}s.`);
+    this.toast(`Bought a ${def.name}! It roams the pen and makes ${def.productName.toLowerCase()}.`);
     this.emitState();
   }
 
   // Collect a ready product if the click landed on an animal. Returns true if so.
   private tryCollectAnimal(wx: number, wy: number): boolean {
     for (const a of this.animals) {
-      if (a.egg && Phaser.Math.Distance.Between(wx, wy, a.sprite.x, a.sprite.y) < 28) {
+      if (a.product && Phaser.Math.Distance.Between(wx, wy, a.sprite.x, a.sprite.y) < 30) {
         const def = ANIMAL_BY_ID[a.type];
-        a.egg.destroy();
-        a.egg = undefined;
+        a.product.destroy();
+        a.product = undefined;
         a.layAt = this.time.now + def.layMs / this.growthMult;
         this.coins += def.productValue;
         this.earned += def.productValue;
@@ -931,21 +934,25 @@ export class FarmScene extends Phaser.Scene {
 
   private updateAnimals(time: number) {
     for (const a of this.animals) {
+      const def = ANIMAL_BY_ID[a.type];
       if (time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
         a.nextWander = time + 2500 + Math.random() * 3500;
         const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, PEN.x0 + 12, PEN.x1 - 12);
         const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, PEN.y0 + 12, PEN.y1 - 12);
         a.sprite.setFlipX(nx < a.sprite.x);
-        a.sprite.play('chicken-walk', true);
+        a.sprite.play(`${a.type}-walk`, true);
         this.tweens.add({
           targets: a.sprite, x: nx, y: ny, duration: 1100, ease: 'Sine.inOut',
-          onComplete: () => a.sprite.play('chicken-idle', true),
+          onComplete: () => a.sprite.play(`${a.type}-idle`, true),
         });
       }
-      if (!a.egg && time >= a.layAt) {
-        a.egg = this.add.image(a.sprite.x, a.sprite.y - 18, 'eggitem', 0).setScale(2).setDepth(99990);
+      if (!a.product && time >= a.layAt) {
+        a.product = this.add
+          .image(a.sprite.x, a.sprite.y + def.productOffsetY, def.productSheet, def.productFrame)
+          .setScale(2)
+          .setDepth(99990);
       }
-      if (a.egg) a.egg.setPosition(a.sprite.x, a.sprite.y - 18);
+      if (a.product) a.product.setPosition(a.sprite.x, a.sprite.y + def.productOffsetY);
       a.sprite.setDepth(a.sprite.y + 14);
     }
   }
@@ -1026,13 +1033,14 @@ export class FarmScene extends Phaser.Scene {
     this.achievements = new Set(data.achievements ?? []);
     this.animalCounts = data.animals ?? {};
     for (const [type, count] of Object.entries(this.animalCounts)) {
+      const adef = ANIMAL_BY_ID[type];
+      if (!adef) continue;
       for (let i = 0; i < count; i++) {
-        if (type === 'chicken') {
-          this.spawnChicken(
-            Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
-            Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
-          );
-        }
+        this.spawnAnimal(
+          adef,
+          Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
+          Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
+        );
       }
     }
 
