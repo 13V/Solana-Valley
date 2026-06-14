@@ -5,6 +5,8 @@ import {
   GRID_H,
   GAME_WIDTH,
   GAME_HEIGHT,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
   PLAYER_SPEED,
   REACH,
   STARTING_COINS,
@@ -43,6 +45,7 @@ import {
   type Upgrades,
 } from '../progression';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
+import { PLOTS, MY_PLOT, isInMyPlot, type Plot } from '../plots';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -86,7 +89,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 type SaveData = {
   v: number;
@@ -173,18 +176,28 @@ export class FarmScene extends Phaser.Scene {
   create() {
     this.applyDevParams();
 
-    this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
     this.buildWorld();
     this.placeDecorations();
     this.buildFences();
+    this.buildPlots();
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'pchar', 0);
+    this.player = this.physics.add.sprite(
+      (MY_PLOT.px + MY_PLOT.pw / 2) * TILE,
+      (MY_PLOT.py + MY_PLOT.ph + 1) * TILE,
+      'pchar',
+      0,
+    );
     this.player.setCollideWorldBounds(true);
     this.player.setOrigin(0.5, 0.72).setScale(1.25);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
     this.physics.add.collider(this.player, this.obstacles);
+
+    // Camera follows the player around the larger world.
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     // Fireflies drift in at night.
     this.fireflies = this.add
@@ -200,13 +213,15 @@ export class FarmScene extends Phaser.Scene {
         blendMode: 'ADD',
         emitting: false,
       })
-      .setDepth(89500);
+      .setDepth(89500)
+      .setScrollFactor(0);
 
     this.add
       .image(0, 0, 'vignette')
       .setOrigin(0, 0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setDepth(88000);
+      .setDepth(88000)
+      .setScrollFactor(0);
 
     // Rain (falling streaks) + a storm tint, toggled by the weather scheduler.
     this.rain = this.add
@@ -222,17 +237,20 @@ export class FarmScene extends Phaser.Scene {
         alpha: { start: 0.55, end: 0.2 },
         emitting: false,
       })
-      .setDepth(89800);
+      .setDepth(89800)
+      .setScrollFactor(0);
     this.storm = this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x3a4a66, 1)
       .setOrigin(0, 0)
       .setDepth(89900)
+      .setScrollFactor(0)
       .setAlpha(0);
 
     this.ambient = this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0a1430, 1)
       .setOrigin(0, 0)
       .setDepth(90000)
+      .setScrollFactor(0)
       .setAlpha(0);
 
     this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(100000);
@@ -672,6 +690,58 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // ---- plots --------------------------------------------------------------
+
+  // The 20-plot server grid: fence + name-sign each plot. Your plot's soil is
+  // tinted so it's easy to find; the neighbours show crops so the server reads
+  // as alive.
+  private buildPlots() {
+    for (const plot of PLOTS) {
+      const gapX = plot.px + Math.floor(plot.pw / 2);
+      this.encloseRegion(plot.px - 1, plot.py - 1, plot.px + plot.pw, plot.py + plot.ph, {
+        top: true, bottom: true, left: true, right: true, gap: [gapX, plot.py + plot.ph],
+      });
+      if (plot.mine) {
+        for (let y = plot.py; y < plot.py + plot.ph; y++) {
+          for (let x = plot.px; x < plot.px + plot.pw; x++) this.ground[y][x].setTint(0xe6f6bb);
+        }
+      } else {
+        this.dressNeighborPlot(plot);
+      }
+      this.addPlotSign(plot);
+    }
+  }
+
+  private dressNeighborPlot(plot: Plot) {
+    for (let y = plot.py; y < plot.py + plot.ph; y++) {
+      for (let x = plot.px; x < plot.px + plot.pw; x++) {
+        const cx = x * TILE + TILE / 2;
+        const cy = y * TILE + TILE / 2;
+        this.add.image(cx, cy, 'tilled', this.solidTilledFrame(x, y)).setScale(2).setDepth(1);
+        if (Math.random() < 0.82) {
+          const plant = PLANTS[Math.floor(Math.random() * PLANTS.length)];
+          const stage = Phaser.Math.Between(1, STAGES - 1);
+          this.add.image(cx, cy, 'cropsheet', plant.cropRow * 5 + stage).setScale(2).setDepth(this.cropDepth(y));
+        }
+      }
+    }
+  }
+
+  private addPlotSign(plot: Plot) {
+    const cx = (plot.px + plot.pw / 2) * TILE;
+    const ty = (plot.py - 1) * TILE + 8;
+    this.add
+      .text(cx, ty, plot.mine ? '★ Your Plot' : `${plot.owner}'s plot`, {
+        fontFamily: 'Pixelify Sans, monospace',
+        fontSize: plot.mine ? '16px' : '13px',
+        color: plot.mine ? '#fff0a8' : '#ffffff',
+        stroke: '#39271a',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(60000);
+  }
+
   // ---- helpers ------------------------------------------------------------
 
   private key(x: number, y: number): string {
@@ -750,6 +820,7 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private till(x: number, y: number): boolean {
+    if (!isInMyPlot(x, y)) return false; // can only farm your own plot
     const t = this.tiles[y][x];
     if (t.tilled || this.crops.has(this.key(x, y))) return false;
     t.tilled = true;
@@ -1582,10 +1653,11 @@ export class FarmScene extends Phaser.Scene {
     const tx = Math.floor(p.worldX / TILE);
     const ty = Math.floor(p.worldY / TILE);
     if (this.pointerInside && this.inBounds(tx, ty)) {
+      const canFarm = this.inRange(tx, ty) && isInMyPlot(tx, ty);
       this.highlight
         .setVisible(true)
         .setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)
-        .setTint(this.inRange(tx, ty) ? 0xffffff : 0xff5555);
+        .setTint(canFarm ? 0xffffff : 0xff5555);
     } else {
       this.highlight.setVisible(false);
     }

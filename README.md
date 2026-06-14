@@ -21,9 +21,13 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 ## Features
 
 **Farming loop**
-- Walk a hand-made world (cabin, trees, rocks, pond, wildflowers) with collision.
-- Hoe grass → plant seeds → water → crops grow in **real time** (watering
-  doubles growth speed) → harvest when ripe.
+- A **Grow-a-Garden-style server of 20 plots** — you farm your own allocated
+  plot while 19 neighbours' gardens grow around you, in a larger world the
+  **camera follows** you across. Your home (cabin, ranch, orchard, pond) sits
+  at the top; the plot grid is below it.
+- Hoe → plant seeds → water → crops grow in **real time** (watering doubles
+  growth speed) → harvest when ripe — all inside your plot (the cursor turns red
+  on anyone else's).
 - Premium animated farmer: smooth 8-frame directional walk, per-direction idle
   breathing, and directional hoe / watering-can swings. Swaying trees, animated water.
 
