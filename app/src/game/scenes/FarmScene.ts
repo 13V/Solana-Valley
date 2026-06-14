@@ -73,6 +73,7 @@ type SaveData = {
 export class FarmScene extends Phaser.Scene {
   private tiles: Tile[][] = [];
   private ground: Phaser.GameObjects.Image[][] = [];
+  private overlay: Phaser.GameObjects.Image[][] = []; // tilled-dirt autotile over grass
   private crops = new Map<string, Crop>();
   private wetTiles = new Set<string>();
   private rainbowCrops = new Set<Crop>();
@@ -86,6 +87,7 @@ export class FarmScene extends Phaser.Scene {
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
   private facing: Dir = 'down';
   private pointerInside = false;
+  private actingUntil = 0;
 
   private coins = STARTING_COINS;
   private selected = 'hoe';
@@ -116,7 +118,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'char', 0);
     this.player.setCollideWorldBounds(true);
-    this.player.setOrigin(0.5, 0.72);
+    this.player.setOrigin(0.5, 0.72).setScale(1.25);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
     this.physics.add.collider(this.player, this.obstacles);
 
@@ -278,24 +280,63 @@ export class FarmScene extends Phaser.Scene {
         repeat: -1,
       });
     }
+    // Tool-use poses from the Sprout Lands action sheet.
+    const actionFrames: Record<string, number[]> = { hoe: [0, 1, 0], water: [16, 17, 16] };
+    for (const [name, frames] of Object.entries(actionFrames)) {
+      const key = `act-${name}`;
+      if (!this.anims.exists(key)) {
+        this.anims.create({ key, frames: this.anims.generateFrameNumbers('actions', { frames }), frameRate: 8, repeat: 0 });
+      }
+    }
+  }
+
+  private playAction(tool: 'hoe' | 'water') {
+    this.actingUntil = this.time.now + 360;
+    this.player.anims.play(`act-${tool}`, true);
   }
 
   private grassFrame(x: number, y: number): number {
     return (x * 7 + y * 13) % 3; // clean full-grass tiles 0..2
   }
 
+  // Tilled-dirt autotile: bitmask of orthogonal tilled neighbours -> nine-slice
+  // frame in the Sprout Lands tilled-dirt sheet (N=1, E=2, S=4, W=8).
+  private static AUTOTILE: Record<number, number> = {
+    15: 42, 14: 34, 11: 50, 13: 43, 7: 41, 6: 33, 12: 35, 3: 49, 9: 51,
+  };
+
   private buildWorld() {
     for (let y = 0; y < GRID_H; y++) {
       this.tiles[y] = [];
       this.ground[y] = [];
+      this.overlay[y] = [];
       for (let x = 0; x < GRID_W; x++) {
         this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
-        this.ground[y][x] = this.add
-          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'grass', this.grassFrame(x, y))
-          .setScale(2)
-          .setDepth(0);
+        const cx = x * TILE + TILE / 2;
+        const cy = y * TILE + TILE / 2;
+        this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
+        this.overlay[y][x] = this.add.image(cx, cy, 'tilled', 42).setScale(2).setDepth(1).setVisible(false);
       }
     }
+  }
+
+  private isTilled(x: number, y: number): boolean {
+    return this.inBounds(x, y) && this.tiles[y][x].tilled;
+  }
+
+  private tilledFrame(x: number, y: number): number {
+    let m = 0;
+    if (this.isTilled(x, y - 1)) m |= 1;
+    if (this.isTilled(x + 1, y)) m |= 2;
+    if (this.isTilled(x, y + 1)) m |= 4;
+    if (this.isTilled(x - 1, y)) m |= 8;
+    return FarmScene.AUTOTILE[m] ?? 42;
+  }
+
+  // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
+  private refreshTile(x: number, y: number) {
+    const around: Array<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of around) if (this.inBounds(x + dx, y + dy)) this.setGroundTexture(x + dx, y + dy);
   }
 
   private placeDecorations() {
@@ -403,14 +444,11 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private setGroundTexture(x: number, y: number) {
-    const t = this.tiles[y][x];
-    const img = this.ground[y][x];
-    if (t.tilled) {
-      img.setTexture('tilled', 0);
-      img.setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
+    const ov = this.overlay[y][x];
+    if (this.tiles[y][x].tilled) {
+      ov.setVisible(true).setFrame(this.tilledFrame(x, y)).setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
     } else {
-      img.setTexture('grass', this.grassFrame(x, y));
-      img.clearTint();
+      ov.setVisible(false);
     }
   }
 
@@ -430,10 +468,14 @@ export class FarmScene extends Phaser.Scene {
     if (this.selected === 'hoe') {
       if (!tile.tilled && !crop) {
         tile.tilled = true;
-        this.setGroundTexture(tx, ty);
+        this.refreshTile(tx, ty);
+        this.playAction('hoe');
       }
     } else if (this.selected === 'can') {
-      if (tile.tilled) this.water(tx, ty);
+      if (tile.tilled) {
+        this.water(tx, ty);
+        this.playAction('water');
+      }
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
     }
@@ -739,6 +781,10 @@ export class FarmScene extends Phaser.Scene {
       }
       this.setGroundTexture(x, y);
     }
+    // Recompute autotile frames now that all tilled neighbours are known.
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) if (this.tiles[y][x].tilled) this.setGroundTexture(x, y);
+    }
 
     for (const c of data.crops ?? []) {
       const plant = PLANT_BY_ID[c.p];
@@ -839,15 +885,18 @@ export class FarmScene extends Phaser.Scene {
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
     if (vx !== 0 || vy !== 0) {
+      this.actingUntil = 0; // moving cancels the tool pose
       if (vx < 0) this.facing = 'left';
       else if (vx > 0) this.facing = 'right';
       else this.facing = vy < 0 ? 'up' : 'down';
       this.player.anims.play(`walk-${this.facing}`, true);
+    } else if (time < this.actingUntil) {
+      // let the tool-use animation play out
     } else {
       this.player.anims.stop();
-      this.player.setFrame(FarmScene.DIR_ROW[this.facing]);
+      this.player.setTexture('char', FarmScene.DIR_ROW[this.facing]);
     }
-    this.player.setDepth(this.player.y + 16);
+    this.player.setDepth(this.player.y + 18);
 
     // crop growth
     for (const crop of this.crops.values()) {

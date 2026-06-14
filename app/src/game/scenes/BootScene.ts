@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('tilled', `${A}tilled.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('water', `${A}water.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('char', `${A}character.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('actions', `${A}actions.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
   }
@@ -98,27 +99,30 @@ export class BootScene extends Phaser.Scene {
 
   private drawFruit(g: Phaser.GameObjects.Graphics, plant: Plant, cx: number, topY: number) {
     const c = plant.fruit;
-    const outline = 0x00000022;
+    const outline = 0x40243a; // soft dark plum outline, Sprout Lands style
     const hi = 0xffffff;
+    // small ground shadow so the fruit sits in the world
+    g.fillStyle(0x000000, 0.12);
+    g.fillEllipse(cx, TILE - 4, 14, 4);
     const dot = (x: number, y: number, r: number) => {
+      g.lineStyle(1.5, outline, 0.9);
       g.fillStyle(c, 1);
       g.fillCircle(x, y, r);
-      g.fillStyle(hi, 0.35);
-      g.fillCircle(x - r * 0.35, y - r * 0.35, r * 0.35);
-      g.lineStyle(1, outline, 1);
       g.strokeCircle(x, y, r);
+      g.fillStyle(hi, 0.4);
+      g.fillCircle(x - r * 0.34, y - r * 0.34, Math.max(1, r * 0.3));
     };
     switch (plant.shape) {
       case 'round':
         dot(cx, topY - 1, 6);
         break;
       case 'giant':
+        g.lineStyle(1.5, outline, 0.9);
         g.fillStyle(c, 1);
         g.fillEllipse(cx, topY + 2, 18, 13);
-        g.fillStyle(hi, 0.25);
-        g.fillEllipse(cx - 4, topY - 1, 7, 4);
-        g.lineStyle(1, outline, 1);
         g.strokeEllipse(cx, topY + 2, 18, 13);
+        g.fillStyle(hi, 0.22);
+        g.fillEllipse(cx - 4, topY - 1, 7, 4);
         break;
       case 'berry':
         dot(cx - 3, topY, 3);
@@ -126,10 +130,10 @@ export class BootScene extends Phaser.Scene {
         dot(cx, topY - 4, 3);
         break;
       case 'root':
+        g.lineStyle(1.5, outline, 0.9);
         g.fillStyle(c, 1);
         g.fillTriangle(cx - 4, topY + 4, cx + 4, topY + 4, cx, topY + 11);
-        g.fillStyle(hi, 0.25);
-        g.fillTriangle(cx - 2, topY + 4, cx, topY + 4, cx - 1, topY + 8);
+        g.strokeTriangle(cx - 4, topY + 4, cx + 4, topY + 4, cx, topY + 11);
         break;
       case 'leafy':
         g.fillStyle(plant.leaf, 1);
@@ -139,21 +143,46 @@ export class BootScene extends Phaser.Scene {
         break;
       case 'star':
         this.drawStar(g, cx, topY - 1, 5, 8, 3.5, c);
+        g.lineStyle(1.5, outline, 0.9);
+        this.strokeStar(g, cx, topY - 1, 5, 8, 3.5);
         g.fillStyle(hi, 0.3);
         g.fillCircle(cx - 1, topY - 2, 1.5);
         break;
       case 'flower': {
         const petals = 6;
-        g.fillStyle(c, 1);
         for (let i = 0; i < petals; i++) {
           const a = (i / petals) * Math.PI * 2;
+          g.lineStyle(1.5, outline, 0.85);
+          g.fillStyle(c, 1);
           g.fillCircle(cx + Math.cos(a) * 5, topY + Math.sin(a) * 5, 3);
+          g.strokeCircle(cx + Math.cos(a) * 5, topY + Math.sin(a) * 5, 3);
         }
         g.fillStyle(0xffe14a, 1);
         g.fillCircle(cx, topY, 3);
         break;
       }
     }
+  }
+
+  private strokeStar(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    points: number,
+    outer: number,
+    inner: number,
+  ) {
+    g.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outer : inner;
+      const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.closePath();
+    g.strokePath();
   }
 
   private drawStar(
