@@ -95,7 +95,12 @@ export class BootScene extends Phaser.Scene {
     // House: chimney + walls + window block from the modular house sheet.
     this.textures.get('house').add('cottage', 0, 0, 0, 48, 64);
     // A complete chicken coop (orange roof) from the modular coop sheet.
-    this.textures.get('coop').add('coop', 0, 64, 0, 64, 80);
+    const coop = this.textures.get('coop');
+    coop.add('coop', 0, 64, 0, 64, 80);
+    // Top row of the coop sheet = six little cottages with different roof colours
+    // (red, orange, green, teal, blue, purple). Used as homestead houses so each
+    // farm gets a varied, properly-roofed cottage.
+    for (let i = 0; i < 6; i++) coop.add(`cottage${i}`, 0, i * 64, 0, 64, 64);
   }
 
   private makeUtilTextures() {

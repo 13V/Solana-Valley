@@ -43,7 +43,14 @@ import {
   type Upgrades,
 } from '../progression';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
-import { HOME, MY_PLOT, isInMyPlot, NEIGHBORS, type Neighbor } from '../plots';
+import {
+  HOME,
+  MY_PLOT,
+  isInMyPlot,
+  HOMESTEADS,
+  type Homestead,
+  type Rect,
+} from '../plots';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -63,17 +70,14 @@ type Crop = {
 };
 type Dir = 'down' | 'up' | 'left' | 'right';
 
-// Decorative trees/rocks in the open margins (kept clear of homestead + plots).
-const TREES: Array<[number, number]> = [
-  [1, 3], [1, 11], [7, 11], [20, 11], [33, 11], [39, 11], [1, 21], [39, 3], [1, 43], [39, 43],
-];
-const ROCKS: Array<[number, number]> = [
-  [14, 11], [27, 11], [0, 20], [40, 20], [0, 33], [40, 37],
-];
-const POND = { x0: HOME.pond.x0, y0: HOME.pond.y0, w: HOME.pond.w, h: HOME.pond.h };
-const CABIN = { cx: HOME.houseCx, baseY: HOME.houseBaseRow - 1 };
+// The player's animal pen + orchard in *pixel* coords (derived from HOME). These
+// drive where bought/bred animals spawn and how far they may wander.
 const PEN = { x0: HOME.pen.x0 * TILE, y0: HOME.pen.y0 * TILE, x1: (HOME.pen.x1 + 1) * TILE, y1: (HOME.pen.y1 + 1) * TILE };
 const ORCHARD = { x0: HOME.orchard.x0 * TILE, y0: HOME.orchard.y0 * TILE, x1: (HOME.orchard.x1 + 1) * TILE, y1: (HOME.orchard.y1 + 1) * TILE };
+
+// Palette swaps used for the static animals dotted into neighbour pens.
+const NEI_CHICKS = ['chick_white', 'chick_brown', 'chick_green', 'chick_red'];
+const NEI_COWS = ['cow_light', 'cow_brown', 'cow_pink'];
 
 type Animal = {
   sprite: Phaser.GameObjects.Sprite;
@@ -518,14 +522,33 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private buildPaths() {
-    // A dirt yard around the homestead.
-    this.layDirt(2, 9, 7, 11);
-    // A connector from your plot down to the main avenue.
-    this.layDirt(11, 9, 12, 11);
-    // The main avenue between the homestead and the plots.
-    this.layDirt(1, 11, GRID_W - 2, 12);
-    // Walkways running down the gaps between the neighbour plot columns.
-    for (const cx of [8, 16, 24, 32]) this.layDirt(cx, 12, cx, GRID_H - 3);
+    // A tidy dirt-road grid weaving between the fenced homesteads: one horizontal
+    // avenue per gap-row, and vertical lanes down every gap-column. Each homestead
+    // gets a short stub from its gate (bottom-centre of its fence) to a lane.
+    const left = HOMESTEADS[0].ix - 2; // one tile past the leftmost fence
+    const right = HOMESTEADS[4].interior.x1 + 2; // one tile past the rightmost fence
+
+    // Horizontal avenues: above row 0, between the rows, and below row 1.
+    const row0 = HOMESTEADS[0];
+    const row1 = HOMESTEADS[5];
+    const aboveY = row0.iy - 3; // grass band above the top fences
+    const midY = row0.interior.y1 + 2; // the avenue between the two rows
+    for (const y of [aboveY, aboveY + 1]) this.layDirt(left, y, right, y);
+    for (const y of [midY, midY + 1]) this.layDirt(left, y, right, y);
+
+    // Vertical lanes down the gap columns (between adjacent homestead fences),
+    // plus end lanes flanking the whole neighbourhood.
+    const top = aboveY;
+    const bottom = row1.interior.y1 + 2;
+    const laneXs = [left, right];
+    for (let c = 0; c < 4; c++) laneXs.push(HOMESTEADS[c].interior.x1 + 2); // gap between col c and c+1
+    for (const x of laneXs) this.layDirt(x, top, x, bottom);
+
+    // Short gate stubs from each homestead's bottom-centre fence gap to the avenue.
+    for (const h of HOMESTEADS) {
+      const gx = Math.floor((h.farm.x0 + h.pen.x1) / 2);
+      this.layDirt(gx, h.interior.y1 + 1, gx, h.interior.y1 + 1);
+    }
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
@@ -535,115 +558,14 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private placeDecorations() {
-    // Pond (animated water).
-    for (let dy = 0; dy < POND.h; dy++) {
-      for (let dx = 0; dx < POND.w; dx++) {
-        const tx = POND.x0 + dx;
-        const ty = POND.y0 + dy;
-        const cx = tx * TILE + TILE / 2;
-        const cy = ty * TILE + TILE / 2;
-        this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(1).play('water-anim');
-        this.tiles[ty][tx].obstacle = true;
-        this.addCollider(cx, cy, TILE, TILE);
-      }
-    }
-    // Lily pads and reeds floating on the pond.
-    this.add.image((POND.x0 + 1) * TILE, (POND.y0 + 0.4) * TILE, 'waterobj', 11).setScale(2).setDepth(3);
-    this.add.image((POND.x0 + 0.4) * TILE, (POND.y0 + 1.1) * TILE, 'waterobj', 8).setScale(2).setDepth(3);
-    this.add.image((POND.x0 + 2.1) * TILE, (POND.y0 + 0.9) * TILE, 'waterobj', 6).setScale(2).setDepth(4);
-
-    // Cottage.
-    const cabinX = CABIN.cx * TILE + TILE / 2;
-    const cabinBase = (CABIN.baseY + 1) * TILE;
-    this.add.image(cabinX, cabinBase, 'house', 'cottage').setOrigin(0.5, 1).setScale(2).setDepth(cabinBase);
-    for (let ty = CABIN.baseY - 2; ty <= CABIN.baseY; ty++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const tx = CABIN.cx + dx;
-        if (this.inBounds(tx, ty)) this.tiles[ty][tx].obstacle = true;
-      }
-    }
-    this.addCollider(cabinX, cabinBase - 12, 84, 24);
-
-    // Rocks.
-    const rockFrames = ['rock_l', 'rock_s', 'rock_pile'];
-    ROCKS.forEach(([tx, ty], i) => {
-      const cx = tx * TILE + TILE / 2;
-      const cy = ty * TILE + TILE / 2;
-      this.add.image(cx, cy + 4, 'biome', rockFrames[i % rockFrames.length]).setScale(2).setDepth(cy + 8);
-      this.tiles[ty][tx].obstacle = true;
-      this.addCollider(cx, cy + 6, 24, 12);
-    });
-
-    // Trees (with a gentle sway from the base).
-    const treeFrames = ['tree', 'tree_apple'];
-    TREES.forEach(([tx, ty], i) => {
-      const cx = tx * TILE + TILE / 2;
-      const baseY = ty * TILE + TILE;
-      const tree = this.add
-        .image(cx, baseY + 4, 'biome', treeFrames[i % treeFrames.length])
-        .setOrigin(0.5, 1)
-        .setScale(2)
-        .setDepth(baseY);
-      this.tiles[ty][tx].obstacle = true;
-      this.addCollider(cx, baseY - 4, 16, 12);
-      this.tweens.add({
-        targets: tree,
-        angle: { from: -1.3, to: 1.3 },
-        duration: 2200 + Math.random() * 800,
-        delay: Math.random() * 1500,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
-    });
-
-    // Water well (in the homestead yard, below the house).
-    const wellX = HOME.well.x * TILE + TILE / 2;
-    const wellY = HOME.well.y * TILE;
-    this.add.image(wellX, wellY, 'well').setScale(2).setDepth(wellY + 24);
-    for (const [ox, oy] of [[HOME.well.x, HOME.well.y - 1], [HOME.well.x, HOME.well.y]] as Array<[number, number]>) {
-      if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
-    }
-    this.addCollider(wellX, wellY, 44, 38);
-
-    // Chicken coop crowning the top of the animal pen.
-    const coopX = Math.round((HOME.pen.x0 + HOME.pen.x1) / 2) * TILE + TILE / 2;
-    const coopBase = (HOME.pen.y0 + 1) * TILE;
-    this.add.image(coopX, coopBase, 'coop', 'coop').setOrigin(0.5, 1).setScale(2).setDepth(coopBase);
-    for (let oy = HOME.pen.y0; oy <= HOME.pen.y0 + 1; oy++) {
-      for (let ox = HOME.pen.x0 + 1; ox <= HOME.pen.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
-    }
-    this.addCollider(coopX, coopBase - 18, 110, 30);
-
-    // Ranch feed station inside the pen: a wide hay bale and a feed trough.
-    this.add.image((HOME.pen.x0 + 1) * TILE + 16, (HOME.pen.y0 + 3) * TILE, 'hay', 6).setScale(2).setDepth((HOME.pen.y0 + 3) * TILE);
-    this.add.image((HOME.pen.x0 + 2) * TILE + 16, (HOME.pen.y0 + 3) * TILE, 'hay', 7).setScale(2).setDepth((HOME.pen.y0 + 3) * TILE);
-    this.add.image((HOME.pen.x1 - 2) * TILE + 16, (HOME.pen.y0 + 4) * TILE, 'hay', 0).setScale(2).setDepth((HOME.pen.y0 + 5) * TILE);
-
-    // Homestead props: a workbench and a treasure chest in the yard by the house.
-    const benchX = (HOME.houseCx + 2) * TILE;
-    const benchY = (HOME.houseBaseRow + 1) * TILE;
-    this.add.image(benchX, benchY, 'workstation').setOrigin(0.5, 0.7).setScale(2).setDepth(benchY + 10);
-    this.addCollider(benchX, benchY + 4, 56, 18);
-
-    const chestX = (HOME.houseCx - 2) * TILE + TILE / 2;
-    const chestY = (HOME.houseBaseRow + 1) * TILE;
-    this.add.image(chestX, chestY, 'chest', 16).setOrigin(0.5, 1).setScale(2).setDepth(chestY);
-    this.addCollider(chestX, chestY - 8, 26, 16);
-
-    // A cosy picnic spot on the open grass between home and the plots.
-    const picX = (HOME.houseCx + 1) * TILE;
-    const picY = 11.5 * TILE;
-    this.add.image(picX, picY, 'picnic').setScale(1.8).setDepth(2);
-    this.add.image(picX + 16, picY - 4, 'basket').setScale(1.7).setDepth(3);
-
-    // ---- nature: dense greenery across the open grass -----------------------
+    // Scatter nature only across the *open* grass — never inside a homestead's
+    // fenced footprint (incl. its 1-tile fence ring), so interiors stay tidy.
     const free = (tx: number, ty: number) =>
-      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle && !isInMyPlot(tx, ty) && !this.inNeighborPlot(tx, ty);
+      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle && !this.inAnyHomestead(tx, ty);
 
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let placed = 0, guard = 0;
-    while (placed < 48 && guard++ < 800) {
+    while (placed < 60 && guard++ < 1200) {
       const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
       if (!free(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[placed % decoFrames.length]).setScale(2).setDepth(2);
@@ -652,7 +574,7 @@ export class FarmScene extends Phaser.Scene {
 
     const mfsFrames = [0, 3, 12, 15, 25, 36, 48, 52];
     let m = 0, mg = 0;
-    while (m < 28 && mg++ < 500) {
+    while (m < 36 && mg++ < 800) {
       const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
       if (!free(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[m % mfsFrames.length]).setScale(2).setDepth(3);
@@ -662,16 +584,37 @@ export class FarmScene extends Phaser.Scene {
     // Premium berry bushes & shrubs for colour (from the trees/bushes sheet).
     const bushFrames = [36, 37, 38, 39, 40, 48, 49, 50, 51];
     let b = 0, bg = 0;
-    while (b < 20 && bg++ < 400) {
+    while (b < 26 && bg++ < 600) {
       const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
       if (!free(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', bushFrames[b % bushFrames.length]).setScale(2).setDepth(ty * TILE + TILE);
       b++;
     }
 
+    // A handful of swaying shade trees dotted in the open grass between homesteads.
+    const treeFrames = ['tree', 'tree_apple'];
+    let t = 0, tg = 0;
+    while (t < 14 && tg++ < 600) {
+      const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
+      if (!free(tx, ty)) continue;
+      const cx = tx * TILE + TILE / 2;
+      const baseY = ty * TILE + TILE;
+      const tree = this.add
+        .image(cx, baseY + 4, 'biome', treeFrames[t % treeFrames.length])
+        .setOrigin(0.5, 1).setScale(2).setDepth(baseY);
+      this.tiles[ty][tx].obstacle = true;
+      this.addCollider(cx, baseY - 4, 16, 12);
+      this.tweens.add({
+        targets: tree, angle: { from: -1.3, to: 1.3 },
+        duration: 2200 + Math.random() * 800, delay: Math.random() * 1500,
+        yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+      t++;
+    }
+
     // A leafy tree-line framing the world out in the backdrop grass.
     const treePics = ['tree', 'tree_apple'];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 36; i++) {
       const out = Phaser.Math.Between(80, 380);
       let x: number, y: number;
       switch (i % 4) {
@@ -682,17 +625,12 @@ export class FarmScene extends Phaser.Scene {
       }
       this.add.image(x, y, 'biome', treePics[i % 2]).setOrigin(0.5, 1).setScale(2).setDepth(y);
     }
-
-    // A boat moored on the pond, and potted plants flanking the cabin.
-    this.add.image((HOME.pond.x0 + 1.4) * TILE, (HOME.pond.y0 + 0.8) * TILE, 'boats', 0).setScale(1.15).setDepth((HOME.pond.y0 + 1) * TILE);
-    this.add.image((HOME.houseCx - 1) * TILE, (HOME.houseBaseRow + 1) * TILE, 'furniture', 12).setScale(2).setDepth((HOME.houseBaseRow + 1) * TILE);
-    this.add.image((HOME.houseCx + 1) * TILE, (HOME.houseBaseRow + 1) * TILE, 'furniture', 13).setScale(2).setDepth((HOME.houseBaseRow + 1) * TILE);
   }
 
-  // True if a tile sits inside any neighbour plot's interior (keep decor out of them).
-  private inNeighborPlot(tx: number, ty: number): boolean {
-    for (const n of NEIGHBORS) {
-      if (tx >= n.px && tx < n.px + n.pw && ty >= n.py && ty < n.py + n.ph) return true;
+  // True if a tile sits inside any homestead's fenced footprint (fence ring incl.).
+  private inAnyHomestead(tx: number, ty: number): boolean {
+    for (const h of HOMESTEADS) {
+      if (tx >= h.interior.x0 - 1 && tx <= h.interior.x1 + 1 && ty >= h.interior.y0 - 1 && ty <= h.interior.y1 + 1) return true;
     }
     return false;
   }
@@ -702,25 +640,10 @@ export class FarmScene extends Phaser.Scene {
     box.setVisible(false).setDisplaySize(w, h).refreshBody();
   }
 
-  // Wooden fences (autotiled from the 4×4 Sprout Lands fence sheet) that enclose
-  // the animal pen and the orchard so the producers read as a real ranch.
-  // Decorative only — animals are already kept in by their wander bounds.
-  private buildFences() {
-    // Pen: U-shape (left / right / bottom); the coop crowns the open top edge.
-    this.encloseRegion(HOME.pen.x0, HOME.pen.y0, HOME.pen.x1, HOME.pen.y1, { left: true, right: true, bottom: true });
-    // Orchard: full rectangle with a gap in the bottom edge for an entrance.
-    const ogx = Math.floor((HOME.orchard.x0 + HOME.orchard.x1) / 2);
-    this.encloseRegion(HOME.orchard.x0, HOME.orchard.y0, HOME.orchard.x1, HOME.orchard.y1, { top: true, bottom: true, left: true, right: true, gap: [ogx, HOME.orchard.y1] });
-
-    // A gate in the orchard entrance that swings open as the farmer approaches.
-    const gx = ogx * TILE + TILE / 2;
-    const gy = HOME.orchard.y1 * TILE + TILE / 2;
-    if (!this.anims.exists('gate-open')) {
-      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
-      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
-    }
-    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
-  }
+  // buildFences is folded into buildPlots/buildHomestead now (every homestead has
+  // its own outer fence + inner pen fence); this stays as a no-op anchor in case
+  // create() ordering is ever revisited.
+  private buildFences() {}
 
   private encloseRegion(
     tx0: number,
@@ -757,45 +680,152 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // ---- plots --------------------------------------------------------------
+  // ---- homesteads ---------------------------------------------------------
 
-  // The 20-plot server grid: fence + name-sign each plot. Your plot's soil is
-  // tinted so it's easy to find; the neighbours show crops so the server reads
-  // as alive.
+  // Build all 10 fenced homesteads. Each has a house, a crop farm and an animal
+  // pen. #0 is the player's (farmable, real animals); the rest are decorative
+  // neighbours so the neighbourhood reads as alive.
   private buildPlots() {
-    // Your plot: fence + faint tilled rows (so the planting slots are visible) +
-    // a star sign and a little signpost.
-    const p = MY_PLOT;
-    this.encloseRegion(p.px - 1, p.py - 1, p.px + p.pw, p.py + p.ph, {
-      top: true, bottom: true, left: true, right: true, gap: [p.px + Math.floor(p.pw / 2), p.py + p.ph],
+    for (const h of HOMESTEADS) this.buildHomestead(h);
+  }
+
+  // One self-contained homestead: outer fence (with a front gate gap), a cottage
+  // top-left, a crop bed lower-left, and a fenced animal pen (coop + hay) right.
+  private buildHomestead(h: Homestead) {
+    const it = h.interior;
+    const gateCx = Math.floor((h.farm.x0 + h.pen.x1) / 2); // bottom-centre gate gap
+
+    // House + coop FIRST so their footprint tiles are flagged obstacle, then the
+    // fences autotile around them cleanly.
+    this.placeCottage(h);
+    this.placeCoop(h);
+
+    // Outer fence around the whole interior, gap at the bottom-centre for a gate.
+    this.encloseRegion(it.x0 - 1, it.y0 - 1, it.x1 + 1, it.y1 + 1, {
+      top: true, bottom: true, left: true, right: true, gap: [gateCx, it.y1 + 1],
     });
-    // Checkerboard tint marks the plantable slots without looking pre-tilled.
-    for (let y = p.py; y < p.py + p.ph; y++) {
-      for (let x = p.px; x < p.px + p.pw; x++) {
+
+    // Inner pen fence: U-shape (left/right/bottom); the coop crowns the open top.
+    this.encloseRegion(h.pen.x0, h.pen.y0, h.pen.x1, h.pen.y1, { left: true, right: true, bottom: true });
+
+    // Hay bales + trough inside the pen (a little ranch dressing).
+    this.add.image((h.pen.x0 + 1) * TILE + 16, (h.pen.y0 + 4) * TILE, 'hay', 6).setScale(2).setDepth((h.pen.y0 + 4) * TILE);
+    this.add.image((h.pen.x0 + 2) * TILE + 16, (h.pen.y0 + 4) * TILE, 'hay', 7).setScale(2).setDepth((h.pen.y0 + 4) * TILE);
+    this.add.image((h.pen.x1 - 1) * TILE, (h.pen.y0 + 5) * TILE, 'hay', 0).setScale(2).setDepth((h.pen.y0 + 6) * TILE);
+
+    // Orchard slot (top-right, above the pen).
+    this.placeOrchard(h);
+
+    // The crop farm: the player's is a tinted, plantable bed; neighbours show crops.
+    // Neighbour pens get a couple of idle animals so they look lived-in (the
+    // player's real animals spawn when bought).
+    if (h.mine) {
+      this.markPlayerFarm(h.farm);
+    } else {
+      this.dressFarmBed(h.farm);
+      this.dressNeighborPen(h);
+    }
+
+    // Name sign on the top fence + a little signpost by the gate.
+    this.addPlotSign(h.signCx, it.y0 - 1, h.mine ? '★ Your Homestead' : `${h.owner}'s farm`, h.mine);
+    this.addSignpost(gateCx, it.y1 + 1);
+
+    // The player's homestead gets a working front gate that swings open on approach.
+    if (h.mine) {
+      const gx = gateCx * TILE + TILE / 2;
+      const gy = (it.y1 + 1) * TILE + TILE / 2;
+      if (!this.anims.exists('gate-open')) {
+        this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
+        this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
+      }
+      this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+    }
+  }
+
+  // A roofed cottage anchored at the homestead's house corner. Each homestead
+  // gets a different roof colour from the coop sheet; the footprint is flagged so
+  // fences/scatter steer clear.
+  private placeCottage(h: Homestead) {
+    const cx = h.house.cx * TILE + TILE / 2;
+    const base = (h.house.baseRow + 1) * TILE;
+    // Player keeps the warm red roof (cottage0); neighbours cycle the rest.
+    const roof = h.mine ? 0 : 1 + (h.index % 5);
+    this.add.image(cx, base, 'coop', `cottage${roof}`).setOrigin(0.5, 1).setScale(2).setDepth(base);
+    for (let ty = h.house.baseRow - 3; ty <= h.house.baseRow; ty++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const tx = h.house.cx + dx;
+        if (this.inBounds(tx, ty)) this.tiles[ty][tx].obstacle = true;
+      }
+    }
+    this.addCollider(cx, base - 14, 100, 24);
+    // A couple of potted plants flanking the door.
+    this.add.image((h.house.cx - 1) * TILE, (h.house.baseRow + 1) * TILE, 'furniture', 12).setScale(2).setDepth((h.house.baseRow + 1) * TILE);
+    this.add.image((h.house.cx + 1) * TILE, (h.house.baseRow + 1) * TILE, 'furniture', 13).setScale(2).setDepth((h.house.baseRow + 1) * TILE);
+  }
+
+  // A small chicken coop crowning the top edge of the animal pen (the classic
+  // orange-roof coop, so it reads distinctly from the house).
+  private placeCoop(h: Homestead) {
+    const coopX = Math.round((h.pen.x0 + h.pen.x1) / 2) * TILE + TILE / 2;
+    const coopBase = (h.pen.y0 + 1) * TILE;
+    this.add.image(coopX, coopBase, 'coop', 'coop').setOrigin(0.5, 1).setScale(1.7).setDepth(coopBase);
+    for (let oy = h.pen.y0; oy <= h.pen.y0 + 1; oy++) {
+      for (let ox = h.pen.x0 + 1; ox <= h.pen.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    }
+    this.addCollider(coopX, coopBase - 14, 92, 22);
+  }
+
+  // Drop a couple of idle, static animals into a neighbour's pen for life.
+  private dressNeighborPen(h: Homestead) {
+    const cow = h.index % 2 === 0; // alternate cows and chickens between farms
+    const sheets = cow ? NEI_COWS : NEI_CHICKS;
+    const scale = cow ? 1.7 : 2.4;
+    const spots: Array<[number, number]> = [
+      [h.pen.x0 + 2, h.pen.y0 + 4],
+      [h.pen.x1 - 1, h.pen.y0 + 5],
+    ];
+    spots.forEach(([tx, ty], i) => {
+      const sheet = sheets[(h.index + i) % sheets.length];
+      const sx = tx * TILE + TILE / 2;
+      const sy = ty * TILE + TILE / 2;
+      const s = this.add.sprite(sx, sy, sheet, 0).setOrigin(0.5, 0.75).setScale(scale).setDepth(sy + 14);
+      s.setFlipX(i % 2 === 1);
+      if (this.anims.exists(`${sheet}-idle`)) s.play(`${sheet}-idle`);
+    });
+  }
+
+  // The orchard: real swaying fruit trees for the player (producers spawn here),
+  // decorative apple trees for neighbours.
+  private placeOrchard(h: Homestead) {
+    const slots = Math.min(2, h.orchard.x1 - h.orchard.x0); // 1–2 tree spots
+    for (let i = 0; i < slots; i++) {
+      const tx = h.orchard.x0 + 1 + i * 2;
+      const ty = h.orchard.y1;
+      if (!this.inBounds(tx, ty)) continue;
+      const cx = tx * TILE + TILE / 2;
+      const baseY = ty * TILE + TILE;
+      const tree = this.add.image(cx, baseY + 2, 'biome', 'tree_apple').setOrigin(0.5, 1).setScale(2).setDepth(baseY);
+      this.tweens.add({
+        targets: tree, angle: { from: -1.2, to: 1.2 },
+        duration: 2400 + Math.random() * 800, delay: Math.random() * 1500,
+        yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    }
+  }
+
+  // Player's crop bed: a soft checkerboard tint marks the plantable slots.
+  private markPlayerFarm(f: Rect) {
+    for (let y = f.y0; y <= f.y1; y++) {
+      for (let x = f.x0; x <= f.x1; x++) {
         this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c);
       }
     }
-    this.addPlotSign(p.px + p.pw / 2, p.py, '★ Your Plot', true);
-    this.addSignpost(p.px - 1, p.py - 1);
-
-    // Neighbours: fence + growing crops + a name sign (the rest of the server).
-    for (const n of NEIGHBORS) {
-      this.encloseRegion(n.px - 1, n.py - 1, n.px + n.pw, n.py + n.ph, {
-        top: true, bottom: true, left: true, right: true, gap: [n.px + Math.floor(n.pw / 2), n.py + n.ph],
-      });
-      this.dressNeighborPlot(n);
-      this.addPlotSign(n.px + n.pw / 2, n.py, `${n.owner}'s plot`, false);
-      this.addSignpost(n.px - 1, n.py - 1);
-    }
   }
 
-  private addSignpost(tx: number, ty: number) {
-    this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + 40);
-  }
-
-  private dressNeighborPlot(n: Neighbor) {
-    for (let y = n.py; y < n.py + n.ph; y++) {
-      for (let x = n.px; x < n.px + n.pw; x++) {
+  // Neighbour crop bed: tilled soil with a scatter of growing crops.
+  private dressFarmBed(f: Rect) {
+    for (let y = f.y0; y <= f.y1; y++) {
+      for (let x = f.x0; x <= f.x1; x++) {
         const cx = x * TILE + TILE / 2;
         const cy = y * TILE + TILE / 2;
         this.add.image(cx, cy, 'tilled', this.solidTilledFrame(x, y)).setScale(2).setDepth(1);
@@ -806,6 +836,10 @@ export class FarmScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private addSignpost(tx: number, ty: number) {
+    this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + 40);
   }
 
   private addPlotSign(cxTile: number, topTile: number, label: string, mine: boolean) {
