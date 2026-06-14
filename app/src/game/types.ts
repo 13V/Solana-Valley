@@ -23,6 +23,7 @@ export type UiState = {
   seeds: Record<string, number>; // plantId -> count owned
   harvest: Record<string, number>; // stackKey -> count owned
   shop: ShopEntry[]; // full catalog with current stock
+  animalCounts: Record<string, number>; // animal id -> owned count
   progress: Progress;
 };
 

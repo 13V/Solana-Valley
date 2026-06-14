@@ -13,6 +13,7 @@ export interface GameEvents {
   'ui:sellStack': string; // harvest stack key
   'ui:sellAll': void;
   'ui:buyUpgrade': string; // upgrade id
+  'ui:buyAnimal': string; // animal id
 }
 
 type Handler<T> = (payload: T) => void;

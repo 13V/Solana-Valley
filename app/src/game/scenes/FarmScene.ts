@@ -40,6 +40,7 @@ import {
   type UpgradeId,
   type Upgrades,
 } from '../progression';
+import { ANIMAL_BY_ID } from '../animals';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -67,9 +68,18 @@ const ROCKS: Array<[number, number]> = [
 ];
 const POND = { x0: 25, y0: 14, w: 3, h: 2 };
 const CABIN = { cx: 4, baseY: 4 };
+const PEN = { x0: 5 * TILE, y0: 6 * TILE, x1: 11 * TILE, y1: 11 * TILE }; // chicken roaming area
+
+type Animal = {
+  sprite: Phaser.GameObjects.Sprite;
+  type: string;
+  layAt: number;
+  nextWander: number;
+  egg?: Phaser.GameObjects.Image;
+};
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 type SaveData = {
   v: number;
@@ -92,6 +102,7 @@ type SaveData = {
   discPlants: string[];
   discMutations: string[];
   achievements: string[];
+  animals: Record<string, number>;
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -129,6 +140,8 @@ export class FarmScene extends Phaser.Scene {
   private discoveredPlants = new Set<string>();
   private discoveredMutations = new Set<string>();
   private achievements = new Set<string>();
+  private animals: Animal[] = [];
+  private animalCounts: Record<string, number> = {};
 
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
   private restockMs = RESTOCK_MS;
@@ -201,6 +214,7 @@ export class FarmScene extends Phaser.Scene {
     // Browsers suspend audio until a user gesture; resume on first input.
     this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.tryCollectAnimal(p.worldX, p.worldY)) return;
       this.useToolAt(Math.floor(p.worldX / TILE), Math.floor(p.worldY / TILE));
     });
     this.input.on('pointermove', () => (this.pointerInside = true));
@@ -216,6 +230,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
+      bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
     );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
@@ -293,9 +308,12 @@ export class FarmScene extends Phaser.Scene {
     const coins = Number(params.get('coins'));
     if (Number.isFinite(coins) && coins > 0) this.coins = coins;
 
+    const xp = Number(params.get('xp'));
+    if (Number.isFinite(xp) && xp > 0) this.xp = xp;
+
     if (params.has('reset')) localStorage.removeItem(SAVE_KEY);
     // Don't load/save during scripted/dev sessions so demos stay deterministic.
-    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins'].some((k) => params.has(k));
+    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp'].some((k) => params.has(k));
   }
 
   private static DIR_ROW: Record<Dir, number> = { down: 0, up: 4, left: 8, right: 12 };
@@ -327,6 +345,12 @@ export class FarmScene extends Phaser.Scene {
       if (!this.anims.exists(key)) {
         this.anims.create({ key, frames: this.anims.generateFrameNumbers('actions', { frames }), frameRate: 8, repeat: 0 });
       }
+    }
+    if (!this.anims.exists('chicken-idle')) {
+      this.anims.create({ key: 'chicken-idle', frames: this.anims.generateFrameNumbers('chicken', { frames: [0, 1] }), frameRate: 3, repeat: -1 });
+    }
+    if (!this.anims.exists('chicken-walk')) {
+      this.anims.create({ key: 'chicken-walk', frames: this.anims.generateFrameNumbers('chicken', { frames: [4, 5, 6, 7] }), frameRate: 6, repeat: -1 });
     }
   }
 
@@ -846,6 +870,86 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // ---- animals ------------------------------------------------------------
+
+  private spawnChicken(x: number, y: number) {
+    const s = this.add.sprite(x, y, 'chicken', 0).setScale(2).setDepth(y + 14);
+    s.play('chicken-idle');
+    this.animals.push({
+      sprite: s,
+      type: 'chicken',
+      layAt: this.time.now + ANIMAL_BY_ID.chicken.layMs / this.growthMult,
+      nextWander: this.time.now + 1500 + Math.random() * 3000,
+    });
+  }
+
+  private buyAnimal(id: string) {
+    const def = ANIMAL_BY_ID[id];
+    if (!def) return;
+    if (levelInfo(this.xp).level < def.unlockLevel) {
+      this.toast(`${def.name}s unlock at level ${def.unlockLevel}`);
+      return;
+    }
+    if (this.coins < def.cost) {
+      this.toast('Not enough coins');
+      return;
+    }
+    this.coins -= def.cost;
+    this.animalCounts[id] = (this.animalCounts[id] ?? 0) + 1;
+    this.spawnChicken(
+      Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
+      Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
+    );
+    sfx.play('buy');
+    this.toast(`Bought a ${def.name}! It roams the pen and lays ${def.productName.toLowerCase()}s.`);
+    this.emitState();
+  }
+
+  // Collect a ready product if the click landed on an animal. Returns true if so.
+  private tryCollectAnimal(wx: number, wy: number): boolean {
+    for (const a of this.animals) {
+      if (a.egg && Phaser.Math.Distance.Between(wx, wy, a.sprite.x, a.sprite.y) < 28) {
+        const def = ANIMAL_BY_ID[a.type];
+        a.egg.destroy();
+        a.egg = undefined;
+        a.layAt = this.time.now + def.layMs / this.growthMult;
+        this.coins += def.productValue;
+        this.earned += def.productValue;
+        this.gainXp(def.xp);
+        this.checkAchievements();
+        sfx.play('sell');
+        this.burst(a.sprite.x, a.sprite.y - 10, 'p_star', {
+          speed: { min: 30, max: 80 }, lifespan: 600, scale: { start: 1, end: 0 }, tint: 0xfff3a0,
+        }, 6);
+        this.toast(`Collected ${def.productName} (+${def.productValue}🪙)`);
+        this.emitState();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private updateAnimals(time: number) {
+    for (const a of this.animals) {
+      if (time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
+        a.nextWander = time + 2500 + Math.random() * 3500;
+        const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, PEN.x0 + 12, PEN.x1 - 12);
+        const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, PEN.y0 + 12, PEN.y1 - 12);
+        a.sprite.setFlipX(nx < a.sprite.x);
+        a.sprite.play('chicken-walk', true);
+        this.tweens.add({
+          targets: a.sprite, x: nx, y: ny, duration: 1100, ease: 'Sine.inOut',
+          onComplete: () => a.sprite.play('chicken-idle', true),
+        });
+      }
+      if (!a.egg && time >= a.layAt) {
+        a.egg = this.add.image(a.sprite.x, a.sprite.y - 18, 'eggitem', 0).setScale(2).setDepth(99990);
+      }
+      if (a.egg) a.egg.setPosition(a.sprite.x, a.sprite.y - 18);
+      a.sprite.setDepth(a.sprite.y + 14);
+    }
+  }
+
   // ---- persistence (localStorage) ----------------------------------------
 
   private saveState() {
@@ -883,6 +987,7 @@ export class FarmScene extends Phaser.Scene {
       discPlants: [...this.discoveredPlants],
       discMutations: [...this.discoveredMutations],
       achievements: [...this.achievements],
+      animals: this.animalCounts,
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -919,6 +1024,17 @@ export class FarmScene extends Phaser.Scene {
     this.discoveredPlants = new Set(data.discPlants ?? []);
     this.discoveredMutations = new Set(data.discMutations ?? []);
     this.achievements = new Set(data.achievements ?? []);
+    this.animalCounts = data.animals ?? {};
+    for (const [type, count] of Object.entries(this.animalCounts)) {
+      for (let i = 0; i < count; i++) {
+        if (type === 'chicken') {
+          this.spawnChicken(
+            Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
+            Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
+          );
+        }
+      }
+    }
 
     for (const [x, y, wetRemaining] of data.tiles ?? []) {
       if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) continue;
@@ -974,6 +1090,7 @@ export class FarmScene extends Phaser.Scene {
       seeds: { ...this.seeds },
       harvest: { ...this.harvestInv },
       shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.shopStock[p.id] ?? 0 })),
+      animalCounts: { ...this.animalCounts },
       progress: {
         level: info.level,
         xpInto: info.into,
@@ -1059,6 +1176,8 @@ export class FarmScene extends Phaser.Scene {
       this.player.setTexture('char', FarmScene.DIR_ROW[this.facing]);
     }
     this.player.setDepth(this.player.y + 18);
+
+    this.updateAnimals(time);
 
     // crop growth
     for (const crop of this.crops.values()) {

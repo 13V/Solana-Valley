@@ -9,6 +9,7 @@ const initialState: UiState = {
   seeds: {},
   harvest: {},
   shop: [],
+  animalCounts: {},
   progress: {
     level: 1,
     xpInto: 0,

@@ -45,6 +45,8 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
   odds), and **Shop Supply** (faster restocks).
 - **Achievements** with coin rewards, and an **Almanac** tracking every plant
   and mutation you've discovered.
+- **Animals** — buy chickens (unlocked by level) that roam a pen and lay eggs;
+  click them to collect for coins + XP (passive income).
 
 **Atmosphere**
 - A **day/night cycle** with an in-game clock, sunrise/sunset tints, a vignette,
