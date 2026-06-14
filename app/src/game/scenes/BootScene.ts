@@ -14,8 +14,10 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('grass', `${A}grass.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('tilled', `${A}tilled.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('water', `${A}water.png`, { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('char', `${A}character.png`, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('actions', `${A}actions.png`, { frameWidth: 48, frameHeight: 48 });
+    // Premium character: 8 cols × 24 rows of 48px frames. Locomotion lives in
+    // rows 0–11 = three states (idle / walk / run) × four directions
+    // (down, up, left, right); rows 12–23 are tool-use poses.
+    this.load.spritesheet('pchar', `${A}pchar.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('chicken', `${A}chicken.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('eggitem', `${A}eggitem.png`, { frameWidth: 16, frameHeight: 16 });

@@ -164,7 +164,7 @@ export class FarmScene extends Phaser.Scene {
     this.buildWorld();
     this.placeDecorations();
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'char', 0);
+    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'pchar', 0);
     this.player.setCollideWorldBounds(true);
     this.player.setOrigin(0.5, 0.72).setScale(1.25);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
@@ -317,19 +317,40 @@ export class FarmScene extends Phaser.Scene {
     this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp'].some((k) => params.has(k));
   }
 
-  private static DIR_ROW: Record<Dir, number> = { down: 0, up: 4, left: 8, right: 12 };
+  // Premium character sheet (8 frames/row). Rows 0–3 = idle, 4–7 = walk, each
+  // ordered down/up/left/right. First frame of each idle row doubles as the
+  // standing pose.
+  private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 16, right: 24 };
+  private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 48, right: 56 };
+  // Tool swings: rows 12–15 (hoe) and 20–23 (watering can), each 8 frames,
+  // ordered down/up/right/left in the sheet.
+  private static TOOL_ROW: Record<'hoe' | 'water', Record<Dir, number>> = {
+    hoe: { down: 96, up: 104, right: 112, left: 120 },
+    water: { down: 160, up: 168, right: 176, left: 184 },
+  };
 
   private createAnims() {
     for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
-      const key = `walk-${dir}`;
-      if (this.anims.exists(key)) continue;
-      const start = FarmScene.DIR_ROW[dir];
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers('char', { start, end: start + 3 }),
-        frameRate: 8,
-        repeat: -1,
-      });
+      const walk = `walk-${dir}`;
+      if (!this.anims.exists(walk)) {
+        const start = FarmScene.WALK_ROW[dir];
+        this.anims.create({
+          key: walk,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 12,
+          repeat: -1,
+        });
+      }
+      const idle = `idle-${dir}`;
+      if (!this.anims.exists(idle)) {
+        const start = FarmScene.IDLE_ROW[dir];
+        this.anims.create({
+          key: idle,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 6,
+          repeat: -1,
+        });
+      }
     }
     if (!this.anims.exists('water-anim')) {
       this.anims.create({
@@ -339,12 +360,18 @@ export class FarmScene extends Phaser.Scene {
         repeat: -1,
       });
     }
-    // Tool-use poses from the Sprout Lands action sheet.
-    const actionFrames: Record<string, number[]> = { hoe: [0, 1, 0], water: [16, 17, 16] };
-    for (const [name, frames] of Object.entries(actionFrames)) {
-      const key = `act-${name}`;
-      if (!this.anims.exists(key)) {
-        this.anims.create({ key, frames: this.anims.generateFrameNumbers('actions', { frames }), frameRate: 8, repeat: 0 });
+    // Directional tool swings from the premium sheet (rows 12–23, 8 frames each).
+    for (const tool of ['hoe', 'water'] as const) {
+      for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+        const key = `act-${tool}-${dir}`;
+        if (this.anims.exists(key)) continue;
+        const start = FarmScene.TOOL_ROW[tool][dir];
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 18,
+          repeat: 0,
+        });
       }
     }
     for (const a of ANIMALS) {
@@ -358,8 +385,8 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private playAction(tool: 'hoe' | 'water') {
-    this.actingUntil = this.time.now + 360;
-    this.player.anims.play(`act-${tool}`, true);
+    this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
+    this.player.anims.play(`act-${tool}-${this.facing}`, true);
   }
 
   private grassFrame(x: number, y: number): number {
@@ -1225,8 +1252,7 @@ export class FarmScene extends Phaser.Scene {
     } else if (time < this.actingUntil) {
       // let the tool-use animation play out
     } else {
-      this.player.anims.stop();
-      this.player.setTexture('char', FarmScene.DIR_ROW[this.facing]);
+      this.player.anims.play(`idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
 

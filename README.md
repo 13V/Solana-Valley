@@ -24,7 +24,8 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 - Walk a hand-made world (cabin, trees, rocks, pond, wildflowers) with collision.
 - Hoe grass → plant seeds → water → crops grow in **real time** (watering
   doubles growth speed) → harvest when ripe.
-- Animated character (4-frame walk cycle), swaying trees, animated water.
+- Premium animated farmer: smooth 8-frame directional walk, per-direction idle
+  breathing, and directional hoe / watering-can swings. Swaying trees, animated water.
 
 **Grow-a-Garden economy**
 - **16 plants across 7 rarity tiers** — Common → Uncommon → Rare → Legendary →
