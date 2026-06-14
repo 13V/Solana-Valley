@@ -1,8 +1,11 @@
+import { WORLD_COLS, WORLD_ROWS } from './plots';
+
 export const TILE = 32;
-// World grid (bigger than the screen — the camera follows the player). Sized to
-// hold the 5×2 homestead neighbourhood (see plots.ts) with a grass margin.
-export const GRID_W = 94;
-export const GRID_H = 36;
+// World grid (bigger than the screen — the camera follows the player). Derived
+// from the 5×2 homestead neighbourhood geometry (see plots.ts) so the world is
+// always exactly big enough to hold every homestead plus its grass margin.
+export const GRID_W = WORLD_COLS;
+export const GRID_H = WORLD_ROWS;
 export const WORLD_WIDTH = TILE * GRID_W;
 export const WORLD_HEIGHT = TILE * GRID_H;
 // Camera viewport / canvas size (what's on screen at once).

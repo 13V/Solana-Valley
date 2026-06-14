@@ -1,37 +1,41 @@
 // Solana Valley world: a tidy neighbourhood of 10 fenced "homesteads" laid out
-// in a 5×2 grid. Each homestead is a self-contained mini-farm with three areas:
-// a HOUSE (cottage), a CROP FARM (tillable bed) and an ANIMAL PEN (coop + pen).
+// in a 5×2 grid. Each homestead is a self-contained mini-farm with FOUR areas:
+// a HOUSE (cottage), a big 7×7 CROP FARM, a CHICKEN PEN (with coop) and a
+// separate COW PEN (open pasture), plus a little ORCHARD for fruit trees.
 // You own homestead #0 (fully playable); the other 9 are decorative neighbours
-// so the server reads as alive. Everything is flat.
+// so the neighbourhood reads as alive. Everything is flat.
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number }; // tile coords, inclusive
 
 // ---- homestead geometry (tiles) -----------------------------------------
 // Interior of one homestead (inside the fence). Sub-areas are placed relative
-// to this interior's top-left corner.
-export const HS_IW = 14; // interior width
-export const HS_IH = 11; // interior height
+// to this interior's top-left corner. Big enough for a 7×7 farm plus two pens.
+export const HS_IW = 19; // interior width
+export const HS_IH = 16; // interior height
 // Footprint incl. the 1-tile fence ring on every side.
-export const HS_W = HS_IW + 2; // 16
-export const HS_H = HS_IH + 2; // 13
+export const HS_W = HS_IW + 2; // 21
+export const HS_H = HS_IH + 2; // 18
 
 // Grid arrangement.
 export const COLS = 5;
 export const ROWS = 2;
-export const MARGIN_X = 3; // tiles of grass left of the first column
+export const MARGIN_X = 8; // tiles of grass left/right of the neighbourhood (room for the pond)
 export const MARGIN_TOP = 3; // tiles above the first row
+export const MARGIN_BOTTOM = 4; // tiles below the last row
 export const GAP_X = 2; // grass/path gap between homestead columns
-export const GAP_Y = 3; // gap between the two rows (leaves room for the avenue)
+export const GAP_Y = 4; // gap between the two rows (leaves room for the avenue)
 
 // Sub-area layout *relative to a homestead interior's top-left (ix, iy)*.
-// HOUSE: cottage near the top-left. CROP FARM: 5×4 bed lower-left.
-// ANIMAL PEN: 6×7 pen on the right. ORCHARD: 1-2 tree slots above the pen.
+//   HOUSE        top-left            CHICKEN PEN   top-right (coop crowns it)
+//   7×7 FARM     left, under house   COW PEN       bottom-right (open pasture)
+//   ORCHARD      bottom-left, under the farm
 export const SUB = {
   house: { cx: 2, baseRow: 3 }, // cottage centre col + base row (offsets in interior)
-  farm: { x: 0, y: 6, w: 5, h: 4 }, // tillable bed
-  pen: { x: 7, y: 3, w: 6, h: 7 }, // animal pen (fenced)
-  orchard: { x: 8, y: 0, w: 4, h: 2 }, // 1-2 fruit trees, top-right above the pen
-  signCx: 6, // name sign column (top edge), in interior coords
+  farm: { x: 1, y: 6, w: 7, h: 7 }, // 7×7 tillable bed (left)
+  chickenPen: { x: 10, y: 1, w: 6, h: 6 }, // chicken pen (coop on top edge)
+  cowPen: { x: 10, y: 9, w: 8, h: 7 }, // cow pasture (bottom-right)
+  orchard: { x: 1, y: 14, w: 6, h: 2 }, // fruit-tree slots under the farm
+  signCx: 6, // name sign column (top edge) — sits in the gap between house & coop
 };
 
 export type Homestead = {
@@ -39,8 +43,9 @@ export type Homestead = {
   ix: number; iy: number; // interior top-left (tile)
   interior: Rect; // full interior rect (inside the fence)
   house: { cx: number; baseRow: number };
-  farm: Rect; // crop bed (inclusive tile rect)
-  pen: Rect; // animal pen (inclusive tile rect)
+  farm: Rect; // 7×7 crop bed (inclusive tile rect)
+  chickenPen: Rect; // chicken pen (inclusive tile rect)
+  cowPen: Rect; // cow pasture (inclusive tile rect)
   orchard: Rect; // tree slots (inclusive tile rect)
   signCx: number; // sign column (tile)
   owner: string; // display name ('You' for the player)
@@ -67,7 +72,8 @@ function makeHomestead(index: number): Homestead {
     interior: { x0: ix, y0: iy, x1: ix + HS_IW - 1, y1: iy + HS_IH - 1 },
     house: { cx: ix + SUB.house.cx, baseRow: iy + SUB.house.baseRow },
     farm: r(SUB.farm.x, SUB.farm.y, SUB.farm.w, SUB.farm.h),
-    pen: r(SUB.pen.x, SUB.pen.y, SUB.pen.w, SUB.pen.h),
+    chickenPen: r(SUB.chickenPen.x, SUB.chickenPen.y, SUB.chickenPen.w, SUB.chickenPen.h),
+    cowPen: r(SUB.cowPen.x, SUB.cowPen.y, SUB.cowPen.w, SUB.cowPen.h),
     orchard: r(SUB.orchard.x, SUB.orchard.y, SUB.orchard.w, SUB.orchard.h),
     signCx: ix + SUB.signCx,
     owner: NAMES[index % NAMES.length],
@@ -82,8 +88,9 @@ export const PLAYER = HOMESTEADS[0];
 export const NEIGHBOR_HOMESTEADS = HOMESTEADS.filter((h) => !h.mine);
 
 // ---- the player's homestead (drives farming + producers) -----------------
-// MY_PLOT = the player's crop bed (where hoe/plant/water/harvest work).
-// HOME.pen = where animals spawn/wander. HOME.orchard = where fruit trees go.
+// MY_PLOT = the player's 7×7 crop bed (where hoe/plant/water/harvest work).
+// HOME.chickenPen / HOME.cowPen = where animals spawn/wander (routed by type).
+// HOME.orchard = where fruit trees go.
 export const HOME = {
   houseCx: PLAYER.house.cx,
   houseBaseRow: PLAYER.house.baseRow,
@@ -93,7 +100,8 @@ export const HOME = {
     pw: PLAYER.farm.x1 - PLAYER.farm.x0 + 1,
     ph: PLAYER.farm.y1 - PLAYER.farm.y0 + 1,
   },
-  pen: { ...PLAYER.pen } as Rect, // animal roaming area
+  chickenPen: { ...PLAYER.chickenPen } as Rect, // chickens roam here
+  cowPen: { ...PLAYER.cowPen } as Rect, // cows roam here
   orchard: { ...PLAYER.orchard } as Rect, // fruit trees
 };
 
@@ -117,5 +125,6 @@ export const NEIGHBORS: Neighbor[] = NEIGHBOR_HOMESTEADS.map((h) => ({
 }));
 
 // World size needed to hold the whole grid, with a margin on every side.
+// (constants.ts re-exports these as GRID_W / GRID_H so the two never drift.)
 export const WORLD_COLS = MARGIN_X * 2 + COLS * HS_W + (COLS - 1) * GAP_X;
-export const WORLD_ROWS = MARGIN_TOP + ROWS * HS_H + (ROWS - 1) * GAP_Y + 4;
+export const WORLD_ROWS = MARGIN_TOP + ROWS * HS_H + (ROWS - 1) * GAP_Y + MARGIN_BOTTOM;

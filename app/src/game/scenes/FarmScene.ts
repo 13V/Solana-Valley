@@ -85,10 +85,13 @@ type Crop = {
 };
 type Dir = 'down' | 'up' | 'left' | 'right';
 
-// The player's animal pen + orchard in *pixel* coords (derived from HOME). These
-// drive where bought/bred animals spawn and how far they may wander.
-const PEN = { x0: HOME.pen.x0 * TILE, y0: HOME.pen.y0 * TILE, x1: (HOME.pen.x1 + 1) * TILE, y1: (HOME.pen.y1 + 1) * TILE };
-const ORCHARD = { x0: HOME.orchard.x0 * TILE, y0: HOME.orchard.y0 * TILE, x1: (HOME.orchard.x1 + 1) * TILE, y1: (HOME.orchard.y1 + 1) * TILE };
+// The player's two animal pens + orchard in *pixel* coords (derived from HOME).
+// These drive where bought/bred animals spawn and how far they may wander.
+// Chickens roam the chicken pen, cows the cow pasture, fruit trees the orchard.
+const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
+const CHICKEN_PEN = px(HOME.chickenPen);
+const COW_PEN = px(HOME.cowPen);
+const ORCHARD = px(HOME.orchard);
 
 // Palette swaps used for the static animals dotted into neighbour pens.
 const NEI_CHICKS = ['chick_white', 'chick_brown', 'chick_green', 'chick_red'];
@@ -233,7 +236,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(
       (MY_PLOT.px + MY_PLOT.pw / 2) * TILE,
-      (MY_PLOT.py + MY_PLOT.ph + 1) * TILE,
+      (MY_PLOT.py + MY_PLOT.ph - 1) * TILE,
       'pchar',
       0,
     );
@@ -612,7 +615,7 @@ export class FarmScene extends Phaser.Scene {
 
     // Short gate stubs from each homestead's bottom-centre fence gap to the avenue.
     for (const h of HOMESTEADS) {
-      const gx = Math.floor((h.farm.x0 + h.pen.x1) / 2);
+      const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
       this.layDirt(gx, h.interior.y1 + 1, gx, h.interior.y1 + 1);
     }
   }
@@ -755,41 +758,35 @@ export class FarmScene extends Phaser.Scene {
     for (const h of HOMESTEADS) this.buildHomestead(h);
   }
 
-  // One self-contained homestead: outer fence (with a front gate gap), a cottage
-  // top-left, a crop bed lower-left, and a fenced animal pen (coop + hay) right.
+  // One self-contained homestead: an outer fence (with a front gate gap), a
+  // cottage top-left, a 7×7 crop farm on the left, and two separate animal areas
+  // on the right — a chicken pen (with coop) and a cow pasture — plus an orchard.
   private buildHomestead(h: Homestead) {
     const it = h.interior;
-    const gateCx = Math.floor((h.farm.x0 + h.pen.x1) / 2); // bottom-centre gate gap
+    const gateCx = Math.floor((it.x0 + it.x1) / 2); // bottom-centre gate gap
 
-    // House + coop FIRST so their footprint tiles are flagged obstacle, then the
-    // fences autotile around them cleanly.
+    // House FIRST so its footprint is flagged obstacle, then the outer fence
+    // autotiles around it cleanly.
     this.placeCottage(h);
-    this.placeCoop(h);
 
     // Outer fence around the whole interior, gap at the bottom-centre for a gate.
     this.encloseRegion(it.x0 - 1, it.y0 - 1, it.x1 + 1, it.y1 + 1, {
       top: true, bottom: true, left: true, right: true, gap: [gateCx, it.y1 + 1],
     });
 
-    // Inner pen fence: U-shape (left/right/bottom); the coop crowns the open top.
-    this.encloseRegion(h.pen.x0, h.pen.y0, h.pen.x1, h.pen.y1, { left: true, right: true, bottom: true });
-
-    // Hay bales + trough inside the pen (a little ranch dressing).
-    this.add.image((h.pen.x0 + 1) * TILE + 16, (h.pen.y0 + 4) * TILE, 'hay', 6).setScale(2).setDepth((h.pen.y0 + 4) * TILE);
-    this.add.image((h.pen.x0 + 2) * TILE + 16, (h.pen.y0 + 4) * TILE, 'hay', 7).setScale(2).setDepth((h.pen.y0 + 4) * TILE);
-    this.add.image((h.pen.x1 - 1) * TILE, (h.pen.y0 + 5) * TILE, 'hay', 0).setScale(2).setDepth((h.pen.y0 + 6) * TILE);
-
-    // Orchard slot (top-right, above the pen).
+    // The two animal areas (each fenced) and the orchard.
+    this.buildChickenPen(h);
+    this.buildCowPen(h);
     this.placeOrchard(h);
 
     // The crop farm: the player's is a tinted, plantable bed; neighbours show crops.
-    // Neighbour pens get a couple of idle animals so they look lived-in (the
-    // player's real animals spawn when bought).
+    // Neighbour pens get idle animals so they look lived-in (the player's real
+    // animals spawn when bought).
     if (h.mine) {
       this.markPlayerFarm(h.farm);
     } else {
       this.dressFarmBed(h.farm);
-      this.dressNeighborPen(h);
+      this.dressNeighborPens(h);
     }
 
     // Name sign on the top fence + a little signpost by the gate.
@@ -829,32 +826,61 @@ export class FarmScene extends Phaser.Scene {
     this.add.image((h.house.cx + 1) * TILE, (h.house.baseRow + 1) * TILE, 'furniture', 13).setScale(2).setDepth((h.house.baseRow + 1) * TILE);
   }
 
-  // A small chicken coop crowning the top edge of the animal pen (the classic
-  // orange-roof coop, so it reads distinctly from the house).
-  private placeCoop(h: Homestead) {
-    const coopX = Math.round((h.pen.x0 + h.pen.x1) / 2) * TILE + TILE / 2;
-    const coopBase = (h.pen.y0 + 1) * TILE;
+  // The chicken pen: a small orange-roof coop crowning the top edge, a U-shaped
+  // fence (left/right/bottom) framing it, and a little hay dressing.
+  private buildChickenPen(h: Homestead) {
+    const p = h.chickenPen;
+    // Coop (flag its footprint obstacle) before the fence so it autotiles cleanly.
+    const coopX = Math.round((p.x0 + p.x1) / 2) * TILE + TILE / 2;
+    const coopBase = (p.y0 + 1) * TILE;
     this.add.image(coopX, coopBase, 'coop', 'coop').setOrigin(0.5, 1).setScale(1.7).setDepth(coopBase);
-    for (let oy = h.pen.y0; oy <= h.pen.y0 + 1; oy++) {
-      for (let ox = h.pen.x0 + 1; ox <= h.pen.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    for (let oy = p.y0; oy <= p.y0 + 1; oy++) {
+      for (let ox = p.x0 + 1; ox <= p.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
     }
     this.addCollider(coopX, coopBase - 14, 92, 22);
+    // U-shaped fence; the coop crowns the open top.
+    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, { left: true, right: true, bottom: true });
+    this.add.image((p.x0 + 1) * TILE + 16, (p.y1 - 1) * TILE, 'hay', 6).setScale(2).setDepth((p.y1 - 1) * TILE);
+    this.add.image((p.x1 - 1) * TILE, (p.y1 - 1) * TILE, 'hay', 7).setScale(2).setDepth((p.y1 - 1) * TILE);
   }
 
-  // Drop a couple of idle, static animals into a neighbour's pen for life.
-  private dressNeighborPen(h: Homestead) {
-    const cow = h.index % 2 === 0; // alternate cows and chickens between farms
-    const sheets = cow ? NEI_COWS : NEI_CHICKS;
-    const scale = cow ? 1.7 : 2.4;
-    const spots: Array<[number, number]> = [
-      [h.pen.x0 + 2, h.pen.y0 + 4],
-      [h.pen.x1 - 1, h.pen.y0 + 5],
+  // The cow pasture: an open fenced field (gate gap at the bottom-centre) with a
+  // few hay bales. No building — cows graze in the open, distinct from the coop.
+  private buildCowPen(h: Homestead) {
+    const p = h.cowPen;
+    const gap = Math.round((p.x0 + p.x1) / 2);
+    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, {
+      top: true, left: true, right: true, bottom: true, gap: [gap, p.y1],
+    });
+    this.add.image((p.x0 + 1) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 6).setScale(2).setDepth((p.y0 + 2) * TILE);
+    this.add.image((p.x0 + 2) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 7).setScale(2).setDepth((p.y0 + 2) * TILE);
+    this.add.image((p.x1 - 1) * TILE, (p.y1 - 2) * TILE, 'hay', 0).setScale(2).setDepth((p.y1 - 2) * TILE);
+  }
+
+  // Drop a few idle, static animals into a neighbour's pens for life: chickens in
+  // the chicken pen, cows in the cow pasture.
+  private dressNeighborPens(h: Homestead) {
+    const cp = h.chickenPen;
+    const chickSpots: Array<[number, number]> = [
+      [cp.x0 + 2, cp.y0 + 3], [cp.x1 - 1, cp.y0 + 4], [cp.x0 + 3, cp.y1 - 1],
     ];
-    spots.forEach(([tx, ty], i) => {
-      const sheet = sheets[(h.index + i) % sheets.length];
-      const sx = tx * TILE + TILE / 2;
+    chickSpots.forEach(([tx, ty], i) => {
+      const sheet = NEI_CHICKS[(h.index + i) % NEI_CHICKS.length];
       const sy = ty * TILE + TILE / 2;
-      const s = this.add.sprite(sx, sy, sheet, 0).setOrigin(0.5, 0.75).setScale(scale).setDepth(sy + 14);
+      const s = this.add.sprite(tx * TILE + TILE / 2, sy, sheet, 0)
+        .setOrigin(0.5, 0.75).setScale(2.4).setDepth(sy + 14);
+      s.setFlipX(i % 2 === 1);
+      if (this.anims.exists(`${sheet}-idle`)) s.play(`${sheet}-idle`);
+    });
+    const wp = h.cowPen;
+    const cowSpots: Array<[number, number]> = [
+      [wp.x0 + 2, wp.y0 + 3], [wp.x1 - 2, wp.y0 + 4], [wp.x0 + 4, wp.y1 - 2],
+    ];
+    cowSpots.forEach(([tx, ty], i) => {
+      const sheet = NEI_COWS[(h.index + i) % NEI_COWS.length];
+      const sy = ty * TILE + TILE / 2;
+      const s = this.add.sprite(tx * TILE + TILE / 2, sy, sheet, 0)
+        .setOrigin(0.5, 0.75).setScale(1.7).setDepth(sy + 14);
       s.setFlipX(i % 2 === 1);
       if (this.anims.exists(`${sheet}-idle`)) s.play(`${sheet}-idle`);
     });
@@ -1433,8 +1459,12 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- animals ------------------------------------------------------------
 
+  // Where a producer lives: fruit trees in the orchard, cows in the cow pasture,
+  // chickens (and any other small animal) in the chicken pen. Used both to spawn
+  // a new producer and to clamp its wandering.
   private producerArea(def: AnimalDef) {
-    return def.category === 'tree' ? ORCHARD : PEN;
+    if (def.category === 'tree') return ORCHARD;
+    return def.id === 'cow' ? COW_PEN : CHICKEN_PEN;
   }
 
   // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
@@ -1519,7 +1549,9 @@ export class FarmScene extends Phaser.Scene {
       Phaser.Math.Between(area.y0 + 24, area.y1 - 24),
     );
     sfx.play('buy');
-    const where = def.category === 'tree' ? 'grows in the orchard' : 'roams the pen';
+    const where = def.category === 'tree'
+      ? 'grows in the orchard'
+      : def.id === 'cow' ? 'grazes the cow pasture' : 'roams the chicken pen';
     this.toast(`Bought a ${def.name}! It ${where} and makes ${def.productName.toLowerCase()}.`);
     this.emitState();
   }
@@ -1572,8 +1604,9 @@ export class FarmScene extends Phaser.Scene {
       const def = ANIMAL_BY_ID[a.type];
       if (!def.stationary && time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
         a.nextWander = time + 2500 + Math.random() * 3500;
-        const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, PEN.x0 + 12, PEN.x1 - 12);
-        const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, PEN.y0 + 12, PEN.y1 - 12);
+        const pen = this.producerArea(def); // clamp each animal to its own pen
+        const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, pen.x0 + 30, pen.x1 - 30);
+        const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, pen.y0 + 38, pen.y1 - 28);
         a.sprite.setFlipX(nx < a.sprite.x);
         a.sprite.play(`${a.color}-walk`, true);
         this.tweens.add({
@@ -1640,9 +1673,10 @@ export class FarmScene extends Phaser.Scene {
   // water tile is flagged obstacle + given a collider so the player can't walk
   // onto it (and clicks route to fishing). Lily pads add a little life.
   private buildPond() {
-    // 4×3 water rect on open grass directly below the player's homestead, an
-    // easy walk from the spawn point at the crop bed's gate.
-    this.pond = { x0: 6, y0: 16, x1: 9, y1: 18 };
+    // 4×4 water rect in the open grass just left of the player's homestead (a
+    // short walk down the lane from the farm). Sat outside any fence so it never
+    // collides with a homestead interior.
+    this.pond = { x0: 2, y0: 10, x1: 5, y1: 13 };
     const p = this.pond;
     for (let y = p.y0; y <= p.y1; y++) {
       for (let x = p.x0; x <= p.x1; x++) {
@@ -1961,8 +1995,8 @@ export class FarmScene extends Phaser.Scene {
       for (let i = 0; i < count; i++) {
         this.spawnAnimal(
           adef,
-          Phaser.Math.Between(area.x0 + 24, area.x1 - 24),
-          Phaser.Math.Between(area.y0 + 24, area.y1 - 24),
+          Phaser.Math.Between(area.x0 + 34, area.x1 - 34),
+          Phaser.Math.Between(area.y0 + 40, area.y1 - 30),
         );
       }
     }
