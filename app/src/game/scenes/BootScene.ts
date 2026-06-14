@@ -61,9 +61,6 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('glayer', `${A}glayer.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('glayer2', `${A}glayer2.png`, { frameWidth: 16, frameHeight: 16 });
-    // Hill tileset with strong brown cliff faces — used for raised platforms and
-    // sunken pits (clearer depth than the soft-edged grass layers).
-    this.load.spritesheet('ghill', `${A}grass_hill.png`, { frameWidth: 16, frameHeight: 16 });
   }
 
   create() {
@@ -100,11 +97,7 @@ export class BootScene extends Phaser.Scene {
     // House: chimney + walls + window block from the modular house sheet.
     this.textures.get('house').add('cottage', 0, 0, 0, 48, 64);
     // A complete chicken coop (orange roof) from the modular coop sheet.
-    const coop = this.textures.get('coop');
-    coop.add('coop', 0, 64, 0, 64, 80);
-    // The coop sheet's top row holds six complete cottages (different roof
-    // colours) — reused as the neighbours' little houses for variety.
-    for (let i = 0; i < 6; i++) coop.add(`nhouse${i}`, 0, i * 64, 0, 64, 88);
+    this.textures.get('coop').add('coop', 0, 64, 0, 64, 80);
   }
 
   private makeUtilTextures() {

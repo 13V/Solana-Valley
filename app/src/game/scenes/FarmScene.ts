@@ -43,7 +43,7 @@ import {
   type Upgrades,
 } from '../progression';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
-import { HOME, MY_PLOT, isInMyPlot, NEIGHBORS, type Neighbor, type Rect } from '../plots';
+import { HOME, MY_PLOT, isInMyPlot, NEIGHBORS, type Neighbor } from '../plots';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
 
@@ -529,25 +529,6 @@ export class FarmScene extends Phaser.Scene {
     for (const cx of [8, 16, 24, 32]) this.layDirt(cx, 12, cx, GRID_H - 3);
   }
 
-  // ---- elevation (Sprout Lands "Tile Layers" look) -----------------------
-  //
-  // The 'ghill' hill tileset is an 11-col autotile with strong brown cliff
-  // faces. A clean RAISED platform is the standard 9-slice:
-  //   [TL,T,TR, L,C,R, BL,B,BR] = [0,1,2, 11,12,13, 22,23,24]
-  // Frames 11/13 are the left/right cliff strips, 22/23/24 the bottom cliff,
-  // 0/1/2 the grass top rim, 48/49/50/51 the diagonal outer corners.
-  private static RAISE = [0, 1, 2, 11, 12, 13, 22, 23, 24];
-  // A SUNKEN pit is the inverse: the cliff faces point INWARD on every side.
-  //   top edge drops down  -> bottom-cliff frame 23
-  //   left edge faces right -> right-cliff frame 13
-  //   right edge faces left -> left-cliff  frame 11
-  //   bottom edge faces up  -> top-rim     frame 1
-  // The corners reuse the raised platform's rounded corners, mirrored so the
-  // grass pokes INTO the pit (cliff faces inward diagonally):
-  //   pit-TL -> 24 (raised BR), TR -> 22 (raised BL), BL -> 2 (raised TR),
-  //   pit-BR -> 0 (raised TL).
-  private static PIT = { TL: 24, T: 23, TR: 22, L: 13, R: 11, BL: 2, B: 1, BR: 0 };
-
   // Render a raised rectangular platform via a 9-slice autotile.
   // frames = [TL,T,TR, L,C,R, BL,B,BR]; depth keeps it above the base ground.
   private nineSlice(x0: number, y0: number, x1: number, y1: number, key: string, frames: number[], depth: number) {
@@ -561,70 +542,29 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // A sunken rectangular pit: a dirt floor with grass cliff edges dropping in.
-  // The dirt floor is laid first (depth ~0.1) so the tilled overlay (depth 1)
-  // and crops (high depth) always render above it — farming still works.
-  // floorKey: which dirt texture to fill the floor with.
-  private pitRect(x0: number, y0: number, x1: number, y1: number, depth = 0.1, floorKey = 'soil') {
-    const P = FarmScene.PIT;
+  // A sunken rectangular pit: a dirt floor with grass edges dropping into it.
+  private pitRect(x0: number, y0: number, x1: number, y1: number) {
+    // edge swap: pit-top uses the platform's bottom-edge frame, etc.
+    const E = { T: 23, B: 1, L: 13, R: 11, iTL: 16, iTR: 17, iBL: 27, iBR: 28 };
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         if (!this.inBounds(x, y)) continue;
-        const cx = x * TILE + TILE / 2;
-        const cy = y * TILE + TILE / 2;
-        // Dirt floor everywhere inside the pit.
-        this.add.image(cx, cy, floorKey, this.solidTilledFrame(x, y)).setScale(2).setDepth(depth);
-        // Grass cliff overlay on the perimeter (faces inward).
+        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'soil', this.solidTilledFrame(x, y)).setScale(2).setDepth(0.15);
         const L = x === x0, R = x === x1, T = y === y0, B = y === y1;
         let f = -1;
-        if (T && L) f = P.TL; else if (T && R) f = P.TR; else if (B && L) f = P.BL; else if (B && R) f = P.BR;
-        else if (T) f = P.T; else if (B) f = P.B; else if (L) f = P.L; else if (R) f = P.R;
-        if (f >= 0) this.add.image(cx, cy, 'ghill', f).setScale(2).setDepth(depth + 0.05 + y * 0.001);
+        if (T && L) f = E.iTL; else if (T && R) f = E.iTR; else if (B && L) f = E.iBL; else if (B && R) f = E.iBR;
+        else if (T) f = E.T; else if (B) f = E.B; else if (L) f = E.L; else if (R) f = E.R;
+        if (f >= 0) this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'glayer', f).setScale(2).setDepth(0.18);
       }
     }
   }
 
-  // A raised grass platform (9-slice with brown cliff faces), used under cabins
-  // so they read as sitting on higher ground.
-  private raisePlatform(x0: number, y0: number, x1: number, y1: number, depth = 0.2) {
-    this.nineSlice(x0, y0, x1, y1, 'ghill', FarmScene.RAISE, depth);
-  }
-
-  // Lay out one homestead/plot's elevation: a raised cabin platform + a sunken
-  // crop bed (and an optional second sunken bed, e.g. the animal pen).
-  // Coords are tile-space; beds are inclusive rectangles.
-  private elevatePlot(opts: {
-    platform?: Rect;            // raised cabin platform (inclusive)
-    crop: Rect;                 // sunken farm/crop bed (inclusive)
-    pen?: Rect;                 // optional second sunken bed (animal pen)
-  }) {
-    if (opts.platform) this.raisePlatform(opts.platform.x0, opts.platform.y0, opts.platform.x1, opts.platform.y1);
-    this.pitRect(opts.crop.x0, opts.crop.y0, opts.crop.x1, opts.crop.y1);
-    if (opts.pen) this.pitRect(opts.pen.x0, opts.pen.y0, opts.pen.x1, opts.pen.y1);
-  }
-
-  // A neighbour plot's interior split into a raised house terrace (top rows)
-  // sitting above a sunken crop bed (bottom rows), so each reads as multi-level.
-  private neighborTerrace(n: Neighbor) {
-    return {
-      platform: { x0: n.px, y0: n.py, x1: n.px + n.pw - 1, y1: n.py + 1 } as Rect,
-      bed: { x0: n.px, y0: n.py + 2, x1: n.px + n.pw - 1, y1: n.py + n.ph - 1 } as Rect,
-    };
-  }
-
   private buildElevation() {
-    // Player homestead: raised cabin platform, sunken farm + sunken animal pen.
-    this.elevatePlot({
-      platform: { x0: HOME.houseCx - 2, y0: HOME.houseBaseRow - 4, x1: HOME.houseCx + 2, y1: HOME.houseBaseRow + 1 },
-      crop: { x0: MY_PLOT.px, y0: MY_PLOT.py, x1: MY_PLOT.px + MY_PLOT.pw - 1, y1: MY_PLOT.py + MY_PLOT.ph - 1 },
-      pen: { x0: HOME.pen.x0, y0: HOME.pen.y0, x1: HOME.pen.x1, y1: HOME.pen.y1 },
-    });
-    // Every neighbour plot: raised house terrace above a sunken crop bed.
-    for (const n of NEIGHBORS) {
-      const t = this.neighborTerrace(n);
-      this.raisePlatform(t.platform.x0, t.platform.y0, t.platform.x1, t.platform.y1);
-      this.pitRect(t.bed.x0, t.bed.y0, t.bed.x1, t.bed.y1);
-    }
+    const GL = [0, 1, 2, 11, 12, 13, 22, 23, 24];
+    // PROTOTYPE: raised dark-grass platform under the cabin.
+    this.nineSlice(HOME.houseCx - 2, HOME.houseBaseRow - 4, HOME.houseCx + 2, HOME.houseBaseRow + 1, 'glayer2', GL, 0.2);
+    // PROTOTYPE: sunken farm plot (dirt pit dug into the grass).
+    this.pitRect(MY_PLOT.px, MY_PLOT.py, MY_PLOT.px + MY_PLOT.pw - 1, MY_PLOT.py + MY_PLOT.ph - 1);
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
@@ -858,16 +798,22 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- plots --------------------------------------------------------------
 
-  // The 20-plot server grid: fence + name-sign each plot. Your plot is a sunken
-  // dirt bed (built in buildElevation) you hoe & plant; the neighbours show
-  // crops growing on their own sunken beds so the server reads as alive.
+  // The 20-plot server grid: fence + name-sign each plot. Your plot's soil is
+  // tinted so it's easy to find; the neighbours show crops so the server reads
+  // as alive.
   private buildPlots() {
-    // Your plot: fence + a star sign and a little signpost. The plantable
-    // surface is the sunken dirt floor laid down in buildElevation().
+    // Your plot: fence + faint tilled rows (so the planting slots are visible) +
+    // a star sign and a little signpost.
     const p = MY_PLOT;
     this.encloseRegion(p.px - 1, p.py - 1, p.px + p.pw, p.py + p.ph, {
       top: true, bottom: true, left: true, right: true, gap: [p.px + Math.floor(p.pw / 2), p.py + p.ph],
     });
+    // Checkerboard tint marks the plantable slots without looking pre-tilled.
+    for (let y = p.py; y < p.py + p.ph; y++) {
+      for (let x = p.px; x < p.px + p.pw; x++) {
+        this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c);
+      }
+    }
     this.addPlotSign(p.px + p.pw / 2, p.py, '★ Your Plot', true);
     this.addSignpost(p.px - 1, p.py - 1);
 
@@ -887,20 +833,12 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private dressNeighborPlot(n: Neighbor) {
-    const t = this.neighborTerrace(n);
-    // A little cottage on the raised terrace (base at the terrace's front lip).
-    // The roof colour varies per plot for a lived-in, varied-village feel.
-    const houseX = (n.px + n.pw / 2) * TILE;
-    const houseBase = (t.platform.y1 + 1) * TILE;
-    const variant = NEIGHBORS.indexOf(n);
-    this.add.image(houseX, houseBase, 'coop', `nhouse${((variant % 6) + 6) % 6}`)
-      .setOrigin(0.5, 1).setScale(1.4).setDepth(houseBase);
-    // Crops grow on the sunken bed's dirt floor (the pit supplies the soil).
-    for (let y = t.bed.y0; y <= t.bed.y1; y++) {
-      for (let x = t.bed.x0; x <= t.bed.x1; x++) {
-        if (Math.random() < 0.8) {
-          const cx = x * TILE + TILE / 2;
-          const cy = y * TILE + TILE / 2;
+    for (let y = n.py; y < n.py + n.ph; y++) {
+      for (let x = n.px; x < n.px + n.pw; x++) {
+        const cx = x * TILE + TILE / 2;
+        const cy = y * TILE + TILE / 2;
+        this.add.image(cx, cy, 'tilled', this.solidTilledFrame(x, y)).setScale(2).setDepth(1);
+        if (Math.random() < 0.82) {
           const plant = PLANTS[Math.floor(Math.random() * PLANTS.length)];
           const stage = Phaser.Math.Between(1, STAGES - 1);
           this.add.image(cx, cy, 'cropsheet', plant.cropRow * 5 + stage).setScale(2).setDepth(this.cropDepth(y));
