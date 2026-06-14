@@ -485,6 +485,10 @@ export class FarmScene extends Phaser.Scene {
         this.addCollider(cx, cy, TILE, TILE);
       }
     }
+    // Lily pads and reeds floating on the pond.
+    this.add.image(26 * TILE, 14.4 * TILE, 'waterobj', 11).setScale(2).setDepth(3);
+    this.add.image(25.4 * TILE, 15.1 * TILE, 'waterobj', 8).setScale(2).setDepth(3);
+    this.add.image(27.1 * TILE, 14.9 * TILE, 'waterobj', 6).setScale(2).setDepth(4);
 
     // Cottage.
     const cabinX = CABIN.cx * TILE + TILE / 2;
