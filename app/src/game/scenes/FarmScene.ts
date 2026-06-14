@@ -35,7 +35,9 @@ import {
   growthFactor,
   harvestXp,
   levelInfo,
+  marketBonus,
   restockReductionMs,
+  sprinklerIntervalMs,
   toolRadius,
   type UpgradeId,
   type Upgrades,
@@ -130,6 +132,7 @@ export class FarmScene extends Phaser.Scene {
   private raining = false;
   private weatherUntil = 0;
   private lastRainWater = 0;
+  private lastSprinkle = 0;
   private startRaining = false;
   private facing: Dir = 'down';
   private pointerInside = false;
@@ -973,7 +976,7 @@ export class FarmScene extends Phaser.Scene {
     const count = this.harvestInv[key] ?? 0;
     if (count <= 0) return;
     const [plantId, mutId, wet] = key.split('|');
-    const value = cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
+    const value = Math.round(cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count * marketBonus(this.upgrades.market));
     delete this.harvestInv[key];
     this.coins += value;
     this.earned += value;
@@ -989,6 +992,7 @@ export class FarmScene extends Phaser.Scene {
       const [plantId, mutId, wet] = key.split('|');
       total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
     }
+    total = Math.round(total * marketBonus(this.upgrades.market));
     if (total <= 0) {
       this.toast('Nothing to sell');
       return;
@@ -1566,6 +1570,12 @@ export class FarmScene extends Phaser.Scene {
     this.ambient.setAlpha(alpha);
     this.fireflies.emitting = (frac < 0.3 || frac >= 0.82) && !this.raining;
     this.updateWeather(time);
+
+    // Sprinkler upgrade keeps tilled tiles watered on a timer.
+    if (time - this.lastSprinkle > sprinklerIntervalMs(this.upgrades.sprinkler) / this.growthMult) {
+      this.lastSprinkle = time;
+      if (this.upgrades.sprinkler > 0) this.rainWater();
+    }
 
     // tile cursor
     const p = this.input.activePointer;

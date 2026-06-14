@@ -43,7 +43,8 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
   tiers** in the shop (work your way from carrots to Prismatic blooms).
 - **Upgrades** (spend coins, permanent): bigger **Hoe**/**Watering Can** area
   (up to 7×7), **Fertilizer** (faster growth), **Fortune** (better mutation
-  odds), and **Shop Supply** (faster restocks).
+  odds), **Shop Supply** (faster restocks), a **Sprinkler** (auto-waters your
+  crops), and a **Market Stall** (higher crop sale prices).
 - **Achievements** with coin rewards, and an **Almanac** tracking every plant
   and mutation you've discovered.
 - **Ranch & Orchard** — passive income: buy **chickens** (eggs), **cows** (milk),

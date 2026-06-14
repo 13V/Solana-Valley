@@ -30,7 +30,7 @@ export function harvestXp(baseValue: number): number {
 
 // ---- upgrades -----------------------------------------------------------
 
-export type UpgradeId = 'water' | 'hoe' | 'growth' | 'fortune' | 'supply';
+export type UpgradeId = 'water' | 'hoe' | 'growth' | 'fortune' | 'supply' | 'sprinkler' | 'market';
 
 export type UpgradeDef = {
   id: UpgradeId;
@@ -49,6 +49,8 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'growth', name: 'Fertilizer', icon: '🌿', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
   { id: 'fortune', name: 'Fortune', icon: '🍀', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck` },
   { id: 'supply', name: 'Shop Supply', icon: '🛒', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
+  { id: 'sprinkler', name: 'Sprinkler', icon: '💦', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`) },
+  { id: 'market', name: 'Market Stall', icon: '💰', max: 5, cost: (l) => 350 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
 ];
 
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
@@ -56,13 +58,15 @@ export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
 ) as Record<UpgradeId, UpgradeDef>;
 
 export type Upgrades = Record<UpgradeId, number>;
-export const EMPTY_UPGRADES: Upgrades = { water: 0, hoe: 0, growth: 0, fortune: 0, supply: 0 };
+export const EMPTY_UPGRADES: Upgrades = { water: 0, hoe: 0, growth: 0, fortune: 0, supply: 0, sprinkler: 0, market: 0 };
 
 // Effects
 export const toolRadius = (lvl: number) => lvl; // 0=1 tile, 1=3x3, 2=5x5, 3=7x7
 export const growthFactor = (lvl: number) => 1 + 0.15 * lvl;
 export const fortuneLuck = (lvl: number) => 1 + 0.2 * lvl;
 export const restockReductionMs = (lvl: number) => lvl * 20_000;
+export const marketBonus = (lvl: number) => 1 + 0.1 * lvl; // crop sale price multiplier
+export const sprinklerIntervalMs = (lvl: number) => (lvl > 0 ? 45_000 / lvl : Infinity);
 
 // ---- achievements -------------------------------------------------------
 
