@@ -41,6 +41,7 @@ import {
   type Upgrades,
 } from '../progression';
 import { bus } from '../EventBus';
+import { sfx } from '../audio';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
 type Crop = {
@@ -197,6 +198,8 @@ export class FarmScene extends Phaser.Scene {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
 
+    // Browsers suspend audio until a user gesture; resume on first input.
+    this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.useToolAt(Math.floor(p.worldX / TILE), Math.floor(p.worldY / TILE));
     });
@@ -504,13 +507,19 @@ export class FarmScene extends Phaser.Scene {
       this.forArea(tx, ty, toolRadius(this.upgrades.hoe), (x, y) => {
         if (this.till(x, y)) did = true;
       });
-      if (did) this.playAction('hoe');
+      if (did) {
+        this.playAction('hoe');
+        sfx.play('till'); // once per click, not per tilled tile
+      }
     } else if (this.selected === 'can') {
       let did = false;
       this.forArea(tx, ty, toolRadius(this.upgrades.water), (x, y) => {
         if (this.waterTile(x, y)) did = true;
       });
-      if (did) this.playAction('water');
+      if (did) {
+        this.playAction('water');
+        sfx.play('water'); // once per click, not per watered tile
+      }
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
     }
@@ -581,6 +590,7 @@ export class FarmScene extends Phaser.Scene {
       lifespan: 380,
       scale: { start: 1, end: 0 },
     }, 6);
+    sfx.play('plant');
     this.emitState();
   }
 
@@ -649,6 +659,7 @@ export class FarmScene extends Phaser.Scene {
     const k = this.key(tx, ty);
     const crop = this.crops.get(k);
     if (!crop || !crop.mature) return;
+    sfx.play('harvest');
     const m = crop.mutation ?? MUTATION_BY_ID.normal;
     const value = cropValue(crop.plant, m, crop.wetAtMature);
     this.harvestInv[stackKey(crop.plant.id, m.id, crop.wetAtMature)] =
@@ -732,6 +743,7 @@ export class FarmScene extends Phaser.Scene {
     this.seeds[plantId] = (this.seeds[plantId] ?? 0) + 1;
     this.selectedSeed = plantId;
     this.selected = 'seed';
+    sfx.play('buy');
     this.toast(`Bought ${plant.name} seed`);
     this.emitState();
   }
@@ -754,6 +766,7 @@ export class FarmScene extends Phaser.Scene {
     delete this.harvestInv[key];
     this.coins += value;
     this.earned += value;
+    sfx.play('sell');
     this.checkAchievements();
     this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)`);
     this.emitState();
@@ -772,6 +785,7 @@ export class FarmScene extends Phaser.Scene {
     this.harvestInv = {};
     this.coins += total;
     this.earned += total;
+    sfx.play('sell');
     this.checkAchievements();
     this.toast(`Sold everything (+${total}🪙)`);
     this.emitState();
@@ -798,6 +812,7 @@ export class FarmScene extends Phaser.Scene {
     this.xp += amount;
     const after = levelInfo(this.xp).level;
     if (after > before) {
+      sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
       this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
     }
@@ -815,6 +830,7 @@ export class FarmScene extends Phaser.Scene {
       if (!this.achievements.has(a.id) && a.test(stats)) {
         this.achievements.add(a.id);
         this.coins += a.reward;
+        sfx.play('achievement');
         this.toast(`🏆 ${a.name}!  +${a.reward}🪙`);
       }
     }
@@ -835,6 +851,7 @@ export class FarmScene extends Phaser.Scene {
     }
     this.coins -= cost;
     this.upgrades[def.id] = lvl + 1;
+    sfx.play('upgrade');
     this.toast(`${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`);
     this.emitState();
   }
