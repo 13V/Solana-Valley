@@ -4,6 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSolBalance } from '../chain/useSolBalance';
 import { useGameState, useClock } from './useGameState';
 import { sfx } from '../game/audio';
+import { pendingChoices } from '../game/skills';
 
 // Day/night get cropped weather-sheet sprites; dawn/dusk keep their emoji
 // (no clean pixel match in the pack). `emoji` doubles as the img alt text.
@@ -38,8 +39,9 @@ export function Hud({
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
-  const { coins, progress } = useGameState();
+  const { coins, progress, skills, perks } = useGameState();
   const { day, clock, phase } = useClock();
+  const perkChoices = pendingChoices(skills, perks).length;
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
@@ -68,16 +70,32 @@ export function Hud({
         </span>
       </div>
       <div className="hud-buttons">
-        {BUTTONS.map((b) => (
-          <button
-            key={b.id}
-            className={`iconbtn ${panel === b.id ? 'active' : ''}`}
-            onClick={() => onToggle(b.id)}
-            title={b.label}
-          >
-            {b.img ? <img className="btn-ico" src={b.img} alt={b.emoji} /> : b.emoji}
-          </button>
-        ))}
+        {BUTTONS.map((b) => {
+          const showDot = b.id === 'skills' && perkChoices > 0;
+          return (
+            <button
+              key={b.id}
+              className={`iconbtn ${panel === b.id ? 'active' : ''}`}
+              onClick={() => onToggle(b.id)}
+              title={showDot ? `${b.label} — ${perkChoices} perk choice${perkChoices > 1 ? 's' : ''} available!` : b.label}
+              style={showDot ? { position: 'relative' } : undefined}
+            >
+              {b.img ? <img className="btn-ico" src={b.img} alt={b.emoji} /> : b.emoji}
+              {showDot && (
+                <span
+                  style={{
+                    position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16,
+                    padding: '0 3px', borderRadius: 8, background: '#e6433a', color: '#fff',
+                    fontSize: 10, lineHeight: '16px', textAlign: 'center', fontWeight: 700,
+                    border: '2px solid #fff3d8', boxSizing: 'border-box',
+                  }}
+                >
+                  {perkChoices}
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           className="iconbtn"
           title={muted ? 'Unmute' : 'Mute'}

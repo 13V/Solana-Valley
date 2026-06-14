@@ -1,4 +1,4 @@
-import type { Skills } from './skills';
+import type { Skills, ChosenPerks } from './skills';
 
 // A seed offer in the shop's current stock.
 export type ShopEntry = { plantId: string; stock: number };
@@ -28,6 +28,7 @@ export type UiState = {
   animalCounts: Record<string, number>; // animal id -> owned count
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
+  perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
 };
 
 // Lightweight time/restock state, emitted about once per second.

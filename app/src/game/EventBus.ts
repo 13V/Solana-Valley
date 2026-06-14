@@ -1,4 +1,5 @@
 import type { UiState, ClockState } from './types';
+import type { SkillId } from './skills';
 
 // Typed pub/sub bridge between the Phaser game (authoritative state) and the
 // React UI overlay. The game emits `state`/`clock`/`toast`; the UI emits
@@ -14,6 +15,7 @@ export interface GameEvents {
   'ui:sellAll': void;
   'ui:buyUpgrade': string; // upgrade id
   'ui:buyAnimal': string; // animal id
+  'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
 }
 
 type Handler<T> = (payload: T) => void;

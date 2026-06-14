@@ -24,6 +24,7 @@ const initialState: UiState = {
     achievements: [],
   },
   skills: { ...EMPTY_SKILLS },
+  perks: {},
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };
