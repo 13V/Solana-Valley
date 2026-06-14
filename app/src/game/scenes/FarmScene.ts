@@ -68,7 +68,8 @@ const ROCKS: Array<[number, number]> = [
 ];
 const POND = { x0: 25, y0: 14, w: 3, h: 2 };
 const CABIN = { cx: 4, baseY: 4 };
-const PEN = { x0: 5 * TILE, y0: 6 * TILE, x1: 11 * TILE, y1: 11 * TILE }; // chicken roaming area
+const PEN = { x0: 5 * TILE, y0: 6 * TILE, x1: 11 * TILE, y1: 11 * TILE }; // animal roaming area
+const ORCHARD = { x0: 18 * TILE, y0: 3 * TILE, x1: 27 * TILE, y1: 9 * TILE }; // fruit trees
 
 type Animal = {
   sprite: Phaser.GameObjects.Sprite;
@@ -907,8 +908,16 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- animals ------------------------------------------------------------
 
+  private producerArea(def: AnimalDef) {
+    return def.category === 'tree' ? ORCHARD : PEN;
+  }
+
   private spawnAnimal(def: AnimalDef, x: number, y: number) {
-    const s = this.add.sprite(x, y, def.sheet, def.idleFrames[0]).setScale(def.scale).setDepth(y + 14);
+    const s = this.add
+      .sprite(x, y, def.sheet, def.idleFrames[0])
+      .setOrigin(0.5, def.originY)
+      .setScale(def.scale)
+      .setDepth(y + 14);
     s.play(`${def.id}-idle`);
     this.animals.push({
       sprite: s,
@@ -931,20 +940,22 @@ export class FarmScene extends Phaser.Scene {
     }
     this.coins -= def.cost;
     this.animalCounts[id] = (this.animalCounts[id] ?? 0) + 1;
+    const area = this.producerArea(def);
     this.spawnAnimal(
       def,
-      Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
-      Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
+      Phaser.Math.Between(area.x0 + 24, area.x1 - 24),
+      Phaser.Math.Between(area.y0 + 24, area.y1 - 24),
     );
     sfx.play('buy');
-    this.toast(`Bought a ${def.name}! It roams the pen and makes ${def.productName.toLowerCase()}.`);
+    const where = def.category === 'tree' ? 'grows in the orchard' : 'roams the pen';
+    this.toast(`Bought a ${def.name}! It ${where} and makes ${def.productName.toLowerCase()}.`);
     this.emitState();
   }
 
   // Collect a ready product if the click landed on an animal. Returns true if so.
   private tryCollectAnimal(wx: number, wy: number): boolean {
     for (const a of this.animals) {
-      if (a.product && Phaser.Math.Distance.Between(wx, wy, a.sprite.x, a.sprite.y) < 30) {
+      if (a.product && Phaser.Math.Distance.Between(wx, wy, a.product.x, a.product.y) < 30) {
         const def = ANIMAL_BY_ID[a.type];
         a.product.destroy();
         a.product = undefined;
@@ -968,7 +979,7 @@ export class FarmScene extends Phaser.Scene {
   private updateAnimals(time: number) {
     for (const a of this.animals) {
       const def = ANIMAL_BY_ID[a.type];
-      if (time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
+      if (!def.stationary && time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
         a.nextWander = time + 2500 + Math.random() * 3500;
         const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, PEN.x0 + 12, PEN.x1 - 12);
         const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, PEN.y0 + 12, PEN.y1 - 12);
@@ -1068,11 +1079,12 @@ export class FarmScene extends Phaser.Scene {
     for (const [type, count] of Object.entries(this.animalCounts)) {
       const adef = ANIMAL_BY_ID[type];
       if (!adef) continue;
+      const area = this.producerArea(adef);
       for (let i = 0; i < count; i++) {
         this.spawnAnimal(
           adef,
-          Phaser.Math.Between(PEN.x0 + 16, PEN.x1 - 16),
-          Phaser.Math.Between(PEN.y0 + 16, PEN.y1 - 16),
+          Phaser.Math.Between(area.x0 + 24, area.x1 - 24),
+          Phaser.Math.Between(area.y0 + 24, area.y1 - 24),
         );
       }
     }

@@ -45,8 +45,9 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
   odds), and **Shop Supply** (faster restocks).
 - **Achievements** with coin rewards, and an **Almanac** tracking every plant
   and mutation you've discovered.
-- **Animals** — buy chickens (unlocked by level) that roam a pen and lay eggs;
-  click them to collect for coins + XP (passive income).
+- **Ranch & Orchard** — passive income: buy **chickens** (eggs), **cows** (milk),
+  and **fruit trees** (apple/orange/peach/pear), each unlocked by level. They
+  produce on a timer; click to collect for coins + XP.
 
 **Atmosphere**
 - A **day/night cycle** with an in-game clock, sunrise/sunset tints, a vignette,

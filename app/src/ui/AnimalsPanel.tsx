@@ -8,8 +8,8 @@ export function AnimalsPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel">
       <div className="panel-head">
-        <h3>🐔 Animals</h3>
-        <span className="muted">they roam the pen and lay goods — click them to collect</span>
+        <h3>🐔 Ranch &amp; Orchard</h3>
+        <span className="muted">they produce goods over time — click them to collect</span>
         <button className="x" onClick={onClose}>
           <img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" />
         </button>
@@ -20,12 +20,12 @@ export function AnimalsPanel({ onClose }: { onClose: () => void }) {
           const locked = progress.level < a.unlockLevel;
           const afford = coins >= a.cost;
           return (
-            <div className={`row ${locked ? 'locked' : ''}`} key={a.id} style={{ borderLeftColor: '#e0a23c' }}>
-              <img className="crop-ico-sm" src={`/assets/sprout-ui/icon_${a.id}.png`} alt="" />
+            <div className={`row ${locked ? 'locked' : ''}`} key={a.id} style={{ borderLeftColor: a.category === 'tree' ? '#5fae4a' : '#e0a23c' }}>
+              <img className="crop-ico-sm" src={a.icon} alt="" />
               <span className="row-name">
                 {a.name}
                 <span className="row-sub">
-                  lays {a.productName} (+{a.productValue}🪙) every {Math.round(a.layMs / 1000)}s
+                  {a.productName} (+{a.productValue.toLocaleString()}🪙) every {Math.round(a.layMs / 1000)}s
                 </span>
               </span>
               <span className="stock">×{owned}</span>

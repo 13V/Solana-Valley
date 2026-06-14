@@ -22,6 +22,10 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('cow', `${A}cow.png`, { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('milkitem', `${A}milkitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('mfs', `${A}mfs.png`, { frameWidth: 16, frameHeight: 16 });
+    for (const t of ['apple', 'orange', 'peach', 'pear']) {
+      this.load.spritesheet(`tree_${t}`, `${A}tree_${t}.png`, { frameWidth: 32, frameHeight: 48 });
+      this.load.spritesheet(`fruit_${t}`, `${A}fruit_${t}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
     this.load.image('coop', `${A}coop.png`);
