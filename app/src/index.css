@@ -533,3 +533,140 @@ body {
   height: 34px !important;
   font-size: 13px !important;
 }
+
+/* ===================================================================== */
+/* Sprout Lands premium UI skin (enabled via .ui-skin when assets load)   */
+/* ===================================================================== */
+:root {
+  --ui-panel: url('/assets/sprout-ui/ui_panel.png');
+  --ui-btn: url('/assets/sprout-ui/ui_btn.png');
+  --ui-btn-press: url('/assets/sprout-ui/ui_btn_press.png');
+  --ui-btn-light: url('/assets/sprout-ui/ui_btn_light.png');
+  --ink: #4a3526;
+  --ink-soft: #6e5740;
+}
+
+.ui-skin .panel {
+  background: none;
+  border: 20px solid transparent;
+  border-image: var(--ui-panel) 14 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  padding: 0 2px;
+}
+
+.ui-skin .panel-head {
+  background: none;
+  border-bottom: 2px solid rgba(74, 53, 38, 0.22);
+  color: #3a2a1c;
+}
+
+.ui-skin .panel-head .muted,
+.ui-skin .muted,
+.ui-skin .row-meta,
+.ui-skin .row-sub,
+.ui-skin .stock,
+.ui-skin .empty,
+.ui-skin .rarity {
+  color: var(--ink-soft);
+}
+
+.ui-skin .x {
+  color: var(--ink);
+}
+
+.ui-skin .row {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(74, 53, 38, 0.12);
+}
+
+.ui-skin .row.sel {
+  background: rgba(123, 214, 106, 0.3);
+}
+
+.ui-skin .row-name {
+  color: #3a2a1c;
+}
+
+.ui-skin .alm-cell {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(74, 53, 38, 0.18);
+}
+
+.ui-skin .alm-name {
+  color: #3a2a1c;
+}
+
+.ui-skin .alm-body h4,
+.ui-skin .help-body h4 {
+  color: #8a5a1e;
+}
+
+.ui-skin .help-body {
+  color: var(--ink);
+}
+
+/* Buttons / chips share the wooden button frame */
+.ui-skin .btn,
+.ui-skin .iconbtn,
+.ui-skin .slot,
+.ui-skin .badge {
+  background: none;
+  border: 9px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.ui-skin .badge {
+  font-weight: 700;
+}
+
+.ui-skin .badge.coins,
+.ui-skin .badge.lvl {
+  color: #7a4a06;
+}
+
+.ui-skin .btn {
+  padding: 3px 10px;
+}
+
+.ui-skin .btn.sm {
+  border-width: 8px;
+  padding: 1px 7px;
+}
+
+.ui-skin .btn:hover,
+.ui-skin .iconbtn:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+  color: var(--ink);
+}
+
+.ui-skin .btn.active,
+.ui-skin .iconbtn.active,
+.ui-skin .btn:active,
+.ui-skin .iconbtn:active {
+  border-image: var(--ui-btn-press) 8 fill stretch;
+}
+
+.ui-skin .slot {
+  border-width: 10px;
+}
+
+.ui-skin .slot.selected {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+  box-shadow: none;
+}
+
+.ui-skin .slot-label,
+.ui-skin .slot-key {
+  color: var(--ink);
+  opacity: 0.85;
+}
+
+.ui-skin .btn:disabled {
+  filter: grayscale(0.4);
+  opacity: 0.55;
+}

@@ -7,6 +7,8 @@ app/dist/
 
 # third-party art fetched by scripts/fetch-assets.mjs (not redistributed here)
 app/public/assets/sprout/
+# premium Sprout Lands UI pack (licensed per-user; not redistributed here)
+app/public/assets/sprout-ui/
 
 # logs / env
 *.log

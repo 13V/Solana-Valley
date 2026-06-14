@@ -31,6 +31,14 @@ export function App() {
     };
   }, []);
 
+  // Enable the Sprout Lands premium UI skin only if its assets are present
+  // (they're git-ignored), so the UI degrades to the default theme otherwise.
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => document.documentElement.classList.add('ui-skin');
+    img.src = '/assets/sprout-ui/ui_panel.png';
+  }, []);
+
   const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));
   const close = () => setPanel(null);
   const closeHelp = () => {
