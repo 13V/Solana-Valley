@@ -125,6 +125,12 @@ export class FarmScene extends Phaser.Scene {
   private highlight!: Phaser.GameObjects.Image;
   private ambient!: Phaser.GameObjects.Rectangle;
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private rain!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private storm!: Phaser.GameObjects.Rectangle;
+  private raining = false;
+  private weatherUntil = 0;
+  private lastRainWater = 0;
+  private startRaining = false;
   private facing: Dir = 'down';
   private pointerInside = false;
   private actingUntil = 0;
@@ -198,6 +204,27 @@ export class FarmScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
       .setDepth(88000);
+
+    // Rain (falling streaks) + a storm tint, toggled by the weather scheduler.
+    this.rain = this.add
+      .particles(0, 0, 'raindrop', {
+        x: { min: -40, max: GAME_WIDTH },
+        y: -12,
+        lifespan: 900,
+        frequency: 14,
+        quantity: 2,
+        speedY: { min: 520, max: 660 },
+        speedX: { min: -120, max: -80 },
+        scaleY: { min: 0.8, max: 1.4 },
+        alpha: { start: 0.55, end: 0.2 },
+        emitting: false,
+      })
+      .setDepth(89800);
+    this.storm = this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x3a4a66, 1)
+      .setOrigin(0, 0)
+      .setDepth(89900)
+      .setAlpha(0);
 
     this.ambient = this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0a1430, 1)
@@ -319,9 +346,11 @@ export class FarmScene extends Phaser.Scene {
     const xp = Number(params.get('xp'));
     if (Number.isFinite(xp) && xp > 0) this.xp = xp;
 
+    this.startRaining = params.has('rain');
+
     if (params.has('reset')) localStorage.removeItem(SAVE_KEY);
     // Don't load/save during scripted/dev sessions so demos stay deterministic.
-    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp'].some((k) => params.has(k));
+    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp', 'rain'].some((k) => params.has(k));
   }
 
   // Premium character sheet (8 frames/row). Rows 0–3 = idle, 4–7 = walk, each
@@ -1407,6 +1436,48 @@ export class FarmScene extends Phaser.Scene {
     };
   }
 
+  // Occasional rain: a passing shower that waters every tilled tile for free.
+  private updateWeather(time: number) {
+    if (this.weatherUntil === 0) {
+      if (this.startRaining) {
+        this.raining = true;
+        this.rain.emitting = true;
+        this.storm.setAlpha(0.2);
+        this.weatherUntil = time + 30_000;
+      } else {
+        this.weatherUntil = time + 30_000 + Math.random() * 40_000; // first dry spell
+      }
+    }
+    if (time >= this.weatherUntil) {
+      this.raining = !this.raining;
+      this.rain.emitting = this.raining;
+      this.tweens.add({ targets: this.storm, alpha: this.raining ? 0.2 : 0, duration: 1500 });
+      if (this.raining) {
+        this.weatherUntil = time + 22_000 + Math.random() * 22_000; // shower length
+        this.toast('🌧️ A gentle rain rolls in — your crops are watered.');
+      } else {
+        this.weatherUntil = time + 55_000 + Math.random() * 70_000; // dry spell
+        this.toast('🌤️ The rain clears up.');
+      }
+    }
+    if (this.raining && time - this.lastRainWater > 1500) {
+      this.lastRainWater = time;
+      this.rainWater();
+    }
+  }
+
+  // Wet every tilled tile (rain falls everywhere).
+  private rainWater() {
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        if (!this.tiles[y][x].tilled) continue;
+        this.tiles[y][x].wetUntil = this.time.now + WET_MS;
+        this.wetTiles.add(this.key(x, y));
+        this.setGroundTexture(x, y);
+      }
+    }
+  }
+
   update(time: number, delta: number) {
     // movement
     let vx = 0;
@@ -1484,7 +1555,8 @@ export class FarmScene extends Phaser.Scene {
     const { color, alpha } = this.ambientFor(frac);
     this.ambient.setFillStyle(color);
     this.ambient.setAlpha(alpha);
-    this.fireflies.emitting = frac < 0.3 || frac >= 0.82;
+    this.fireflies.emitting = (frac < 0.3 || frac >= 0.82) && !this.raining;
+    this.updateWeather(time);
 
     // tile cursor
     const p = this.input.activePointer;

@@ -55,6 +55,8 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 **Atmosphere**
 - A **day/night cycle** with an in-game clock, sunrise/sunset tints, a vignette,
   and **fireflies at night**.
+- **Weather**: passing showers roll in with falling rain and an overcast tint —
+  and rain **waters every tilled tile for free** while it lasts.
 - Particle FX for watering, planting, harvesting, and rare-crop sparkles.
 
 **Quality of life**
@@ -113,6 +115,7 @@ don't touch your real farm):
 | `?give=strawberry:10,pumpkin:3` | Grant seeds (and select the first) |
 | `?mut=rainbow` | Force a mutation on every harvest (`gold`, `rainbow`, …) |
 | `?time=0.85` | Start at a point in the day (0 = midnight, 0.5 = noon) |
+| `?rain=1` | Start with a rain shower falling |
 | `?reset=1` | Clear the local save |
 
 ## Project structure

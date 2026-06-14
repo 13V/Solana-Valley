@@ -159,6 +159,12 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
 
     g = this.gfx();
+    g.fillStyle(0xbfe3ff, 1);
+    g.fillRect(0, 0, 2, 9);
+    g.generateTexture('raindrop', 2, 9);
+    g.destroy();
+
+    g = this.gfx();
     const vw = 160;
     const vh = 96;
     for (let i = 0; i <= 60; i++) {
