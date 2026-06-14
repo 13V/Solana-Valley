@@ -78,6 +78,9 @@ type Animal = {
   layAt: number;
   nextWander: number;
   product?: Phaser.GameObjects.Image;
+  baby?: boolean; // a young animal that grows into an adult
+  growUpAt?: number; // when a baby becomes an adult
+  breedAt?: number; // when an adult next tries to produce a baby
 };
 
 const SAVE_KEY = 'solana-valley:save';
@@ -386,6 +389,17 @@ export class FarmScene extends Phaser.Scene {
         }
         if (!this.anims.exists(`${sheet}-walk`)) {
           this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+        }
+      }
+      // Baby palette swaps for breedable animals.
+      if (a.breeding) {
+        for (const sheet of a.breeding.babySheets) {
+          if (!this.anims.exists(`${sheet}-idle`)) {
+            this.anims.create({ key: `${sheet}-idle`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.breeding.babyIdle }), frameRate: 4, repeat: -1 });
+          }
+          if (!this.anims.exists(`${sheet}-walk`)) {
+            this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.breeding.babyWalk }), frameRate: 7, repeat: -1 });
+          }
         }
       }
     }
@@ -1051,6 +1065,28 @@ export class FarmScene extends Phaser.Scene {
       color,
       layAt: this.time.now + def.layMs / this.growthMult,
       nextWander: this.time.now + 1500 + Math.random() * 3000,
+      breedAt: def.breeding ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult : undefined,
+    });
+  }
+
+  // A baby wanders the pen and grows into an adult after a while.
+  private spawnBaby(def: AnimalDef, x: number, y: number) {
+    if (!def.breeding) return;
+    const color = Phaser.Utils.Array.GetRandom(def.breeding.babySheets);
+    const s = this.add
+      .sprite(x, y, color, def.breeding.babyIdle[0])
+      .setOrigin(0.5, def.originY)
+      .setScale(def.breeding.babyScale)
+      .setDepth(y + 14);
+    s.play(`${color}-idle`);
+    this.animals.push({
+      sprite: s,
+      type: def.id,
+      color,
+      baby: true,
+      growUpAt: this.time.now + def.breeding.growMs / this.growthMult,
+      layAt: Infinity,
+      nextWander: this.time.now + 1000 + Math.random() * 2500,
     });
   }
 
@@ -1104,6 +1140,8 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private updateAnimals(time: number) {
+    const grown: Animal[] = [];
+    const breeders: Animal[] = [];
     for (const a of this.animals) {
       const def = ANIMAL_BY_ID[a.type];
       if (!def.stationary && time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
@@ -1117,15 +1155,51 @@ export class FarmScene extends Phaser.Scene {
           onComplete: () => a.sprite.play(`${a.color}-idle`, true),
         });
       }
-      if (!a.product && time >= a.layAt) {
-        a.product = this.add
-          .image(a.sprite.x, a.sprite.y + def.productOffsetY, def.productSheet, def.productFrame)
-          .setScale(def.productScale ?? 2)
-          .setDepth(99990);
+      if (a.baby) {
+        if (a.growUpAt !== undefined && time >= a.growUpAt) grown.push(a);
+      } else {
+        if (!a.product && time >= a.layAt) {
+          a.product = this.add
+            .image(a.sprite.x, a.sprite.y + def.productOffsetY, def.productSheet, def.productFrame)
+            .setScale(def.productScale ?? 2)
+            .setDepth(99990);
+        }
+        if (a.product) a.product.setPosition(a.sprite.x, a.sprite.y + def.productOffsetY);
+        if (def.breeding && a.breedAt !== undefined && time >= a.breedAt) {
+          a.breedAt = time + (def.breeding.ms * (0.7 + Math.random() * 0.6)) / this.growthMult;
+          breeders.push(a);
+        }
       }
-      if (a.product) a.product.setPosition(a.sprite.x, a.sprite.y + def.productOffsetY);
       a.sprite.setDepth(a.sprite.y + 14);
     }
+    // Defer list mutations until after iteration.
+    for (const a of breeders) this.tryBreed(a);
+    for (const a of grown) this.growUp(a);
+  }
+
+  // An adult tries to produce a baby, if it has a mate and the herd isn't full.
+  private tryBreed(a: Animal) {
+    const def = ANIMAL_BY_ID[a.type];
+    if (!def.breeding) return;
+    if ((this.animalCounts[a.type] ?? 0) < 2) return; // needs a pair
+    const herd = this.animals.filter((x) => x.type === a.type).length; // adults + babies
+    if (herd >= def.breeding.cap) return;
+    this.spawnBaby(def, a.sprite.x + (Math.random() * 2 - 1) * 16, a.sprite.y + 10);
+    this.burst(a.sprite.x, a.sprite.y - 8, 'p_star', { speed: { min: 20, max: 50 }, lifespan: 600, scale: { start: 0.8, end: 0 }, tint: 0xffc6e0 }, 5);
+    this.toast(`🐣 A baby ${def.name.toLowerCase()} was born!`);
+  }
+
+  private growUp(a: Animal) {
+    const def = ANIMAL_BY_ID[a.type];
+    const i = this.animals.indexOf(a);
+    if (i >= 0) this.animals.splice(i, 1);
+    const { x, y } = a.sprite;
+    a.sprite.destroy();
+    this.animalCounts[a.type] = (this.animalCounts[a.type] ?? 0) + 1;
+    this.spawnAnimal(def, x, y);
+    this.burst(x, y - 10, 'p_star', { speed: { min: 30, max: 70 }, lifespan: 700, scale: { start: 1, end: 0 }, tint: 0xfff3a0 }, 7);
+    this.toast(`✨ A baby ${def.name.toLowerCase()} grew into an adult!`);
+    this.emitState();
   }
 
   // ---- persistence (localStorage) ----------------------------------------

@@ -28,6 +28,15 @@ export type AnimalDef = {
   icon: string; // UI icon path
   colorways?: string[]; // optional palette-swap sheets; one is picked per animal
   rareColor?: string; // the uncommon colour in colorways (rolled less often)
+  breeding?: {
+    cap: number; // max herd (adults + babies) of this type before breeding stops
+    ms: number; // average interval an adult tries to produce a baby
+    growMs: number; // how long a baby takes to grow into an adult
+    babyScale: number;
+    babyIdle: number[];
+    babyWalk: number[];
+    babySheets: string[]; // baby palette-swap sheets (one picked per baby)
+  };
 };
 
 const tree = (
@@ -55,6 +64,11 @@ export const ANIMALS: AnimalDef[] = [
     productSheet: 'eggitem', productFrame: 0, productOffsetY: -20, productScale: 1.4,
     icon: '/assets/sprout-ui/icon_chicken.png',
     colorways: ['chick_white', 'chick_brown', 'chick_green', 'chick_red', 'chick_blue'], rareColor: 'chick_blue',
+    breeding: {
+      cap: 10, ms: 70_000, growMs: 80_000, babyScale: 1.7,
+      babyIdle: [0, 1, 2, 3], babyWalk: [16, 17, 18, 19, 20, 21, 22, 23],
+      babySheets: ['baby_chick_white', 'baby_chick_brown', 'baby_chick_green', 'baby_chick_red', 'baby_chick_blue'],
+    },
   },
   {
     id: 'cow', name: 'Cow', category: 'animal', cost: 600, unlockLevel: 6,
@@ -64,6 +78,11 @@ export const ANIMALS: AnimalDef[] = [
     productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
     icon: '/assets/sprout-ui/icon_cow.png',
     colorways: ['cow_light', 'cow_brown', 'cow_green', 'cow_pink', 'cow_purple'], rareColor: 'cow_purple',
+    breeding: {
+      cap: 8, ms: 95_000, growMs: 110_000, babyScale: 1.15,
+      babyIdle: [0, 1], babyWalk: [8, 9, 10, 11],
+      babySheets: ['baby_cow_light', 'baby_cow_brown', 'baby_cow_green', 'baby_cow_pink', 'baby_cow_purple'],
+    },
   },
   tree('apple', 'Apple Tree', 500, 4, 120, 45_000, 14),
   tree('orange', 'Orange Tree', 900, 8, 230, 55_000, 22),

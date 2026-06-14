@@ -48,7 +48,9 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
   and mutation you've discovered.
 - **Ranch & Orchard** — passive income: buy **chickens** (eggs), **cows** (milk),
   and **fruit trees** (apple/orange/peach/pear), each unlocked by level. They
-  produce on a timer; click to collect for coins + XP.
+  produce on a timer; click to collect for coins + XP. Animals spawn in random
+  **colours** (with a rare blue chicken / purple cow) and **breed** — keep a pair
+  and baby animals appear and grow into adults, so your herd grows itself.
 
 **Atmosphere**
 - A **day/night cycle** with an in-game clock, sunrise/sunset tints, a vignette,

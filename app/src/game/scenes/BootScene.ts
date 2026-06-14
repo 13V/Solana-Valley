@@ -28,6 +28,13 @@ export class BootScene extends Phaser.Scene {
     for (const c of ['brown', 'green', 'light', 'pink', 'purple']) {
       this.load.spritesheet(`cow_${c}`, `${A}cow_${c}.png`, { frameWidth: 32, frameHeight: 32 });
     }
+    // Baby animals (for breeding) share the adult palette swaps.
+    for (const c of ['white', 'blue', 'brown', 'green', 'red']) {
+      this.load.spritesheet(`baby_chick_${c}`, `${A}baby_chick_${c}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
+    for (const c of ['brown', 'green', 'light', 'pink', 'purple']) {
+      this.load.spritesheet(`baby_cow_${c}`, `${A}baby_cow_${c}.png`, { frameWidth: 32, frameHeight: 32 });
+    }
     this.load.spritesheet('eggitem', `${A}eggitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('milkitem', `${A}milkitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('mfs', `${A}mfs.png`, { frameWidth: 16, frameHeight: 16 });
