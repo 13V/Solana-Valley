@@ -339,11 +339,9 @@ export class FarmScene extends Phaser.Scene {
     return (x * 7 + y * 13) % 3; // clean full-grass tiles 0..2
   }
 
-  // Tilled-dirt autotile: bitmask of orthogonal tilled neighbours -> nine-slice
-  // frame in the Sprout Lands tilled-dirt sheet (N=1, E=2, S=4, W=8).
-  private static AUTOTILE: Record<number, number> = {
-    15: 42, 14: 34, 11: 50, 13: 43, 7: 41, 6: 33, 12: 35, 3: 49, 9: 51,
-  };
+  // Solid tilled-dirt tiles (premium Tilled_Dirt_v2 sheet, 11 cols) that tile
+  // seamlessly into a filled plot; a few variants add subtle texture.
+  private static TILLED_FRAMES = [55, 56, 57];
 
   private buildWorld() {
     for (let y = 0; y < GRID_H; y++) {
@@ -360,17 +358,8 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  private isTilled(x: number, y: number): boolean {
-    return this.inBounds(x, y) && this.tiles[y][x].tilled;
-  }
-
-  private tilledFrame(x: number, y: number): number {
-    let m = 0;
-    if (this.isTilled(x, y - 1)) m |= 1;
-    if (this.isTilled(x + 1, y)) m |= 2;
-    if (this.isTilled(x, y + 1)) m |= 4;
-    if (this.isTilled(x - 1, y)) m |= 8;
-    return FarmScene.AUTOTILE[m] ?? 42;
+  private solidTilledFrame(x: number, y: number): number {
+    return FarmScene.TILLED_FRAMES[(x * 7 + y * 13) % 3];
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
@@ -486,7 +475,7 @@ export class FarmScene extends Phaser.Scene {
   private setGroundTexture(x: number, y: number) {
     const ov = this.overlay[y][x];
     if (this.tiles[y][x].tilled) {
-      ov.setVisible(true).setFrame(this.tilledFrame(x, y)).setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
+      ov.setVisible(true).setFrame(this.solidTilledFrame(x, y)).setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
     } else {
       ov.setVisible(false);
     }
