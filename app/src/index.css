@@ -670,3 +670,11 @@ body {
   filter: grayscale(0.4);
   opacity: 0.55;
 }
+
+.hud-icon {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  vertical-align: -2px;
+  margin-right: 2px;
+}

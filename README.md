@@ -55,6 +55,7 @@ demand, not committed — see [CREDITS](CREDITS.md)); crops and all effects
 - **Autosave** to `localStorage` — your farm, coins, seeds, harvest, shop, and
   time all persist across reloads.
 - A built-in **How to Play** panel (shown on first visit).
+- **Synthesized sound effects** (WebAudio, no audio files) with a HUD mute toggle.
 
 **Solana**
 - Connect Phantom/Solflare (devnet); see your address and live SOL balance.

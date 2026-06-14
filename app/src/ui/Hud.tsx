@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSolBalance } from '../chain/useSolBalance';
 import { useGameState, useClock } from './useGameState';
+import { sfx } from '../game/audio';
 
 const PHASE_ICON: Record<string, string> = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
 
@@ -32,14 +34,18 @@ export function Hud({
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
     : null;
   const xpPct = progress.xpNeed > 0 ? Math.min(100, (progress.xpInto / progress.xpNeed) * 100) : 100;
+  const [muted, setMuted] = useState(() => sfx.isMuted());
 
   return (
     <div className="hud">
       <div className="hud-left">
         <span className="badge">{PHASE_ICON[phase]} Day {day} · {clock}</span>
-        <span className="badge coins">🪙 {coins.toLocaleString()}</span>
+        <span className="badge coins">
+          <img className="hud-icon" src="/assets/sprout-ui/icon_coin.png" alt="🪙" />
+          {coins.toLocaleString()}
+        </span>
         <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
-          ⭐ Lv {progress.level}
+          <img className="hud-icon" src="/assets/sprout-ui/icon_star.png" alt="⭐" /> Lv {progress.level}
           <span className="xpbar"><span className="xpfill" style={{ width: `${xpPct}%` }} /></span>
         </span>
       </div>
@@ -54,6 +60,18 @@ export function Hud({
             {b.icon}
           </button>
         ))}
+        <button
+          className="iconbtn"
+          title={muted ? 'Unmute' : 'Mute'}
+          onClick={() => {
+            sfx.resume();
+            const next = !muted;
+            sfx.setMuted(next);
+            setMuted(next);
+          }}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
       </div>
       <div className="hud-right">
         {addr && (
