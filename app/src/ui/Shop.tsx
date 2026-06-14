@@ -1,9 +1,9 @@
-import { PLANTS, RARITY } from '../game/economy';
+import { PLANTS, RARITY, RARITY_UNLOCK } from '../game/economy';
 import { useGameState, useClock } from './useGameState';
 import { bus } from '../game/EventBus';
 
 export function Shop({ onClose }: { onClose: () => void }) {
-  const { coins, shop } = useGameState();
+  const { coins, shop, progress } = useGameState();
   const { restockIn } = useClock();
   const stockById: Record<string, number> = Object.fromEntries(shop.map((s) => [s.plantId, s.stock]));
   const mm = String(Math.floor(restockIn / 60)).padStart(2, '0');
@@ -18,24 +18,27 @@ export function Shop({ onClose }: { onClose: () => void }) {
       </div>
       <div className="rows">
         {PLANTS.map((p) => {
-          const stock = stockById[p.id] ?? 0;
           const r = RARITY[p.rarity];
+          const locked = RARITY_UNLOCK[p.rarity] > progress.level;
+          const stock = stockById[p.id] ?? 0;
           const afford = coins >= p.seedCost;
           return (
-            <div className="row" key={p.id} style={{ borderLeftColor: r.css }}>
+            <div className={`row ${locked ? 'locked' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
               <span className="dot" style={{ background: r.css, color: r.css }} />
               <span className="row-name">
                 {p.name}
                 <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>
               </span>
               <span className="row-meta">{p.growthSeconds}s · {p.baseValue.toLocaleString()}🪙</span>
-              <span className={`stock ${stock > 0 ? '' : 'out'}`}>{stock > 0 ? `×${stock}` : '—'}</span>
+              <span className={`stock ${stock > 0 && !locked ? '' : 'out'}`}>
+                {locked ? '🔒' : stock > 0 ? `×${stock}` : '—'}
+              </span>
               <button
                 className="btn sm"
-                disabled={stock <= 0 || !afford}
+                disabled={locked || stock <= 0 || !afford}
                 onClick={() => bus.emit('ui:buySeed', p.id)}
               >
-                {p.seedCost.toLocaleString()}🪙
+                {locked ? `Lv ${RARITY_UNLOCK[p.rarity]}` : `${p.seedCost.toLocaleString()}🪙`}
               </button>
             </div>
           );

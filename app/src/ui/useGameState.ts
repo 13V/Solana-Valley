@@ -9,6 +9,18 @@ const initialState: UiState = {
   seeds: {},
   harvest: {},
   shop: [],
+  progress: {
+    level: 1,
+    xpInto: 0,
+    xpNeed: 1,
+    upgrades: {},
+    earned: 0,
+    harvested: 0,
+    mutationsFound: 0,
+    discoveredPlants: [],
+    discoveredMutations: [],
+    achievements: [],
+  },
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };

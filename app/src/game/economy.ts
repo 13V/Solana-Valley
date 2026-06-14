@@ -77,6 +77,17 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
+// Player level at which each rarity tier becomes available in the shop.
+export const RARITY_UNLOCK: Record<Rarity, number> = {
+  Common: 1,
+  Uncommon: 2,
+  Rare: 5,
+  Legendary: 9,
+  Mythical: 14,
+  Divine: 20,
+  Prismatic: 28,
+};
+
 // ---- mutations ----------------------------------------------------------
 
 export type Mutation = {
@@ -103,11 +114,22 @@ export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
 
 const MUT_TOTAL = MUTATIONS.reduce((s, m) => s + m.weight, 0);
 
-export function pickMutation(): Mutation {
-  let r = Math.random() * MUT_TOTAL;
-  for (const m of MUTATIONS) {
-    r -= m.weight;
-    if (r <= 0) return m;
+// `luck` (>=1) scales up the odds of non-normal mutations (the Fortune upgrade).
+export function pickMutation(luck = 1): Mutation {
+  if (luck <= 1) {
+    let r = Math.random() * MUT_TOTAL;
+    for (const m of MUTATIONS) {
+      r -= m.weight;
+      if (r <= 0) return m;
+    }
+    return MUTATIONS[0];
+  }
+  const weights = MUTATIONS.map((m) => (m.id === 'normal' ? m.weight : m.weight * luck));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < MUTATIONS.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return MUTATIONS[i];
   }
   return MUTATIONS[0];
 }
@@ -125,9 +147,13 @@ function randInt(min: number, max: number): number {
 // Roll a fresh shop stock map (plantId -> count). Commons always present;
 // rarer tiers appear with decreasing probability — that's the "wait for the
 // rare restock" chase.
-export function rollShop(): Record<string, number> {
+export function rollShop(level = 99): Record<string, number> {
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
+    if (RARITY_UNLOCK[p.rarity] > level) {
+      stock[p.id] = 0; // tier not unlocked yet
+      continue;
+    }
     const r = RARITY[p.rarity];
     stock[p.id] = Math.random() < r.present ? randInt(r.qty[0], r.qty[1]) : 0;
   }

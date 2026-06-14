@@ -7,6 +7,8 @@ import { Hotbar } from './Hotbar';
 import { Shop } from './Shop';
 import { SeedsPanel } from './SeedsPanel';
 import { BagPanel } from './BagPanel';
+import { UpgradesPanel } from './UpgradesPanel';
+import { AlmanacPanel } from './AlmanacPanel';
 import { HelpPanel } from './HelpPanel';
 import { Toasts } from './Toasts';
 
@@ -45,6 +47,8 @@ export function App() {
           {panel === 'shop' && <Shop onClose={close} />}
           {panel === 'seeds' && <SeedsPanel onClose={close} />}
           {panel === 'bag' && <BagPanel onClose={close} />}
+          {panel === 'upgrades' && <UpgradesPanel onClose={close} />}
+          {panel === 'almanac' && <AlmanacPanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           <Hotbar />
           <Toasts />

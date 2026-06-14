@@ -5,7 +5,16 @@ import { useGameState, useClock } from './useGameState';
 
 const PHASE_ICON: Record<string, string> = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'help' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'upgrades' | 'almanac' | 'help' | null;
+
+const BUTTONS: Array<{ id: Exclude<Panel, null>; icon: string; label: string }> = [
+  { id: 'shop', icon: '🛒', label: 'Shop' },
+  { id: 'seeds', icon: '🌱', label: 'Seeds' },
+  { id: 'bag', icon: '🎒', label: 'Harvest' },
+  { id: 'upgrades', icon: '⬆️', label: 'Upgrades' },
+  { id: 'almanac', icon: '📖', label: 'Almanac' },
+  { id: 'help', icon: '❔', label: 'Help' },
+];
 
 export function Hud({
   panel,
@@ -16,32 +25,35 @@ export function Hud({
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
-  const { coins } = useGameState();
+  const { coins, progress } = useGameState();
   const { day, clock, phase } = useClock();
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
     : null;
+  const xpPct = progress.xpNeed > 0 ? Math.min(100, (progress.xpInto / progress.xpNeed) * 100) : 100;
 
   return (
     <div className="hud">
       <div className="hud-left">
-        <span className="badge">
-          {PHASE_ICON[phase]} Day {day} · {clock}
-        </span>
+        <span className="badge">{PHASE_ICON[phase]} Day {day} · {clock}</span>
         <span className="badge coins">🪙 {coins.toLocaleString()}</span>
-        <button className={`btn ${panel === 'shop' ? 'active' : ''}`} onClick={() => onToggle('shop')}>
-          🛒 Shop
-        </button>
-        <button className={`btn ${panel === 'seeds' ? 'active' : ''}`} onClick={() => onToggle('seeds')}>
-          🌱 Seeds
-        </button>
-        <button className={`btn ${panel === 'bag' ? 'active' : ''}`} onClick={() => onToggle('bag')}>
-          🎒 Harvest
-        </button>
-        <button className={`btn ${panel === 'help' ? 'active' : ''}`} onClick={() => onToggle('help')}>
-          ?
-        </button>
+        <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
+          ⭐ Lv {progress.level}
+          <span className="xpbar"><span className="xpfill" style={{ width: `${xpPct}%` }} /></span>
+        </span>
+      </div>
+      <div className="hud-buttons">
+        {BUTTONS.map((b) => (
+          <button
+            key={b.id}
+            className={`iconbtn ${panel === b.id ? 'active' : ''}`}
+            onClick={() => onToggle(b.id)}
+            title={b.label}
+          >
+            {b.icon}
+          </button>
+        ))}
       </div>
       <div className="hud-right">
         {addr && (

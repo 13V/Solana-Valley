@@ -37,6 +37,15 @@ demand, not committed — see [CREDITS](CREDITS.md)); crops and all effects
 - Inventory: a **Seeds** panel to choose what to plant and a **Harvest**
   backpack to sell stacks (or sell everything).
 
+**Progression**
+- **Levels & XP** — harvesting earns XP; leveling up **unlocks higher rarity
+  tiers** in the shop (work your way from carrots to Prismatic blooms).
+- **Upgrades** (spend coins, permanent): bigger **Hoe**/**Watering Can** area
+  (up to 7×7), **Fertilizer** (faster growth), **Fortune** (better mutation
+  odds), and **Shop Supply** (faster restocks).
+- **Achievements** with coin rewards, and an **Almanac** tracking every plant
+  and mutation you've discovered.
+
 **Atmosphere**
 - A **day/night cycle** with an in-game clock, sunrise/sunset tints, a vignette,
   and **fireflies at night**.

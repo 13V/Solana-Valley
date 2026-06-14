@@ -17,6 +17,7 @@ import {
   PLANTS,
   PLANT_BY_ID,
   RARITY,
+  RARITY_UNLOCK,
   rarityRank,
   pickMutation,
   cropValue,
@@ -26,6 +27,19 @@ import {
   type Plant,
   type Mutation,
 } from '../economy';
+import {
+  ACHIEVEMENTS,
+  EMPTY_UPGRADES,
+  UPGRADE_BY_ID,
+  fortuneLuck,
+  growthFactor,
+  harvestXp,
+  levelInfo,
+  restockReductionMs,
+  toolRadius,
+  type UpgradeId,
+  type Upgrades,
+} from '../progression';
 import { bus } from '../EventBus';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
@@ -54,7 +68,7 @@ const POND = { x0: 25, y0: 14, w: 3, h: 2 };
 const CABIN = { cx: 4, baseY: 4 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 type SaveData = {
   v: number;
@@ -68,6 +82,15 @@ type SaveData = {
   restockMs: number;
   tiles: Array<[number, number, number]>; // x, y, wetRemainingMs (tilled implied)
   crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean }>;
+  // progression
+  xp: number;
+  upgrades: Upgrades;
+  earned: number;
+  harvested: number;
+  mutationsFound: number;
+  discPlants: string[];
+  discMutations: string[];
+  achievements: string[];
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -95,6 +118,16 @@ export class FarmScene extends Phaser.Scene {
   private seeds: Record<string, number> = { carrot: 5 };
   private harvestInv: Record<string, number> = {};
   private shopStock: Record<string, number> = {};
+
+  // progression
+  private xp = 0;
+  private upgrades: Upgrades = { ...EMPTY_UPGRADES };
+  private earned = 0;
+  private harvested = 0;
+  private mutationsFound = 0;
+  private discoveredPlants = new Set<string>();
+  private discoveredMutations = new Set<string>();
+  private achievements = new Set<string>();
 
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
   private restockMs = RESTOCK_MS;
@@ -170,7 +203,7 @@ export class FarmScene extends Phaser.Scene {
     this.input.on('pointermove', () => (this.pointerInside = true));
     this.input.on('gameout', () => (this.pointerInside = false));
 
-    this.shopStock = rollShop();
+    this.shopStock = rollShop(levelInfo(this.xp).level);
     if (this.persist) this.loadSave();
 
     this.unsubs.push(
@@ -179,6 +212,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buySeed', (id) => this.buySeed(id)),
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
+      bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
     );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
@@ -253,9 +287,12 @@ export class FarmScene extends Phaser.Scene {
       if (Number.isFinite(t) && t >= 0 && t < 1) this.timeMs = DAY_LENGTH_MS * t;
     }
 
+    const coins = Number(params.get('coins'));
+    if (Number.isFinite(coins) && coins > 0) this.coins = coins;
+
     if (params.has('reset')) localStorage.removeItem(SAVE_KEY);
     // Don't load/save during scripted/dev sessions so demos stay deterministic.
-    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset'].some((k) => params.has(k));
+    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins'].some((k) => params.has(k));
   }
 
   private static DIR_ROW: Record<Dir, number> = { down: 0, up: 4, left: 8, right: 12 };
@@ -456,29 +493,52 @@ export class FarmScene extends Phaser.Scene {
 
   private useToolAt(tx: number, ty: number) {
     if (!this.inBounds(tx, ty) || !this.inRange(tx, ty)) return;
-    const tile = this.tiles[ty][tx];
-    if (tile.obstacle) return;
     const crop = this.crops.get(this.key(tx, ty));
-
     if (crop && crop.mature) {
       this.harvest(tx, ty);
       return;
     }
 
     if (this.selected === 'hoe') {
-      if (!tile.tilled && !crop) {
-        tile.tilled = true;
-        this.refreshTile(tx, ty);
-        this.playAction('hoe');
-      }
+      let did = false;
+      this.forArea(tx, ty, toolRadius(this.upgrades.hoe), (x, y) => {
+        if (this.till(x, y)) did = true;
+      });
+      if (did) this.playAction('hoe');
     } else if (this.selected === 'can') {
-      if (tile.tilled) {
-        this.water(tx, ty);
-        this.playAction('water');
-      }
+      let did = false;
+      this.forArea(tx, ty, toolRadius(this.upgrades.water), (x, y) => {
+        if (this.waterTile(x, y)) did = true;
+      });
+      if (did) this.playAction('water');
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
     }
+  }
+
+  // Apply a callback over a (2r+1)² area, skipping out-of-bounds/obstacle tiles.
+  private forArea(cx: number, cy: number, r: number, fn: (x: number, y: number) => void) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (this.inBounds(x, y) && !this.tiles[y][x].obstacle) fn(x, y);
+      }
+    }
+  }
+
+  private till(x: number, y: number): boolean {
+    const t = this.tiles[y][x];
+    if (t.tilled || this.crops.has(this.key(x, y))) return false;
+    t.tilled = true;
+    this.refreshTile(x, y);
+    return true;
+  }
+
+  private waterTile(x: number, y: number): boolean {
+    if (!this.tiles[y][x].tilled) return false;
+    this.water(x, y);
+    return true;
   }
 
   private water(tx: number, ty: number) {
@@ -527,7 +587,7 @@ export class FarmScene extends Phaser.Scene {
   private matureCrop(crop: Crop) {
     crop.mature = true;
     crop.stage = STAGES - 1;
-    crop.mutation = this.forcedMutation ?? pickMutation();
+    crop.mutation = this.forcedMutation ?? pickMutation(fortuneLuck(this.upgrades.fortune));
     crop.wetAtMature = this.isWet(crop.tx, crop.ty);
     this.applyMatureVisuals(crop, true);
   }
@@ -614,6 +674,16 @@ export class FarmScene extends Phaser.Scene {
 
     this.removeCrop(crop);
     this.crops.delete(k);
+
+    this.harvested += 1;
+    this.discoveredPlants.add(crop.plant.id);
+    if (m.id !== 'normal') {
+      this.mutationsFound += 1;
+      this.discoveredMutations.add(m.id);
+    }
+    this.gainXp(harvestXp(crop.plant.baseValue));
+    this.checkAchievements();
+
     const label = m.id !== 'normal' ? `${m.name} ` : '';
     this.toast(`Harvested ${label}${crop.plant.name} (worth ${value}🪙)`);
     this.emitState();
@@ -645,6 +715,10 @@ export class FarmScene extends Phaser.Scene {
   private buySeed(plantId: string) {
     const plant = PLANT_BY_ID[plantId];
     if (!plant) return;
+    if (RARITY_UNLOCK[plant.rarity] > levelInfo(this.xp).level) {
+      this.toast(`${plant.rarity} unlocks at level ${RARITY_UNLOCK[plant.rarity]}`);
+      return;
+    }
     if ((this.shopStock[plantId] ?? 0) <= 0) {
       this.toast('Out of stock');
       return;
@@ -679,6 +753,8 @@ export class FarmScene extends Phaser.Scene {
     const value = cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
     delete this.harvestInv[key];
     this.coins += value;
+    this.earned += value;
+    this.checkAchievements();
     this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)`);
     this.emitState();
   }
@@ -695,6 +771,8 @@ export class FarmScene extends Phaser.Scene {
     }
     this.harvestInv = {};
     this.coins += total;
+    this.earned += total;
+    this.checkAchievements();
     this.toast(`Sold everything (+${total}🪙)`);
     this.emitState();
   }
@@ -709,9 +787,55 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private restock() {
-    this.shopStock = rollShop();
-    this.restockMs = RESTOCK_MS;
+    this.shopStock = rollShop(levelInfo(this.xp).level);
+    this.restockMs = Math.max(20_000, RESTOCK_MS - restockReductionMs(this.upgrades.supply));
     this.toast('🛒 The seed shop restocked!');
+    this.emitState();
+  }
+
+  private gainXp(amount: number) {
+    const before = levelInfo(this.xp).level;
+    this.xp += amount;
+    const after = levelInfo(this.xp).level;
+    if (after > before) {
+      this.toast(`⭐ Level ${after}!`);
+      this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
+    }
+  }
+
+  private checkAchievements() {
+    const stats = {
+      earned: this.earned,
+      harvested: this.harvested,
+      mutationsFound: this.mutationsFound,
+      plantsDiscovered: this.discoveredPlants.size,
+      level: levelInfo(this.xp).level,
+    };
+    for (const a of ACHIEVEMENTS) {
+      if (!this.achievements.has(a.id) && a.test(stats)) {
+        this.achievements.add(a.id);
+        this.coins += a.reward;
+        this.toast(`🏆 ${a.name}!  +${a.reward}🪙`);
+      }
+    }
+  }
+
+  private buyUpgrade(id: string) {
+    const def = UPGRADE_BY_ID[id as UpgradeId];
+    if (!def) return;
+    const lvl = this.upgrades[def.id];
+    if (lvl >= def.max) {
+      this.toast('Already maxed');
+      return;
+    }
+    const cost = def.cost(lvl);
+    if (this.coins < cost) {
+      this.toast('Not enough coins');
+      return;
+    }
+    this.coins -= cost;
+    this.upgrades[def.id] = lvl + 1;
+    this.toast(`${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`);
     this.emitState();
   }
 
@@ -744,6 +868,14 @@ export class FarmScene extends Phaser.Scene {
       restockMs: this.restockMs,
       tiles,
       crops,
+      xp: this.xp,
+      upgrades: this.upgrades,
+      earned: this.earned,
+      harvested: this.harvested,
+      mutationsFound: this.mutationsFound,
+      discPlants: [...this.discoveredPlants],
+      discMutations: [...this.discoveredMutations],
+      achievements: [...this.achievements],
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -771,6 +903,15 @@ export class FarmScene extends Phaser.Scene {
     this.restockMs = data.restockMs ?? RESTOCK_MS;
     this.selected = data.selected ?? 'hoe';
     this.selectedSeed = data.selectedSeed ?? null;
+
+    this.xp = data.xp ?? 0;
+    this.upgrades = { ...EMPTY_UPGRADES, ...(data.upgrades ?? {}) };
+    this.earned = data.earned ?? 0;
+    this.harvested = data.harvested ?? 0;
+    this.mutationsFound = data.mutationsFound ?? 0;
+    this.discoveredPlants = new Set(data.discPlants ?? []);
+    this.discoveredMutations = new Set(data.discMutations ?? []);
+    this.achievements = new Set(data.achievements ?? []);
 
     for (const [x, y, wetRemaining] of data.tiles ?? []) {
       if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) continue;
@@ -817,6 +958,7 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private emitState() {
+    const info = levelInfo(this.xp);
     bus.emit('state', {
       coins: this.coins,
       selected: this.selected,
@@ -824,6 +966,18 @@ export class FarmScene extends Phaser.Scene {
       seeds: { ...this.seeds },
       harvest: { ...this.harvestInv },
       shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.shopStock[p.id] ?? 0 })),
+      progress: {
+        level: info.level,
+        xpInto: info.into,
+        xpNeed: info.need,
+        upgrades: { ...this.upgrades },
+        earned: this.earned,
+        harvested: this.harvested,
+        mutationsFound: this.mutationsFound,
+        discoveredPlants: [...this.discoveredPlants],
+        discoveredMutations: [...this.discoveredMutations],
+        achievements: [...this.achievements],
+      },
     });
   }
 
@@ -902,7 +1056,7 @@ export class FarmScene extends Phaser.Scene {
     for (const crop of this.crops.values()) {
       if (crop.mature) continue;
       const wet = this.isWet(crop.tx, crop.ty);
-      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult;
+      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth);
       const total = crop.plant.growthSeconds * 1000;
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
