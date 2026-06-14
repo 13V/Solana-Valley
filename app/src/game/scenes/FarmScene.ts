@@ -181,6 +181,7 @@ export class FarmScene extends Phaser.Scene {
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
     this.buildWorld();
+    this.buildPaths();
     this.placeDecorations();
     this.buildFences();
     this.buildPlots();
@@ -503,6 +504,28 @@ export class FarmScene extends Phaser.Scene {
 
   private solidTilledFrame(x: number, y: number): number {
     return FarmScene.TILLED_FRAMES[(x * 7 + y * 13) % 3];
+  }
+
+  // Packed-dirt paths + a homestead yard, laid as ground decoration (premium
+  // soil tiles). Walkways connect the homestead to the plot grid below.
+  private layDirt(x0: number, y0: number, x1: number, y1: number) {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) continue;
+        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'soil', this.solidTilledFrame(x, y)).setScale(2).setDepth(0.5);
+      }
+    }
+  }
+
+  private buildPaths() {
+    // A dirt yard around the homestead.
+    this.layDirt(2, 9, 7, 11);
+    // A connector from your plot down to the main avenue.
+    this.layDirt(11, 9, 12, 11);
+    // The main avenue between the homestead and the plots.
+    this.layDirt(1, 11, GRID_W - 2, 12);
+    // Walkways running down the gaps between the neighbour plot columns.
+    for (const cx of [8, 16, 24, 32]) this.layDirt(cx, 12, cx, GRID_H - 3);
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).

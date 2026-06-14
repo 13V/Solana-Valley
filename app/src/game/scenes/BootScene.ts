@@ -58,6 +58,7 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('nature', `${A}nature.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('furniture', `${A}furniture.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('boats', `${A}boats.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
   }
 
   create() {
