@@ -182,6 +182,7 @@ export class FarmScene extends Phaser.Scene {
     this.createAnims();
     this.buildWorld();
     this.buildPaths();
+    this.buildElevation();
     this.placeDecorations();
     this.buildFences();
     this.buildPlots();
@@ -526,6 +527,44 @@ export class FarmScene extends Phaser.Scene {
     this.layDirt(1, 11, GRID_W - 2, 12);
     // Walkways running down the gaps between the neighbour plot columns.
     for (const cx of [8, 16, 24, 32]) this.layDirt(cx, 12, cx, GRID_H - 3);
+  }
+
+  // Render a raised rectangular platform via a 9-slice autotile.
+  // frames = [TL,T,TR, L,C,R, BL,B,BR]; depth keeps it above the base ground.
+  private nineSlice(x0: number, y0: number, x1: number, y1: number, key: string, frames: number[], depth: number) {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const fx = x === x0 ? 0 : x === x1 ? 2 : 1;
+        const fy = y === y0 ? 0 : y === y1 ? 2 : 1;
+        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key, frames[fy * 3 + fx]).setScale(2).setDepth(depth + y * 0.001);
+      }
+    }
+  }
+
+  // A sunken rectangular pit: a dirt floor with grass edges dropping into it.
+  private pitRect(x0: number, y0: number, x1: number, y1: number) {
+    // edge swap: pit-top uses the platform's bottom-edge frame, etc.
+    const E = { T: 23, B: 1, L: 13, R: 11, iTL: 16, iTR: 17, iBL: 27, iBR: 28 };
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!this.inBounds(x, y)) continue;
+        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'soil', this.solidTilledFrame(x, y)).setScale(2).setDepth(0.15);
+        const L = x === x0, R = x === x1, T = y === y0, B = y === y1;
+        let f = -1;
+        if (T && L) f = E.iTL; else if (T && R) f = E.iTR; else if (B && L) f = E.iBL; else if (B && R) f = E.iBR;
+        else if (T) f = E.T; else if (B) f = E.B; else if (L) f = E.L; else if (R) f = E.R;
+        if (f >= 0) this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'glayer', f).setScale(2).setDepth(0.18);
+      }
+    }
+  }
+
+  private buildElevation() {
+    const GL = [0, 1, 2, 11, 12, 13, 22, 23, 24];
+    // PROTOTYPE: raised dark-grass platform under the cabin.
+    this.nineSlice(HOME.houseCx - 2, HOME.houseBaseRow - 4, HOME.houseCx + 2, HOME.houseBaseRow + 1, 'glayer2', GL, 0.2);
+    // PROTOTYPE: sunken farm plot (dirt pit dug into the grass).
+    this.pitRect(MY_PLOT.px, MY_PLOT.py, MY_PLOT.px + MY_PLOT.pw - 1, MY_PLOT.py + MY_PLOT.ph - 1);
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
