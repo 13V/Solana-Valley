@@ -6,18 +6,18 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
         <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="help-body">
-        <p>Grow a farm, chase rare crops and lucky mutations, and build your fortune.</p>
+        <p>You've been given <b>★ Your Plot</b> in a valley of 20 — farm it, chase rare crops and lucky mutations, and build your fortune.</p>
         <h4>Controls</h4>
         <ul>
-          <li><b>Move:</b> WASD or arrow keys</li>
+          <li><b>Move:</b> WASD or arrow keys (the camera follows you)</li>
           <li><b>Tools:</b> press <b>1</b> Hoe · <b>2</b> Watering Can · <b>3</b> Seeds (or click the hotbar)</li>
-          <li><b>Use a tool:</b> click a tile within reach (the cursor turns red if too far)</li>
+          <li><b>Use a tool:</b> click a tile in your plot (the cursor turns red on tiles you can't farm)</li>
         </ul>
         <h4>The loop</h4>
         <ul>
-          <li><b>Hoe</b> grass into soil → plant a <b>Seed</b> → <b>Water</b> it (watered crops grow 2× faster)</li>
-          <li>Crops grow in real time. Click a <b>ripe</b> crop to harvest it.</li>
-          <li>Sell your harvest in the <b>🎒 Harvest</b> panel for coins.</li>
+          <li>Head to <b>★ Your Plot</b> and <b>Hoe</b> grass into soil → plant a <b>Seed</b> → <b>Water</b> it (watered crops grow 2× faster)</li>
+          <li>Crops grow in real time. Click a <b>ripe</b> crop to harvest it. (You can only farm your own plot.)</li>
+          <li>Sell your harvest in the <b>🎒 Harvest</b> panel for coins. Up at home you've a ranch, orchard &amp; shop.</li>
         </ul>
         <h4>Rarity &amp; mutations</h4>
         <ul>
