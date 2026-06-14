@@ -20,9 +20,15 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('pchar', `${A}pchar.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('chicken', `${A}chicken.png`, { frameWidth: 16, frameHeight: 16 });
+    // Chickens (16px) and cows (32px) come in several palette swaps; one is
+    // picked per animal for variety.
+    for (const c of ['white', 'blue', 'brown', 'green', 'red']) {
+      this.load.spritesheet(`chick_${c}`, `${A}chick_${c}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
+    for (const c of ['brown', 'green', 'light', 'pink', 'purple']) {
+      this.load.spritesheet(`cow_${c}`, `${A}cow_${c}.png`, { frameWidth: 32, frameHeight: 32 });
+    }
     this.load.spritesheet('eggitem', `${A}eggitem.png`, { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('cow', `${A}cow.png`, { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('milkitem', `${A}milkitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('mfs', `${A}mfs.png`, { frameWidth: 16, frameHeight: 16 });
     for (const t of ['apple', 'orange', 'peach', 'pear']) {

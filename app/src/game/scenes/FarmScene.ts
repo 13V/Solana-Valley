@@ -74,6 +74,7 @@ const ORCHARD = { x0: 18 * TILE, y0: 3 * TILE, x1: 27 * TILE, y1: 9 * TILE }; //
 type Animal = {
   sprite: Phaser.GameObjects.Sprite;
   type: string;
+  color: string; // texture/anim key of the chosen palette swap
   layAt: number;
   nextWander: number;
   product?: Phaser.GameObjects.Image;
@@ -375,12 +376,15 @@ export class FarmScene extends Phaser.Scene {
         });
       }
     }
+    // Animations are keyed by sheet so every palette swap gets its own pair.
     for (const a of ANIMALS) {
-      if (!this.anims.exists(`${a.id}-idle`)) {
-        this.anims.create({ key: `${a.id}-idle`, frames: this.anims.generateFrameNumbers(a.sheet, { frames: a.idleFrames }), frameRate: 3, repeat: -1 });
-      }
-      if (!this.anims.exists(`${a.id}-walk`)) {
-        this.anims.create({ key: `${a.id}-walk`, frames: this.anims.generateFrameNumbers(a.sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+      for (const sheet of a.colorways ?? [a.sheet]) {
+        if (!this.anims.exists(`${sheet}-idle`)) {
+          this.anims.create({ key: `${sheet}-idle`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.idleFrames }), frameRate: 3, repeat: -1 });
+        }
+        if (!this.anims.exists(`${sheet}-walk`)) {
+          this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+        }
       }
     }
   }
@@ -985,16 +989,26 @@ export class FarmScene extends Phaser.Scene {
     return def.category === 'tree' ? ORCHARD : PEN;
   }
 
+  // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
+  private pickColor(def: AnimalDef): string {
+    const ways = def.colorways ?? [def.sheet];
+    if (def.rareColor && Math.random() < 0.11) return def.rareColor;
+    const common = ways.filter((c) => c !== def.rareColor);
+    return Phaser.Utils.Array.GetRandom(common.length ? common : ways);
+  }
+
   private spawnAnimal(def: AnimalDef, x: number, y: number) {
+    const color = this.pickColor(def);
     const s = this.add
-      .sprite(x, y, def.sheet, def.idleFrames[0])
+      .sprite(x, y, color, def.idleFrames[0])
       .setOrigin(0.5, def.originY)
       .setScale(def.scale)
       .setDepth(y + 14);
-    s.play(`${def.id}-idle`);
+    s.play(`${color}-idle`);
     this.animals.push({
       sprite: s,
       type: def.id,
+      color,
       layAt: this.time.now + def.layMs / this.growthMult,
       nextWander: this.time.now + 1500 + Math.random() * 3000,
     });
@@ -1057,16 +1071,16 @@ export class FarmScene extends Phaser.Scene {
         const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, PEN.x0 + 12, PEN.x1 - 12);
         const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, PEN.y0 + 12, PEN.y1 - 12);
         a.sprite.setFlipX(nx < a.sprite.x);
-        a.sprite.play(`${a.type}-walk`, true);
+        a.sprite.play(`${a.color}-walk`, true);
         this.tweens.add({
           targets: a.sprite, x: nx, y: ny, duration: 1100, ease: 'Sine.inOut',
-          onComplete: () => a.sprite.play(`${a.type}-idle`, true),
+          onComplete: () => a.sprite.play(`${a.color}-idle`, true),
         });
       }
       if (!a.product && time >= a.layAt) {
         a.product = this.add
           .image(a.sprite.x, a.sprite.y + def.productOffsetY, def.productSheet, def.productFrame)
-          .setScale(2)
+          .setScale(def.productScale ?? 2)
           .setDepth(99990);
       }
       if (a.product) a.product.setPosition(a.sprite.x, a.sprite.y + def.productOffsetY);

@@ -24,7 +24,10 @@ export type AnimalDef = {
   productSheet: string;
   productFrame: number;
   productOffsetY: number; // px from the sprite to show the product
+  productScale?: number; // product sprite scale (defaults to 2)
   icon: string; // UI icon path
+  colorways?: string[]; // optional palette-swap sheets; one is picked per animal
+  rareColor?: string; // the uncommon colour in colorways (rolled less often)
 };
 
 const tree = (
@@ -47,14 +50,20 @@ export const ANIMALS: AnimalDef[] = [
   {
     id: 'chicken', name: 'Chicken', category: 'animal', cost: 150, unlockLevel: 3,
     productName: 'Egg', productValue: 28, layMs: 30_000, xp: 6,
-    sheet: 'chicken', idleFrames: [0, 1], walkFrames: [4, 5, 6, 7], scale: 2, originY: 0.5, stationary: false,
-    productSheet: 'eggitem', productFrame: 0, productOffsetY: -18, icon: '/assets/sprout-ui/icon_chicken.png',
+    sheet: 'chick_white', idleFrames: [0, 1, 2, 3], walkFrames: [16, 17, 18, 19, 20, 21, 22, 23],
+    scale: 2.4, originY: 0.72, stationary: false,
+    productSheet: 'eggitem', productFrame: 0, productOffsetY: -20, productScale: 1.4,
+    icon: '/assets/sprout-ui/icon_chicken.png',
+    colorways: ['chick_white', 'chick_brown', 'chick_green', 'chick_red', 'chick_blue'], rareColor: 'chick_blue',
   },
   {
     id: 'cow', name: 'Cow', category: 'animal', cost: 600, unlockLevel: 6,
     productName: 'Milk', productValue: 85, layMs: 60_000, xp: 16,
-    sheet: 'cow', idleFrames: [0, 1], walkFrames: [3, 4], scale: 1.5, originY: 0.5, stationary: false,
-    productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, icon: '/assets/sprout-ui/icon_cow.png',
+    sheet: 'cow_light', idleFrames: [0, 1, 2], walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
+    scale: 1.7, originY: 0.78, stationary: false,
+    productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
+    icon: '/assets/sprout-ui/icon_cow.png',
+    colorways: ['cow_light', 'cow_brown', 'cow_green', 'cow_pink', 'cow_purple'], rareColor: 'cow_purple',
   },
   tree('apple', 'Apple Tree', 500, 4, 120, 45_000, 14),
   tree('orange', 'Orange Tree', 900, 8, 230, 55_000, 22),
