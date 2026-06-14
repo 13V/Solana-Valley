@@ -311,6 +311,9 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
     this.emitClock();
 
+    // A little welcome moment pointing the player at their plot.
+    this.time.delayedCall(700, () => this.toast('🌱 Welcome! This is ★ Your Plot — hoe the soil and plant your seeds.'));
+
     // Expose for debugging / e2e screenshots when a dev param is present.
     if (location.search.length > 1) {
       (window as unknown as { __farm?: FarmScene }).__farm = this;
@@ -694,15 +697,20 @@ export class FarmScene extends Phaser.Scene {
   // tinted so it's easy to find; the neighbours show crops so the server reads
   // as alive.
   private buildPlots() {
-    // Your plot: fence + tinted soil + a star sign.
+    // Your plot: fence + faint tilled rows (so the planting slots are visible) +
+    // a star sign and a little signpost.
     const p = MY_PLOT;
     this.encloseRegion(p.px - 1, p.py - 1, p.px + p.pw, p.py + p.ph, {
       top: true, bottom: true, left: true, right: true, gap: [p.px + Math.floor(p.pw / 2), p.py + p.ph],
     });
+    // Checkerboard tint marks the plantable slots without looking pre-tilled.
     for (let y = p.py; y < p.py + p.ph; y++) {
-      for (let x = p.px; x < p.px + p.pw; x++) this.ground[y][x].setTint(0xe6f6bb);
+      for (let x = p.px; x < p.px + p.pw; x++) {
+        this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c);
+      }
     }
     this.addPlotSign(p.px + p.pw / 2, p.py, '★ Your Plot', true);
+    this.addSignpost(p.px - 1, p.py - 1);
 
     // Neighbours: fence + growing crops + a name sign (the rest of the server).
     for (const n of NEIGHBORS) {
@@ -711,7 +719,12 @@ export class FarmScene extends Phaser.Scene {
       });
       this.dressNeighborPlot(n);
       this.addPlotSign(n.px + n.pw / 2, n.py, `${n.owner}'s plot`, false);
+      this.addSignpost(n.px - 1, n.py - 1);
     }
+  }
+
+  private addSignpost(tx: number, ty: number) {
+    this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + 40);
   }
 
   private dressNeighborPlot(n: Neighbor) {
