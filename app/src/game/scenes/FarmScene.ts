@@ -549,6 +549,11 @@ export class FarmScene extends Phaser.Scene {
     }
     this.addCollider(coopX, coopBase - 18, 110, 30);
 
+    // Ranch feed station inside the pen: a wide hay bale and a feed trough.
+    this.add.image(7 * TILE + 16, 7 * TILE, 'hay', 6).setScale(2).setDepth(7 * TILE);
+    this.add.image(8 * TILE + 16, 7 * TILE, 'hay', 7).setScale(2).setDepth(7 * TILE);
+    this.add.image(6 * TILE + 16, 9 * TILE - 4, 'hay', 0).setScale(2).setDepth(9 * TILE);
+
     // Homestead props: a workbench and a treasure chest in the yard near the cabin.
     const benchX = 12.5 * TILE;
     const benchY = 3.4 * TILE;
