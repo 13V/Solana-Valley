@@ -1,57 +1,53 @@
-// Grow-a-Garden-style plots. The server has 20 plots laid out in a grid below
-// the home/town area; each is allocated to one player. In single-player you farm
-// your one allocated plot and the other 19 are neighbours (shown growing crops
-// so the server feels alive). Plots can't be bought — one per player.
+// Grow-a-Garden-style world. Your homestead is a strip — house → your plot →
+// animal pen → orchard, left to right — at the top of a larger world the camera
+// scrolls around. Below it is a grid of 20 neighbour plots (one allocated per
+// player; you can't buy more), shown growing crops so the server feels alive.
 
-export type Plot = {
-  id: number;
-  px: number; // interior top-left tile x
-  py: number; // interior top-left tile y
-  pw: number; // interior width in tiles
-  ph: number; // interior height in tiles
-  owner: string; // display name on the plot sign
-  mine: boolean; // the player's allocated plot
+export type Rect = { x0: number; y0: number; x1: number; y1: number }; // tile coords, inclusive
+
+// ---- the player's homestead (tile coords) -------------------------------
+export const HOME = {
+  houseCx: 5, // cabin centre column
+  houseBaseRow: 7, // cabin base row
+  plot: { px: 9, py: 3, pw: 6, ph: 5 }, // your farmable plot (interior)
+  pen: { x0: 17, y0: 3, x1: 23, y1: 8 } as Rect, // animal roaming area
+  orchard: { x0: 25, y0: 3, x1: 31, y1: 8 } as Rect, // fruit trees
+  well: { x: 3, y: 10 },
+  pond: { x0: 1, y0: 13, w: 3, h: 2 },
 };
 
-const PW = 5; // interior plant columns per plot
-const PH = 4; // interior plant rows per plot
-const COLS = [2, 9, 16, 23]; // interior x of each plot column
-const ROWS = [21, 27, 33, 39, 45]; // interior y of each plot row
-const MINE_COL = 1; // player's plot column index
-const MINE_ROW = 0; // player's plot row index
+export const MY_PLOT = HOME.plot;
 
-// Flavour names so the grid reads like a 20-player server.
+export function isInMyPlot(tx: number, ty: number): boolean {
+  return tx >= MY_PLOT.px && tx < MY_PLOT.px + MY_PLOT.pw && ty >= MY_PLOT.py && ty < MY_PLOT.py + MY_PLOT.ph;
+}
+
+// ---- neighbours ---------------------------------------------------------
+export type Neighbor = {
+  px: number; py: number; pw: number; ph: number; // plot interior
+  owner: string;
+};
+
+const NEI_COLS = [2, 10, 18, 26, 34]; // interior x of each neighbour column
+const NEI_ROWS = [14, 22, 30, 38]; // interior y of each neighbour row
+const NEI_W = 5;
+const NEI_H = 5;
 const NAMES = [
   'Maya', 'Leo', 'Aria', 'Finn', 'Noor', 'Kai', 'Luna', 'Milo', 'Sage', 'Rumi',
-  'Beau', 'Iris', 'Otto', 'Wren', 'Cleo', 'Hugo', 'Vera', 'Remy', 'Juno',
+  'Beau', 'Iris', 'Otto', 'Wren', 'Cleo', 'Hugo', 'Vera', 'Remy', 'Juno', 'Zola',
 ];
 
-export const PLOTS: Plot[] = [];
+export const NEIGHBORS: Neighbor[] = [];
 {
-  let id = 0;
-  let nameIdx = 0;
-  for (let r = 0; r < ROWS.length; r++) {
-    for (let c = 0; c < COLS.length; c++) {
-      const mine = c === MINE_COL && r === MINE_ROW;
-      PLOTS.push({
-        id: id++,
-        px: COLS[c],
-        py: ROWS[r],
-        pw: PW,
-        ph: PH,
-        owner: mine ? 'You' : NAMES[nameIdx++],
-        mine,
-      });
+  let n = 0;
+  for (const py of NEI_ROWS) {
+    for (const px of NEI_COLS) {
+      NEIGHBORS.push({ px, py, pw: NEI_W, ph: NEI_H, owner: NAMES[n % NAMES.length] });
+      n++;
     }
   }
 }
 
-export const MY_PLOT: Plot = PLOTS.find((p) => p.mine)!;
-
-export function isInPlot(plot: Plot, tx: number, ty: number): boolean {
-  return tx >= plot.px && tx < plot.px + plot.pw && ty >= plot.py && ty < plot.py + plot.ph;
-}
-
-export function isInMyPlot(tx: number, ty: number): boolean {
-  return isInPlot(MY_PLOT, tx, ty);
-}
+// World size needed to hold everything (tiles), with a margin.
+export const WORLD_COLS = 41;
+export const WORLD_ROWS = 45;

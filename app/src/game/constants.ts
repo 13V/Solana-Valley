@@ -1,7 +1,7 @@
 export const TILE = 32;
 // World grid (bigger than the screen — the camera follows the player).
-export const GRID_W = 30;
-export const GRID_H = 50;
+export const GRID_W = 41;
+export const GRID_H = 45;
 export const WORLD_WIDTH = TILE * GRID_W; // 960
 export const WORLD_HEIGHT = TILE * GRID_H; // 1600
 // Camera viewport / canvas size (what's on screen at once).
