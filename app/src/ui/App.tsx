@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { WalletProvider } from '../chain/WalletProvider';
 import { createGame } from '../game/createGame';
-import { GAME_WIDTH, GAME_HEIGHT } from '../game/constants';
 import { Hud, type Panel } from './Hud';
 import { Hotbar } from './Hotbar';
 import { Shop } from './Shop';
@@ -49,7 +48,7 @@ export function App() {
 
   return (
     <WalletProvider>
-      <div className="app" style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}>
+      <div className="app">
         <div ref={containerRef} className="game-root" />
         <div className="overlay">
           <Hud panel={panel} onToggle={toggle} />

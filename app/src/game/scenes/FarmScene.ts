@@ -3,8 +3,6 @@ import {
   TILE,
   GRID_W,
   GRID_H,
-  GAME_WIDTH,
-  GAME_HEIGHT,
   WORLD_WIDTH,
   WORLD_HEIGHT,
   PLAYER_SPEED,
@@ -131,7 +129,9 @@ export class FarmScene extends Phaser.Scene {
   private highlight!: Phaser.GameObjects.Image;
   private ambient!: Phaser.GameObjects.Rectangle;
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private fireflyZone!: Phaser.Geom.Rectangle;
   private rain!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private rainZone!: Phaser.Geom.Rectangle;
   private storm!: Phaser.GameObjects.Rectangle;
   private raining = false;
   private weatherUntil = 0;
@@ -196,63 +196,77 @@ export class FarmScene extends Phaser.Scene {
     this.player.body!.setSize(13, 9).setOffset(17, 33);
     this.physics.add.collider(this.player, this.obstacles);
 
-    // Camera follows the player around the larger world.
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    // A tiled-grass backdrop (well past the world edges) so the field fills any
+    // screen size — no flat margin on wide monitors. The camera may roam into it.
+    const M = 1400;
+    this.add
+      .tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M, 'grass', 0)
+      .setTileScale(2, 2)
+      .setDepth(-10);
+
+    // Camera follows the player around the larger world (bounds include the backdrop).
+    this.cameras.main.setBounds(-M, -M, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
-    // Fireflies drift in at night.
+    // Full-screen overlays live in screen space (scrollFactor 0) and track the
+    // viewport size so they always cover the window.
+    const sw = this.scale.width;
+    const sh = this.scale.height;
+
+    // Fireflies drift in at night, spawning across the visible viewport.
+    this.fireflyZone = new Phaser.Geom.Rectangle(0, sh * 0.15, sw, sh * 0.85);
     this.fireflies = this.add
       .particles(0, 0, 'p_bit', {
         tint: [0xfff3a0, 0xfff7c8, 0xd6ff9a],
-        x: { min: 0, max: GAME_WIDTH },
-        y: { min: GAME_HEIGHT * 0.15, max: GAME_HEIGHT },
         lifespan: 2800,
-        frequency: 200,
+        frequency: 130,
         scale: { start: 1.4, end: 0 },
         alpha: { start: 0.9, end: 0 },
         speed: { min: 4, max: 16 },
         blendMode: 'ADD',
         emitting: false,
+        emitZone: { type: 'random', source: this.fireflyZone } as Phaser.Types.GameObjects.Particles.ParticleEmitterConfig['emitZone'],
       })
       .setDepth(89500)
       .setScrollFactor(0);
 
-    this.add
-      .image(0, 0, 'vignette')
-      .setOrigin(0, 0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setDepth(88000)
-      .setScrollFactor(0);
-
     // Rain (falling streaks) + a storm tint, toggled by the weather scheduler.
+    this.rainZone = new Phaser.Geom.Rectangle(-40, -16, sw + 80, 6);
     this.rain = this.add
       .particles(0, 0, 'raindrop', {
-        x: { min: -40, max: GAME_WIDTH },
-        y: -12,
-        lifespan: 900,
-        frequency: 14,
+        lifespan: 2200,
+        frequency: 10,
         quantity: 2,
         speedY: { min: 520, max: 660 },
         speedX: { min: -120, max: -80 },
         scaleY: { min: 0.8, max: 1.4 },
         alpha: { start: 0.55, end: 0.2 },
         emitting: false,
+        emitZone: { type: 'random', source: this.rainZone } as Phaser.Types.GameObjects.Particles.ParticleEmitterConfig['emitZone'],
       })
       .setDepth(89800)
       .setScrollFactor(0);
     this.storm = this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x3a4a66, 1)
+      .rectangle(0, 0, sw, sh, 0x3a4a66, 1)
       .setOrigin(0, 0)
       .setDepth(89900)
       .setScrollFactor(0)
       .setAlpha(0);
 
     this.ambient = this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0a1430, 1)
+      .rectangle(0, 0, sw, sh, 0x0a1430, 1)
       .setOrigin(0, 0)
       .setDepth(90000)
       .setScrollFactor(0)
       .setAlpha(0);
+
+    // Keep the screen-space overlays covering the viewport on window resize.
+    this.scale.on('resize', (gs: Phaser.Structs.Size) => {
+      this.ambient.setSize(gs.width, gs.height);
+      this.storm.setSize(gs.width, gs.height);
+      this.fireflyZone.setTo(0, gs.height * 0.15, gs.width, gs.height * 0.85);
+      this.rainZone.setTo(-40, -16, gs.width + 80, 6);
+    });
 
     this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(100000);
 
