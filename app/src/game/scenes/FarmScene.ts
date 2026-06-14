@@ -69,7 +69,7 @@ const POND = { x0: 25, y0: 14, w: 3, h: 2 };
 const CABIN = { cx: 4, baseY: 4 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 type SaveData = {
   v: number;
@@ -577,7 +577,8 @@ export class FarmScene extends Phaser.Scene {
     }
     const plant = PLANT_BY_ID[seed];
     const sprite = this.add
-      .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, `crop_${plant.id}_0`)
+      .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
+      .setScale(2)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
       plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
@@ -607,7 +608,7 @@ export class FarmScene extends Phaser.Scene {
   private applyMatureVisuals(crop: Crop, announce: boolean) {
     const m = crop.mutation;
     if (!m) return;
-    crop.sprite.setTexture(`crop_${crop.plant.id}_${STAGES - 1}`);
+    crop.sprite.setFrame(crop.plant.cropRow * 5 + (STAGES - 1));
 
     const cx = crop.tx * TILE + TILE / 2;
     const cy = crop.ty * TILE + TILE / 2;
@@ -668,7 +669,7 @@ export class FarmScene extends Phaser.Scene {
     const cx = tx * TILE + TILE / 2;
     const cy = ty * TILE + TILE / 2;
     this.burst(cx, cy, 'p_bit', {
-      tint: crop.plant.fruit,
+      tint: crop.plant.color,
       speed: { min: 40, max: 120 },
       lifespan: 560,
       scale: { start: 1.3, end: 0 },
@@ -948,7 +949,8 @@ export class FarmScene extends Phaser.Scene {
       const plant = PLANT_BY_ID[c.p];
       if (!plant || !this.inBounds(c.x, c.y)) continue;
       const sprite = this.add
-        .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, `crop_${plant.id}_0`)
+        .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
+        .setScale(2)
         .setDepth(this.cropDepth(c.y) - 1);
       const crop: Crop = {
         plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,
@@ -964,7 +966,7 @@ export class FarmScene extends Phaser.Scene {
       } else {
         const ns = Math.min(STAGES - 1, Math.floor((c.g / (plant.growthSeconds * 1000)) * (STAGES - 1)));
         crop.stage = ns;
-        crop.sprite.setTexture(`crop_${plant.id}_${ns}`);
+        crop.sprite.setFrame(plant.cropRow * 5 + ns);
       }
     }
     return true;
@@ -1078,7 +1080,7 @@ export class FarmScene extends Phaser.Scene {
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
         crop.stage = ns;
-        crop.sprite.setTexture(`crop_${crop.plant.id}_${ns}`);
+        crop.sprite.setFrame(crop.plant.cropRow * 5 + ns);
       }
       if (crop.grownMs >= total) this.matureCrop(crop);
     }

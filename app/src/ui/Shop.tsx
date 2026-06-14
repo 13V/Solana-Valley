@@ -25,6 +25,7 @@ export function Shop({ onClose }: { onClose: () => void }) {
           return (
             <div className={`row ${locked ? 'locked' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
               <span className="dot" style={{ background: r.css, color: r.css }} />
+              <img className="crop-ico-sm" src={`/assets/crops/seed_${p.id}.png`} alt="" />
               <span className="row-name">
                 {p.name}
                 <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>

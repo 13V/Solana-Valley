@@ -1,10 +1,9 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
-import { PLANTS, type Plant } from '../economy';
 
-// Loads the Sprout Lands art pack (ground, water, character, decorations) and
-// generates the remaining bits procedurally (crops, particles, glow, vignette),
-// then starts the farm. Run `node scripts/fetch-assets.mjs` to download the art.
+// Loads the Sprout Lands art (ground, water, character, crops, decorations) and
+// generates only the FX bits procedurally (particles, glow, vignette), then
+// starts the farm.
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
@@ -17,13 +16,13 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('water', `${A}water.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('char', `${A}character.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('actions', `${A}actions.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
   }
 
   create() {
     this.makeUtilTextures();
-    this.makeCropTextures();
     this.makeFxTextures();
     this.defineAssetFrames();
     this.scene.start('Farm');
@@ -70,119 +69,6 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(0, 0, 1, 1);
     g.generateTexture('pixel', 1, 1);
     g.destroy();
-  }
-
-  // ---- crops (procedural; Sprout Lands free pack has no crop growth art) ---
-
-  private makeCropTextures() {
-    const STAGES = 4;
-    for (const plant of PLANTS) {
-      for (let s = 0; s < STAGES; s++) {
-        const f = s / (STAGES - 1);
-        const g = this.gfx();
-        const baseY = TILE - 3;
-        g.fillStyle(0x4a3320, 0.0); // keep transparent base (soil drawn by tile)
-        const stemH = Math.round(5 + f * 13);
-        g.fillStyle(plant.leaf, 1);
-        g.fillRect(TILE / 2 - 1, baseY - stemH, 3, stemH);
-        const leaf = Math.max(2, Math.round(2 + f * 4));
-        g.fillRect(TILE / 2 - 1 - leaf, baseY - stemH + 4, leaf, 3);
-        g.fillRect(TILE / 2 + 2, baseY - stemH + 7, leaf, 3);
-        g.fillStyle(0xffffff, 0.18);
-        g.fillRect(TILE / 2 - 1, baseY - stemH, 1, stemH);
-        if (s === STAGES - 1) this.drawFruit(g, plant, TILE / 2, baseY - stemH);
-        g.generateTexture(`crop_${plant.id}_${s}`, TILE, TILE);
-        g.destroy();
-      }
-    }
-  }
-
-  private drawFruit(g: Phaser.GameObjects.Graphics, plant: Plant, cx: number, topY: number) {
-    const c = plant.fruit;
-    const outline = 0x40243a; // soft dark plum outline, Sprout Lands style
-    const hi = 0xffffff;
-    // small ground shadow so the fruit sits in the world
-    g.fillStyle(0x000000, 0.12);
-    g.fillEllipse(cx, TILE - 4, 14, 4);
-    const dot = (x: number, y: number, r: number) => {
-      g.lineStyle(1.5, outline, 0.9);
-      g.fillStyle(c, 1);
-      g.fillCircle(x, y, r);
-      g.strokeCircle(x, y, r);
-      g.fillStyle(hi, 0.4);
-      g.fillCircle(x - r * 0.34, y - r * 0.34, Math.max(1, r * 0.3));
-    };
-    switch (plant.shape) {
-      case 'round':
-        dot(cx, topY - 1, 6);
-        break;
-      case 'giant':
-        g.lineStyle(1.5, outline, 0.9);
-        g.fillStyle(c, 1);
-        g.fillEllipse(cx, topY + 2, 18, 13);
-        g.strokeEllipse(cx, topY + 2, 18, 13);
-        g.fillStyle(hi, 0.22);
-        g.fillEllipse(cx - 4, topY - 1, 7, 4);
-        break;
-      case 'berry':
-        dot(cx - 3, topY, 3);
-        dot(cx + 3, topY - 1, 3);
-        dot(cx, topY - 4, 3);
-        break;
-      case 'root':
-        g.lineStyle(1.5, outline, 0.9);
-        g.fillStyle(c, 1);
-        g.fillTriangle(cx - 4, topY + 4, cx + 4, topY + 4, cx, topY + 11);
-        g.strokeTriangle(cx - 4, topY + 4, cx + 4, topY + 4, cx, topY + 11);
-        break;
-      case 'leafy':
-        g.fillStyle(plant.leaf, 1);
-        g.fillCircle(cx - 3, topY + 2, 4);
-        g.fillCircle(cx + 3, topY + 2, 4);
-        dot(cx, topY - 2, 5);
-        break;
-      case 'star':
-        this.drawStar(g, cx, topY - 1, 5, 8, 3.5, c);
-        g.lineStyle(1.5, outline, 0.9);
-        this.strokeStar(g, cx, topY - 1, 5, 8, 3.5);
-        g.fillStyle(hi, 0.3);
-        g.fillCircle(cx - 1, topY - 2, 1.5);
-        break;
-      case 'flower': {
-        const petals = 6;
-        for (let i = 0; i < petals; i++) {
-          const a = (i / petals) * Math.PI * 2;
-          g.lineStyle(1.5, outline, 0.85);
-          g.fillStyle(c, 1);
-          g.fillCircle(cx + Math.cos(a) * 5, topY + Math.sin(a) * 5, 3);
-          g.strokeCircle(cx + Math.cos(a) * 5, topY + Math.sin(a) * 5, 3);
-        }
-        g.fillStyle(0xffe14a, 1);
-        g.fillCircle(cx, topY, 3);
-        break;
-      }
-    }
-  }
-
-  private strokeStar(
-    g: Phaser.GameObjects.Graphics,
-    cx: number,
-    cy: number,
-    points: number,
-    outer: number,
-    inner: number,
-  ) {
-    g.beginPath();
-    for (let i = 0; i < points * 2; i++) {
-      const r = i % 2 === 0 ? outer : inner;
-      const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
-      const x = cx + Math.cos(a) * r;
-      const y = cy + Math.sin(a) * r;
-      if (i === 0) g.moveTo(x, y);
-      else g.lineTo(x, y);
-    }
-    g.closePath();
-    g.strokePath();
   }
 
   private drawStar(

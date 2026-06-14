@@ -31,6 +31,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
                 key={p.id}
                 style={found ? { borderColor: r.css } : undefined}
               >
+                {found && <img className="crop-ico" src={`/assets/crops/${p.id}.png`} alt="" />}
                 <span className="alm-name">{found ? p.name : '???'}</span>
                 {found && <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>}
               </div>

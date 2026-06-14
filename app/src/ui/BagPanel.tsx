@@ -33,6 +33,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className="row" key={k} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
+                <img className="crop-ico-sm" src={`/assets/crops/${plant.id}.png`} alt="" />
                 <span className="row-name">
                   {plant.name}
                   <span className="rarity-line">

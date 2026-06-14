@@ -25,7 +25,13 @@ export function Hotbar() {
             <span className="slot-key">{i + 1}</span>
             <img
               className="tool-ico"
-              src={`/assets/sprout-ui/${isSeed ? 'tool_seed' : tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`}
+              src={
+                isSeed
+                  ? seedPlant
+                    ? `/assets/crops/seed_${seedPlant.id}.png`
+                    : '/assets/sprout-ui/tool_seed.png'
+                  : `/assets/sprout-ui/${tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`
+              }
               alt={isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}
             />
             <span className="slot-label">{label}</span>

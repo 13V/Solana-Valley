@@ -9,6 +9,8 @@
   https://cupnooble.itch.io/sprout-lands-asset-pack
 - UI (panel frames, buttons, chips, icons):
   **Sprout Lands UI Pack — Premium** — https://cupnooble.itch.io/sprout-lands-ui-pack
+- Crops, produce/seed item icons (and additional content):
+  **Sprout Lands Sprites — Premium pack** — https://cupnooble.itch.io/sprout-lands-asset-pack
 
 These assets are included in this repository under the terms below. They live in
 `app/public/assets/sprout/` (base) and `app/public/assets/sprout-ui/` (premium UI).

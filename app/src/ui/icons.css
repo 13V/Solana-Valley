@@ -52,3 +52,21 @@
   height: 16px;
   vertical-align: middle;
 }
+
+/* Crop seed-packet / produce icons in panels and the hotbar. */
+.crop-ico,
+.crop-ico-sm {
+  image-rendering: pixelated;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.crop-ico {
+  width: 30px;
+  height: 30px;
+}
+
+.crop-ico-sm {
+  width: 24px;
+  height: 24px;
+}
