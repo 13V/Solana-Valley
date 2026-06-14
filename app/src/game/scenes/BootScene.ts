@@ -19,6 +19,7 @@ export class BootScene extends Phaser.Scene {
     // (down, up, left, right); rows 12–23 are tool-use poses.
     this.load.spritesheet('pchar', `${A}pchar.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('chicken', `${A}chicken.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('eggitem', `${A}eggitem.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('cow', `${A}cow.png`, { frameWidth: 32, frameHeight: 32 });

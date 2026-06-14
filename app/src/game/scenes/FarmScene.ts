@@ -163,6 +163,7 @@ export class FarmScene extends Phaser.Scene {
     this.createAnims();
     this.buildWorld();
     this.placeDecorations();
+    this.buildFences();
 
     this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'pchar', 0);
     this.player.setCollideWorldBounds(true);
@@ -533,6 +534,51 @@ export class FarmScene extends Phaser.Scene {
   private addCollider(cx: number, cy: number, w: number, h: number) {
     const box = this.obstacles.create(cx, cy, 'pixel') as Phaser.Physics.Arcade.Sprite;
     box.setVisible(false).setDisplaySize(w, h).refreshBody();
+  }
+
+  // Wooden fences (autotiled from the 4×4 Sprout Lands fence sheet) that enclose
+  // the animal pen and the orchard so the producers read as a real ranch.
+  // Decorative only — animals are already kept in by their wander bounds.
+  private buildFences() {
+    // Pen: U-shape (left / right / bottom); the coop crowns the open top edge.
+    this.encloseRegion(5, 6, 10, 10, { left: true, right: true, bottom: true });
+    // Orchard: full rectangle with a gap in the bottom edge for an entrance.
+    this.encloseRegion(18, 3, 26, 8, { top: true, bottom: true, left: true, right: true, gap: [22, 8] });
+  }
+
+  private encloseRegion(
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    opts: { top?: boolean; bottom?: boolean; left?: boolean; right?: boolean; gap?: [number, number] },
+  ) {
+    // Collect the perimeter tiles we actually want a fence on (skipping anything
+    // already occupied, e.g. a rock or the coop), then autotile each.
+    const want = new Set<string>();
+    const add = (x: number, y: number) => {
+      if (this.inBounds(x, y) && !this.tiles[y][x].obstacle) want.add(this.key(x, y));
+    };
+    if (opts.top) for (let x = tx0; x <= tx1; x++) add(x, ty0);
+    if (opts.bottom) for (let x = tx0; x <= tx1; x++) add(x, ty1);
+    if (opts.left) for (let y = ty0; y <= ty1; y++) add(tx0, y);
+    if (opts.right) for (let y = ty0; y <= ty1; y++) add(tx1, y);
+    if (opts.gap) want.delete(this.key(opts.gap[0], opts.gap[1]));
+
+    for (const k of want) {
+      const [x, y] = k.split(',').map(Number);
+      const has = (dx: number, dy: number) => want.has(this.key(x + dx, y + dy));
+      const u = has(0, -1);
+      const d = has(0, 1);
+      const l = has(-1, 0);
+      const r = has(1, 0);
+      // Sheet rows pick the vertical connection, columns the horizontal one.
+      const row = u && d ? 1 : d ? 0 : u ? 2 : 3;
+      const col = l && r ? 2 : r ? 1 : l ? 3 : 0;
+      const cx = x * TILE + TILE / 2;
+      const cy = y * TILE + TILE / 2;
+      this.add.image(cx, cy, 'fences', row * 4 + col).setScale(2).setDepth(cy + 6);
+    }
   }
 
   // ---- helpers ------------------------------------------------------------
