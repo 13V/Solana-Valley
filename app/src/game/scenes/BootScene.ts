@@ -39,6 +39,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image('house', `${A}house.png`);
     this.load.image('coop', `${A}coop.png`);
     this.load.image('well', `${A}well.png`);
+    // Decorative props.
+    this.load.image('workstation', `${A}workstation.png`);
+    this.load.image('picnic', `${A}picnic.png`);
+    this.load.image('basket', `${A}basket.png`);
+    this.load.spritesheet('chest', `${A}chest.png`, { frameWidth: 16, frameHeight: 16 });
   }
 
   create() {

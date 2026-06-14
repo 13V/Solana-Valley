@@ -504,6 +504,27 @@ export class FarmScene extends Phaser.Scene {
     }
     this.addCollider(coopX, coopBase - 18, 110, 30);
 
+    // Homestead props: a workbench and a treasure chest in the yard near the cabin.
+    const benchX = 12.5 * TILE;
+    const benchY = 3.4 * TILE;
+    this.add.image(benchX, benchY, 'workstation').setOrigin(0.5, 0.7).setScale(2).setDepth(benchY + 10);
+    for (const [ox, oy] of [[11, 3], [12, 3]] as Array<[number, number]>) {
+      if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    }
+    this.addCollider(benchX, benchY + 4, 56, 18);
+
+    const chestX = 14 * TILE + TILE / 2;
+    const chestY = 4 * TILE;
+    this.add.image(chestX, chestY, 'chest', 16).setOrigin(0.5, 1).setScale(2).setDepth(chestY);
+    if (this.inBounds(14, 3)) this.tiles[3][14].obstacle = true;
+    this.addCollider(chestX, chestY - 8, 26, 16);
+
+    // A cosy picnic spot (lies flat on the grass, walkable).
+    const picX = 20 * TILE;
+    const picY = 12.5 * TILE;
+    this.add.image(picX, picY, 'picnic').setScale(1.8).setDepth(2);
+    this.add.image(picX + 16, picY - 4, 'basket').setScale(1.7).setDepth(3);
+
     // Scatter flowers / bushes on open grass.
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let placed = 0;
@@ -1005,6 +1026,14 @@ export class FarmScene extends Phaser.Scene {
       .setScale(def.scale)
       .setDepth(y + 14);
     s.play(`${color}-idle`);
+    if (def.stationary) {
+      // Fruit trees sway gently like the decorative trees.
+      this.tweens.add({
+        targets: s, angle: { from: -1, to: 1 },
+        duration: 2400 + Math.random() * 800, delay: Math.random() * 1500,
+        yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    }
     this.animals.push({
       sprite: s,
       type: def.id,
