@@ -17,7 +17,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
         <span className="muted">
           {dp.size}/{PLANTS.length} plants · {ach.size}/{ACHIEVEMENTS.length} achievements
         </span>
-        <button className="x" onClick={onClose}>✕</button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="alm-body">
         <h4>Plants — {plantPct}% discovered</h4>

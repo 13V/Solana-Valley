@@ -34,6 +34,12 @@ For different terms, Cup Nooble invites contact (Discord: `cup_nooble`).
 > separate art for those features. A fungible SPL token ($VALLEY) is not an NFT,
 > but treat the NFT roadmap items as blocked on this until licensing is sorted.
 
+## Font — Pixelify Sans
+
+UI text uses **Pixelify Sans**, licensed under the SIL Open Font License (OFL).
+The woff2 files are in `app/public/assets/fonts/`. Source:
+https://fonts.google.com/specimen/Pixelify+Sans
+
 ## Original work
 
 Crop sprites and all visual effects (particles, glow, vignette, day/night tint)

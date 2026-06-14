@@ -14,7 +14,7 @@ export function Shop({ onClose }: { onClose: () => void }) {
       <div className="panel-head">
         <h3>🛒 Seed Shop</h3>
         <span className="muted">restock in {mm}:{ss}</span>
-        <button className="x" onClick={onClose}>✕</button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="rows">
         {PLANTS.map((p) => {

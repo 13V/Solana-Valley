@@ -23,7 +23,11 @@ export function Hotbar() {
             title={label}
           >
             <span className="slot-key">{i + 1}</span>
-            <span className="slot-icon">{isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}</span>
+            <img
+              className="tool-ico"
+              src={`/assets/sprout-ui/${isSeed ? 'tool_seed' : tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`}
+              alt={isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}
+            />
             <span className="slot-label">{label}</span>
             {isSeed && <span className="slot-count">{seedCount}</span>}
           </button>

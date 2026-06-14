@@ -11,7 +11,7 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
       <div className="panel-head">
         <h3>🌱 Your Seeds</h3>
         <span className="muted">click to plant with the seed tool</span>
-        <button className="x" onClick={onClose}>✕</button>
+        <button className="x" onClick={onClose}><img className="ui-x" src="/assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       {owned.length === 0 ? (
         <p className="empty">No seeds yet — buy some at the shop.</p>

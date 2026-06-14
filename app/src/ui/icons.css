@@ -1,1 +1,54 @@
-/* Sprout Lands pixel-icon styles (filled by the icons agent). */
+/* Sprout Lands pixel-icon styles.
+   Imported after index.css so these override where needed.
+   Note: .hud-icon (coins/star) is defined in index.css — do NOT redefine it. */
+
+/* Crisp pixel rendering for every cropped sprite icon. */
+.tool-ico,
+.btn-ico,
+.ui-x {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+  display: inline-block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Hotbar tool sprites (hoe / watering can / seed sprout). */
+.tool-ico {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+/* HUD toolbar button icons + day/night phase badge icons. */
+.btn-ico {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  vertical-align: -4px;
+}
+
+/* The phase icon sits inline with the "Day N · 00:00" badge text;
+   it already carries its own rounded tile background from the sheet. */
+.badge .btn-ico {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: -4px;
+}
+
+/* Square HUD buttons center their icon and drop the inline offset. */
+.iconbtn .btn-ico {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+/* Panel close-button X. */
+.ui-x {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}

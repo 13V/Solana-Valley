@@ -5,17 +5,26 @@ import { useSolBalance } from '../chain/useSolBalance';
 import { useGameState, useClock } from './useGameState';
 import { sfx } from '../game/audio';
 
-const PHASE_ICON: Record<string, string> = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
+// Day/night get cropped weather-sheet sprites; dawn/dusk keep their emoji
+// (no clean pixel match in the pack). `emoji` doubles as the img alt text.
+const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
+  dawn: { emoji: '🌅' },
+  day: { emoji: '☀️', img: '/assets/sprout-ui/phase_sun.png' },
+  dusk: { emoji: '🌇' },
+  night: { emoji: '🌙', img: '/assets/sprout-ui/phase_moon.png' },
+};
 
 export type Panel = 'shop' | 'seeds' | 'bag' | 'upgrades' | 'almanac' | 'help' | null;
 
-const BUTTONS: Array<{ id: Exclude<Panel, null>; icon: string; label: string }> = [
-  { id: 'shop', icon: '🛒', label: 'Shop' },
-  { id: 'seeds', icon: '🌱', label: 'Seeds' },
-  { id: 'bag', icon: '🎒', label: 'Harvest' },
-  { id: 'upgrades', icon: '⬆️', label: 'Upgrades' },
-  { id: 'almanac', icon: '📖', label: 'Almanac' },
-  { id: 'help', icon: '❔', label: 'Help' },
+// `emoji` is the original glyph (kept as img alt, or rendered as-is when no
+// pixel icon exists — almanac has no clean book sprite in the pack).
+const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; label: string }> = [
+  { id: 'shop', emoji: '🛒', img: '/assets/sprout-ui/btn_shop.png', label: 'Shop' },
+  { id: 'seeds', emoji: '🌱', img: '/assets/sprout-ui/btn_seeds.png', label: 'Seeds' },
+  { id: 'bag', emoji: '🎒', img: '/assets/sprout-ui/btn_bag.png', label: 'Harvest' },
+  { id: 'upgrades', emoji: '⬆️', img: '/assets/sprout-ui/btn_upgrades.png', label: 'Upgrades' },
+  { id: 'almanac', emoji: '📖', label: 'Almanac' },
+  { id: 'help', emoji: '❔', img: '/assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 
 export function Hud({
@@ -39,7 +48,14 @@ export function Hud({
   return (
     <div className="hud">
       <div className="hud-left">
-        <span className="badge">{PHASE_ICON[phase]} Day {day} · {clock}</span>
+        <span className="badge">
+          {PHASE_ICON[phase].img ? (
+            <img className="btn-ico" src={PHASE_ICON[phase].img} alt={PHASE_ICON[phase].emoji} />
+          ) : (
+            PHASE_ICON[phase].emoji
+          )}{' '}
+          Day {day} · {clock}
+        </span>
         <span className="badge coins">
           <img className="hud-icon" src="/assets/sprout-ui/icon_coin.png" alt="🪙" />
           {coins.toLocaleString()}
@@ -57,7 +73,7 @@ export function Hud({
             onClick={() => onToggle(b.id)}
             title={b.label}
           >
-            {b.icon}
+            {b.img ? <img className="btn-ico" src={b.img} alt={b.emoji} /> : b.emoji}
           </button>
         ))}
         <button
@@ -70,7 +86,11 @@ export function Hud({
             setMuted(next);
           }}
         >
-          {muted ? '🔇' : '🔊'}
+          <img
+            className="btn-ico"
+            src={`/assets/sprout-ui/btn_sound_${muted ? 'off' : 'on'}.png`}
+            alt={muted ? '🔇' : '🔊'}
+          />
         </button>
       </div>
       <div className="hud-right">
