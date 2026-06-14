@@ -12,8 +12,9 @@ token, and a player marketplace.
 > devnet. The on-chain program (token / land / marketplace) is the next
 > milestone — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-All art is generated **procedurally in code** (no third-party sprites), so the
-repo is self-contained and free of asset-licensing issues.
+Visuals use the cozy **Sprout Lands** pixel-art pack by Cup Nooble (fetched on
+demand, not committed — see [CREDITS](CREDITS.md)); crops and all effects
+(particles, glow, day/night) are generated procedurally in code.
 
 ---
 
@@ -63,9 +64,13 @@ repo is self-contained and free of asset-licensing issues.
 ## Getting started
 
 ```bash
-npm install
+npm install      # also fetches the Sprout Lands art (postinstall)
 npm run dev      # http://localhost:5173
 ```
+
+> The pixel-art pack is downloaded by `scripts/fetch-assets.mjs` into the
+> git-ignored `app/public/assets/sprout/` (run `npm run assets` to fetch
+> manually). See [CREDITS.md](CREDITS.md) for licensing.
 
 Other scripts:
 

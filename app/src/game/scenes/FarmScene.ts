@@ -42,7 +42,7 @@ type Crop = {
   glow?: Phaser.GameObjects.Image;
   sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
 };
-type Dir = 'down' | 'up' | 'side';
+type Dir = 'down' | 'up' | 'left' | 'right';
 
 const TREES: Array<[number, number]> = [
   [8, 3], [12, 6], [21, 4], [26, 7], [6, 13], [23, 15], [18, 2], [3, 12],
@@ -51,7 +51,7 @@ const ROCKS: Array<[number, number]> = [
   [10, 9], [24, 11], [15, 3], [19, 13], [5, 6],
 ];
 const POND = { x0: 25, y0: 14, w: 3, h: 2 };
-const CABIN = { cx: 3, baseY: 3 };
+const CABIN = { cx: 4, baseY: 4 };
 
 const SAVE_KEY = 'solana-valley:save';
 const SAVE_VERSION = 2;
@@ -77,8 +77,6 @@ export class FarmScene extends Phaser.Scene {
   private wetTiles = new Set<string>();
   private rainbowCrops = new Set<Crop>();
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
-  private waterTiles: Phaser.GameObjects.Image[] = [];
-  private waterFrame = 0;
 
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -87,7 +85,6 @@ export class FarmScene extends Phaser.Scene {
   private ambient!: Phaser.GameObjects.Rectangle;
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
   private facing: Dir = 'down';
-  private faceLeft = false;
   private pointerInside = false;
 
   private coins = STARTING_COINS;
@@ -113,14 +110,15 @@ export class FarmScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
+    this.createAnims();
     this.buildWorld();
     this.placeDecorations();
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player_down_0');
+    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'char', 0);
     this.player.setCollideWorldBounds(true);
-    this.player.body!.setSize(10, 8).setOffset(7, 19);
+    this.player.setOrigin(0.5, 0.72);
+    this.player.body!.setSize(13, 9).setOffset(17, 33);
     this.physics.add.collider(this.player, this.obstacles);
-    this.createAnims();
 
     // Fireflies drift in at night.
     this.fireflies = this.add
@@ -198,14 +196,6 @@ export class FarmScene extends Phaser.Scene {
     }
 
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.emitClock() });
-    this.time.addEvent({
-      delay: 550,
-      loop: true,
-      callback: () => {
-        this.waterFrame ^= 1;
-        this.waterTiles.forEach((im) => im.setTexture(`water${this.waterFrame}`));
-      },
-    });
 
     this.emitState();
     this.emitClock();
@@ -266,19 +256,32 @@ export class FarmScene extends Phaser.Scene {
     this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset'].some((k) => params.has(k));
   }
 
+  private static DIR_ROW: Record<Dir, number> = { down: 0, up: 4, left: 8, right: 12 };
+
   private createAnims() {
-    const make = (key: string, dir: Dir) => {
-      if (this.anims.exists(key)) return;
+    for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+      const key = `walk-${dir}`;
+      if (this.anims.exists(key)) continue;
+      const start = FarmScene.DIR_ROW[dir];
       this.anims.create({
         key,
-        frames: [0, 1, 2, 3].map((n) => ({ key: `player_${dir}_${n}` })),
+        frames: this.anims.generateFrameNumbers('char', { start, end: start + 3 }),
         frameRate: 8,
         repeat: -1,
       });
-    };
-    make('walk-down', 'down');
-    make('walk-up', 'up');
-    make('walk-side', 'side');
+    }
+    if (!this.anims.exists('water-anim')) {
+      this.anims.create({
+        key: 'water-anim',
+        frames: this.anims.generateFrameNumbers('water', { start: 0, end: 3 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+  }
+
+  private grassFrame(x: number, y: number): number {
+    return (x * 7 + y * 13) % 3; // clean full-grass tiles 0..2
   }
 
   private buildWorld() {
@@ -288,74 +291,83 @@ export class FarmScene extends Phaser.Scene {
       for (let x = 0; x < GRID_W; x++) {
         this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
         this.ground[y][x] = this.add
-          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, `grass${(x * 7 + y * 13) % 3}`)
+          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'grass', this.grassFrame(x, y))
+          .setScale(2)
           .setDepth(0);
       }
     }
   }
 
   private placeDecorations() {
-    // Pond.
+    // Pond (animated water).
     for (let dy = 0; dy < POND.h; dy++) {
       for (let dx = 0; dx < POND.w; dx++) {
         const tx = POND.x0 + dx;
         const ty = POND.y0 + dy;
         const cx = tx * TILE + TILE / 2;
         const cy = ty * TILE + TILE / 2;
-        this.waterTiles.push(this.add.image(cx, cy, 'water0').setDepth(1));
+        this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(1).play('water-anim');
         this.tiles[ty][tx].obstacle = true;
         this.addCollider(cx, cy, TILE, TILE);
       }
     }
 
-    // Cabin.
+    // Cottage.
     const cabinX = CABIN.cx * TILE + TILE / 2;
     const cabinBase = (CABIN.baseY + 1) * TILE;
-    this.add.image(cabinX, cabinBase, 'cabin').setOrigin(0.5, 1).setDepth(cabinBase);
-    for (let ty = CABIN.baseY - 1; ty <= CABIN.baseY; ty++) {
+    this.add.image(cabinX, cabinBase, 'house', 'cottage').setOrigin(0.5, 1).setScale(2).setDepth(cabinBase);
+    for (let ty = CABIN.baseY - 2; ty <= CABIN.baseY; ty++) {
       for (let dx = -1; dx <= 1; dx++) {
         const tx = CABIN.cx + dx;
         if (this.inBounds(tx, ty)) this.tiles[ty][tx].obstacle = true;
       }
     }
-    this.addCollider(cabinX, cabinBase - 13, 84, 26);
+    this.addCollider(cabinX, cabinBase - 12, 84, 24);
 
     // Rocks.
-    for (const [tx, ty] of ROCKS) {
+    const rockFrames = ['rock_l', 'rock_s', 'rock_pile'];
+    ROCKS.forEach(([tx, ty], i) => {
       const cx = tx * TILE + TILE / 2;
       const cy = ty * TILE + TILE / 2;
-      this.add.image(cx, cy, 'rock').setDepth(cy + 8);
+      this.add.image(cx, cy + 4, 'biome', rockFrames[i % rockFrames.length]).setScale(2).setDepth(cy + 8);
       this.tiles[ty][tx].obstacle = true;
-      this.addCollider(cx, cy + 4, 22, 12);
-    }
+      this.addCollider(cx, cy + 6, 24, 12);
+    });
 
-    // Trees, with a gentle sway.
-    for (const [tx, ty] of TREES) {
+    // Trees (with a gentle sway from the base).
+    const treeFrames = ['tree', 'tree_apple'];
+    TREES.forEach(([tx, ty], i) => {
       const cx = tx * TILE + TILE / 2;
       const baseY = ty * TILE + TILE;
-      const tree = this.add.image(cx, baseY, 'tree').setOrigin(0.5, 1).setDepth(baseY);
+      const tree = this.add
+        .image(cx, baseY + 4, 'biome', treeFrames[i % treeFrames.length])
+        .setOrigin(0.5, 1)
+        .setScale(2)
+        .setDepth(baseY);
       this.tiles[ty][tx].obstacle = true;
-      this.addCollider(cx, baseY - 6, 14, 10);
+      this.addCollider(cx, baseY - 4, 16, 12);
       this.tweens.add({
         targets: tree,
-        angle: { from: -1.5, to: 1.5 },
+        angle: { from: -1.3, to: 1.3 },
         duration: 2200 + Math.random() * 800,
         delay: Math.random() * 1500,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.inOut',
       });
-    }
+    });
 
-    // Scatter wildflowers on open grass.
+    // Scatter flowers / bushes on open grass.
+    const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let placed = 0;
     let guard = 0;
-    while (placed < 16 && guard++ < 200) {
+    while (placed < 18 && guard++ < 300) {
       const tx = Phaser.Math.Between(1, GRID_W - 2);
       const ty = Phaser.Math.Between(1, GRID_H - 2);
       if (this.tiles[ty][tx].obstacle) continue;
       this.add
-        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, `flower${placed % 4}`)
+        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[placed % decoFrames.length])
+        .setScale(2)
         .setDepth(2);
       placed++;
     }
@@ -392,9 +404,14 @@ export class FarmScene extends Phaser.Scene {
 
   private setGroundTexture(x: number, y: number) {
     const t = this.tiles[y][x];
-    if (this.isWet(x, y)) this.ground[y][x].setTexture('soil_wet');
-    else if (t.tilled) this.ground[y][x].setTexture('soil');
-    else this.ground[y][x].setTexture(`grass${(x * 7 + y * 13) % 3}`);
+    const img = this.ground[y][x];
+    if (t.tilled) {
+      img.setTexture('tilled', 0);
+      img.setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
+    } else {
+      img.setTexture('grass', this.grassFrame(x, y));
+      img.clearTint();
+    }
   }
 
   // ---- tools --------------------------------------------------------------
@@ -822,20 +839,15 @@ export class FarmScene extends Phaser.Scene {
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
     if (vx !== 0 || vy !== 0) {
-      if (vx !== 0) {
-        this.facing = 'side';
-        this.faceLeft = vx < 0;
-      } else {
-        this.facing = vy < 0 ? 'up' : 'down';
-      }
-      this.player.setFlipX(this.facing === 'side' && this.faceLeft);
+      if (vx < 0) this.facing = 'left';
+      else if (vx > 0) this.facing = 'right';
+      else this.facing = vy < 0 ? 'up' : 'down';
       this.player.anims.play(`walk-${this.facing}`, true);
     } else {
       this.player.anims.stop();
-      this.player.setTexture(`player_${this.facing}_0`);
-      this.player.setFlipX(this.facing === 'side' && this.faceLeft);
+      this.player.setFrame(FarmScene.DIR_ROW[this.facing]);
     }
-    this.player.setDepth(this.player.y + 14);
+    this.player.setDepth(this.player.y + 16);
 
     // crop growth
     for (const crop of this.crops.values()) {

@@ -5,6 +5,9 @@ node_modules/
 dist/
 app/dist/
 
+# third-party art fetched by scripts/fetch-assets.mjs (not redistributed here)
+app/public/assets/sprout/
+
 # logs / env
 *.log
 npm-debug.log*

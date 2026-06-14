@@ -11,7 +11,11 @@
     "@types/react-dom": "18.3.7"
   },
   "scripts": {
+    "assets": "node scripts/fetch-assets.mjs",
+    "postinstall": "node scripts/fetch-assets.mjs",
+    "predev": "node scripts/fetch-assets.mjs",
     "dev": "npm run dev --workspace app",
+    "prebuild": "node scripts/fetch-assets.mjs",
     "build": "npm run build --workspace app",
     "preview": "npm run preview --workspace app",
     "typecheck": "npm run typecheck --workspace app"
