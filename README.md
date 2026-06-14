@@ -32,8 +32,8 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
   breathing, and directional hoe / watering-can swings. Swaying trees, animated water.
 
 **Grow-a-Garden economy**
-- **16 plants across 7 rarity tiers** — Common → Uncommon → Rare → Legendary →
-  Mythical → Divine → **Prismatic**. Rarer crops sell for *far* more.
+- **19 plants across 8 rarity tiers** — Common → Uncommon → Rare → Legendary →
+  Mythical → Divine → Prismatic → **Celestial**. Rarer crops sell for *far* more.
 - **Harvest mutations** that multiply value: Shiny (×2), Frosted (×8),
   **Gold (×20)**, **Rainbow (×50)** — plus a Wet bonus (×1.5) for watered crops.
   Rare/mutated crops **glow and sparkle**.

@@ -863,6 +863,7 @@ export class FarmScene extends Phaser.Scene {
     const sprite = this.add
       .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
       .setScale(2)
+      .setTint(plant.cropTint ?? 0xffffff)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
       plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
@@ -1423,6 +1424,7 @@ export class FarmScene extends Phaser.Scene {
       const sprite = this.add
         .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
+        .setTint(plant.cropTint ?? 0xffffff)
         .setDepth(this.cropDepth(c.y) - 1);
       const crop: Crop = {
         plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,

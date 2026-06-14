@@ -10,7 +10,8 @@ export type Rarity =
   | 'Legendary'
   | 'Mythical'
   | 'Divine'
-  | 'Prismatic';
+  | 'Prismatic'
+  | 'Celestial';
 
 export const RARITY_ORDER: Rarity[] = [
   'Common',
@@ -20,6 +21,7 @@ export const RARITY_ORDER: Rarity[] = [
   'Mythical',
   'Divine',
   'Prismatic',
+  'Celestial',
 ];
 
 export const RARITY: Record<
@@ -33,7 +35,8 @@ export const RARITY: Record<
   Legendary: { color: 0xffc23d, css: '#ffc23d', glow: 0xc8901a, present: 0.32, qty: [2, 4] },
   Mythical: { color: 0xb56bff, css: '#b56bff', glow: 0x7a2fd0, present: 0.14, qty: [1, 2] },
   Divine: { color: 0xff5d5d, css: '#ff5d5d', glow: 0xc02020, present: 0.06, qty: [1, 1] },
-  Prismatic: { color: 0xff8ad8, css: '#ff8ad8', glow: 0xff66cc, present: 0.018, qty: [1, 1] },
+  Prismatic: { color: 0xff8ad8, css: '#ff8ad8', glow: 0xff66cc, present: 0.02, qty: [1, 1] },
+  Celestial: { color: 0x9fe8ff, css: '#9fe8ff', glow: 0x6fd8ff, present: 0.009, qty: [1, 1] },
 };
 
 export type Plant = {
@@ -45,31 +48,39 @@ export type Plant = {
   growthSeconds: number;
   cropRow: number; // row in the Sprout Lands "Farming Plants" sheet (5 stages/row)
   color: number; // glow / particle tint
+  cropTint?: number; // optional base tint of the crop sprite (for palette variants)
 };
 
 // Roster mapped to the premium "Farming Plants" sprite rows (r2..r14), tiered
 // into the rarity ladder so leveling unlocks progressively fancier crops.
 export const PLANTS: Plant[] = [
   // Common
-  { id: 'carrot', name: 'Carrot', rarity: 'Common', seedCost: 10, baseValue: 18, growthSeconds: 24, cropRow: 2, color: 0xe8862b },
-  { id: 'lettuce', name: 'Lettuce', rarity: 'Common', seedCost: 13, baseValue: 24, growthSeconds: 27, cropRow: 7, color: 0x86c34a },
-  { id: 'turnip', name: 'Turnip', rarity: 'Common', seedCost: 16, baseValue: 32, growthSeconds: 30, cropRow: 10, color: 0xe7dcc0 },
+  { id: 'carrot', name: 'Carrot', rarity: 'Common', seedCost: 9, baseValue: 18, growthSeconds: 22, cropRow: 2, color: 0xe8862b },
+  { id: 'spinach', name: 'Spinach', rarity: 'Common', seedCost: 12, baseValue: 25, growthSeconds: 25, cropRow: 1, color: 0x6fbf3a },
+  { id: 'lettuce', name: 'Lettuce', rarity: 'Common', seedCost: 15, baseValue: 31, growthSeconds: 28, cropRow: 7, color: 0x86c34a },
+  { id: 'turnip', name: 'Turnip', rarity: 'Common', seedCost: 20, baseValue: 41, growthSeconds: 32, cropRow: 10, color: 0xe7dcc0 },
   // Uncommon
-  { id: 'tomato', name: 'Tomato', rarity: 'Uncommon', seedCost: 35, baseValue: 70, growthSeconds: 42, cropRow: 4, color: 0xe2402c },
-  { id: 'cauliflower', name: 'Cauliflower', rarity: 'Uncommon', seedCost: 42, baseValue: 84, growthSeconds: 46, cropRow: 3, color: 0xeae3c8 },
-  { id: 'eggplant', name: 'Eggplant', rarity: 'Uncommon', seedCost: 50, baseValue: 104, growthSeconds: 50, cropRow: 5, color: 0x7a3fb0 },
+  { id: 'tomato', name: 'Tomato', rarity: 'Uncommon', seedCost: 36, baseValue: 78, growthSeconds: 42, cropRow: 4, color: 0xe2402c },
+  { id: 'cauliflower', name: 'Cauliflower', rarity: 'Uncommon', seedCost: 46, baseValue: 100, growthSeconds: 47, cropRow: 3, color: 0xeae3c8 },
+  { id: 'eggplant', name: 'Eggplant', rarity: 'Uncommon', seedCost: 56, baseValue: 124, growthSeconds: 52, cropRow: 5, color: 0x7a3fb0 },
   // Rare
-  { id: 'beet', name: 'Beetroot', rarity: 'Rare', seedCost: 80, baseValue: 175, growthSeconds: 66, cropRow: 12, color: 0x8e2f6a },
-  { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 110, baseValue: 250, growthSeconds: 80, cropRow: 14, color: 0x4fae4a },
+  { id: 'beet', name: 'Beetroot', rarity: 'Rare', seedCost: 85, baseValue: 195, growthSeconds: 64, cropRow: 12, color: 0x8e2f6a },
+  { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 120, baseValue: 282, growthSeconds: 78, cropRow: 14, color: 0x4fae4a },
   // Legendary
-  { id: 'corn', name: 'Corn', rarity: 'Legendary', seedCost: 200, baseValue: 520, growthSeconds: 110, cropRow: 8, color: 0xf4c948 },
-  { id: 'pumpkin', name: 'Pumpkin', rarity: 'Legendary', seedCost: 280, baseValue: 720, growthSeconds: 130, cropRow: 9, color: 0xe8862b },
+  { id: 'corn', name: 'Corn', rarity: 'Legendary', seedCost: 210, baseValue: 560, growthSeconds: 104, cropRow: 8, color: 0xf4c948 },
+  { id: 'pumpkin', name: 'Pumpkin', rarity: 'Legendary', seedCost: 300, baseValue: 820, growthSeconds: 124, cropRow: 9, color: 0xe8862b },
   // Mythical
-  { id: 'pinkcabbage', name: 'Pink Cabbage', rarity: 'Mythical', seedCost: 520, baseValue: 1500, growthSeconds: 165, cropRow: 11, color: 0xe06aa0 },
+  { id: 'pinkcabbage', name: 'Pink Cabbage', rarity: 'Mythical', seedCost: 560, baseValue: 1650, growthSeconds: 158, cropRow: 11, color: 0xe06aa0 },
+  { id: 'goldencorn', name: 'Golden Corn', rarity: 'Mythical', seedCost: 820, baseValue: 2500, growthSeconds: 172, cropRow: 8, color: 0xffd84a, cropTint: 0xffc400 },
   // Divine
-  { id: 'bluerose', name: 'Blue Rose', rarity: 'Divine', seedCost: 1300, baseValue: 4800, growthSeconds: 220, cropRow: 6, color: 0x5aa0e0 },
+  { id: 'bluerose', name: 'Blue Rose', rarity: 'Divine', seedCost: 1350, baseValue: 5200, growthSeconds: 205, cropRow: 6, color: 0x5aa0e0 },
+  { id: 'frostpumpkin', name: 'Frost Pumpkin', rarity: 'Divine', seedCost: 2100, baseValue: 8200, growthSeconds: 230, cropRow: 9, color: 0x9fd6ff, cropTint: 0x8fd0ff },
   // Prismatic
-  { id: 'starfruit', name: 'Star Fruit', rarity: 'Prismatic', seedCost: 3600, baseValue: 16000, growthSeconds: 300, cropRow: 13, color: 0x6ad0e0 },
+  { id: 'starfruit', name: 'Star Fruit', rarity: 'Prismatic', seedCost: 3800, baseValue: 16500, growthSeconds: 255, cropRow: 13, color: 0x6ad0e0 },
+  { id: 'moonpetal', name: 'Moonpetal', rarity: 'Prismatic', seedCost: 6400, baseValue: 30000, growthSeconds: 285, cropRow: 6, color: 0xfff0c0, cropTint: 0xf3e9c8 },
+  // Celestial
+  { id: 'galaxyfruit', name: 'Galaxy Fruit', rarity: 'Celestial', seedCost: 13000, baseValue: 64000, growthSeconds: 330, cropRow: 13, color: 0xb98aff, cropTint: 0xc6a3ff },
+  { id: 'voidbloom', name: 'Voidbloom', rarity: 'Celestial', seedCost: 26000, baseValue: 145000, growthSeconds: 400, cropRow: 11, color: 0x8a4fd0, cropTint: 0x9a6ad0 },
 ];
 
 export const PLANT_BY_ID: Record<string, Plant> = Object.fromEntries(
@@ -89,6 +100,7 @@ export const RARITY_UNLOCK: Record<Rarity, number> = {
   Mythical: 14,
   Divine: 20,
   Prismatic: 28,
+  Celestial: 36,
 };
 
 // ---- mutations ----------------------------------------------------------
