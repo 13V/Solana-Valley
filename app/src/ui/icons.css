@@ -39,10 +39,11 @@
   vertical-align: -4px;
 }
 
-/* Square HUD buttons center their icon and drop the inline offset. */
+/* Square HUD buttons center their icon and drop the inline offset. The 40px
+   button has a 24px content box, so a 20px icon keeps clear padding all round. */
 .iconbtn .btn-ico {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   vertical-align: middle;
 }
 
