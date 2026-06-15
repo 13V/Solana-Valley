@@ -48,6 +48,8 @@ import {
   MY_PLOT,
   isInMyPlot,
   HOMESTEADS,
+  SHORE,
+  BEACH,
   type Homestead,
   type Rect,
 } from '../plots';
@@ -241,20 +243,25 @@ export class FarmScene extends Phaser.Scene {
       0,
     );
     this.player.setCollideWorldBounds(true);
-    this.player.setOrigin(0.5, 0.72).setScale(1.25);
+    this.player.setOrigin(0.5, 0.72).setScale(1.85);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
     this.physics.add.collider(this.player, this.obstacles);
 
-    // A tiled-grass backdrop (well past the world edges) so the field fills any
-    // screen size — no flat margin on wide monitors. The camera may roam into it.
+    // A tiled-water backdrop (well past the world edges) so the island floats in
+    // open sea on any screen size. A slow drift keeps the ocean alive.
     const M = 1400;
-    this.add
-      .tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M, 'grass', 0)
+    const sea = this.add
+      .tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M, 'water', 0)
       .setTileScale(2, 2)
       .setDepth(-10000);
+    this.tweens.add({ targets: sea, tilePositionX: 32, duration: 5200, repeat: -1, ease: 'Linear' });
+    this.tweens.add({ targets: sea, tilePositionY: 32, duration: 7400, repeat: -1, ease: 'Linear' });
 
-    // Camera follows the player around the larger world (bounds include the backdrop).
+    // Camera follows the player; zoomed in so the character reads at a cozy size.
+    // (?zoom=<n> overrides for dev/overview screenshots.)
+    const zoomParam = Number(new URLSearchParams(location.search).get('zoom'));
     this.cameras.main.setBounds(-M, -M, WORLD_WIDTH + 2 * M, WORLD_HEIGHT + 2 * M);
+    this.cameras.main.setZoom(Number.isFinite(zoomParam) && zoomParam > 0 ? zoomParam : 1.65);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     // Full-screen overlays live in screen space (scrollFactor 0) and track the
@@ -463,7 +470,7 @@ export class FarmScene extends Phaser.Scene {
 
     if (params.has('reset')) localStorage.removeItem(SAVE_KEY);
     // Don't load/save during scripted/dev sessions so demos stay deterministic.
-    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp', 'rain'].some((k) => params.has(k));
+    this.persist = !['fast', 'give', 'mut', 'time', 'debug', 'reset', 'coins', 'xp', 'rain', 'zoom'].some((k) => params.has(k));
   }
 
   // Premium character sheet (8 frames/row). Rows 0–3 = idle, 4–7 = walk, each
@@ -560,6 +567,15 @@ export class FarmScene extends Phaser.Scene {
   // seamlessly into a filled plot; a few variants add subtle texture.
   private static TILLED_FRAMES = [55, 56, 57];
 
+  // Island layout: a tile is ocean near the very edge, then a sand beach, then
+  // the playable grassy land where the homesteads sit.
+  private tileZone(x: number, y: number): 'ocean' | 'beach' | 'land' {
+    const d = Math.min(x, y, GRID_W - 1 - x, GRID_H - 1 - y);
+    if (d < SHORE) return 'ocean';
+    if (d < SHORE + BEACH) return 'beach';
+    return 'land';
+  }
+
   private buildWorld() {
     for (let y = 0; y < GRID_H; y++) {
       this.tiles[y] = [];
@@ -569,7 +585,19 @@ export class FarmScene extends Phaser.Scene {
         this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
         const cx = x * TILE + TILE / 2;
         const cy = y * TILE + TILE / 2;
-        this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
+        const d = Math.min(x, y, GRID_W - 1 - x, GRID_H - 1 - y);
+        if (d < SHORE) {
+          // Surrounding sea: draw nothing here so the animated water backdrop
+          // shows through (one big living ocean). A wall along the inner shore
+          // keeps the player on the island. (Invisible slot keeps the array dense.)
+          this.ground[y][x] = this.add.image(cx, cy, 'pixel').setVisible(false);
+          this.tiles[y][x].obstacle = true;
+          if (d === SHORE - 1) this.addCollider(cx, cy, TILE, TILE);
+        } else if (d < SHORE + BEACH) {
+          this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
+        } else {
+          this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
+        }
         this.overlay[y][x] = this.add.image(cx, cy, 'tilled', 42).setScale(2).setDepth(1).setVisible(false);
       }
     }
@@ -627,10 +655,11 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private placeDecorations() {
-    // Scatter nature only across the *open* grass — never inside a homestead's
-    // fenced footprint (incl. its 1-tile fence ring), so interiors stay tidy.
+    // Scatter nature only across the *open* grass — never on the beach/ocean and
+    // never inside a homestead's fenced footprint (incl. its fence ring).
     const free = (tx: number, ty: number) =>
-      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle && !this.inAnyHomestead(tx, ty);
+      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle &&
+      this.tileZone(tx, ty) === 'land' && !this.inAnyHomestead(tx, ty);
 
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let placed = 0, guard = 0;
@@ -679,20 +708,6 @@ export class FarmScene extends Phaser.Scene {
         yoyo: true, repeat: -1, ease: 'Sine.inOut',
       });
       t++;
-    }
-
-    // A leafy tree-line framing the world out in the backdrop grass.
-    const treePics = ['tree', 'tree_apple'];
-    for (let i = 0; i < 36; i++) {
-      const out = Phaser.Math.Between(80, 380);
-      let x: number, y: number;
-      switch (i % 4) {
-        case 0: x = Phaser.Math.Between(-240, WORLD_WIDTH + 240); y = -out; break;
-        case 1: x = Phaser.Math.Between(-240, WORLD_WIDTH + 240); y = WORLD_HEIGHT + out; break;
-        case 2: x = -out; y = Phaser.Math.Between(-240, WORLD_HEIGHT + 240); break;
-        default: x = WORLD_WIDTH + out; y = Phaser.Math.Between(-240, WORLD_HEIGHT + 240); break;
-      }
-      this.add.image(x, y, 'biome', treePics[i % 2]).setOrigin(0.5, 1).setScale(2).setDepth(y);
     }
   }
 
@@ -746,6 +761,9 @@ export class FarmScene extends Phaser.Scene {
       const cx = x * TILE + TILE / 2;
       const cy = y * TILE + TILE / 2;
       this.add.image(cx, cy, 'fences', row * 4 + col).setScale(2).setDepth(cy + 6);
+      // Make the fence solid (gaps were excluded above, so gates stay walkable).
+      this.tiles[y][x].obstacle = true;
+      this.addCollider(cx, cy, TILE, TILE);
     }
   }
 
@@ -1673,10 +1691,9 @@ export class FarmScene extends Phaser.Scene {
   // water tile is flagged obstacle + given a collider so the player can't walk
   // onto it (and clicks route to fishing). Lily pads add a little life.
   private buildPond() {
-    // 4×4 water rect in the open grass just left of the player's homestead (a
-    // short walk down the lane from the farm). Sat outside any fence so it never
-    // collides with a homestead interior.
-    this.pond = { x0: 2, y0: 10, x1: 5, y1: 13 };
+    // 4×4 freshwater pond in the open grass just west of the player's homestead
+    // (a short walk down the lane from the farm), inland from the beach.
+    this.pond = { x0: 6, y0: 15, x1: 9, y1: 18 };
     const p = this.pond;
     for (let y = p.y0; y <= p.y1; y++) {
       for (let x = p.x0; x <= p.x1; x++) {
@@ -1814,6 +1831,7 @@ export class FarmScene extends Phaser.Scene {
     return (
       this.inBounds(tx, ty) &&
       !this.tiles[ty][tx].obstacle &&
+      this.tileZone(tx, ty) === 'land' &&
       !this.inAnyHomestead(tx, ty) &&
       !isInMyPlot(tx, ty) &&
       !this.isPondTile(tx, ty) &&

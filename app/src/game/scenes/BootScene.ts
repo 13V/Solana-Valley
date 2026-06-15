@@ -116,6 +116,21 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(0, 0, 1, 1);
     g.generateTexture('pixel', 1, 1);
     g.destroy();
+
+    // A soft sandy beach tile (16px so it scales x2 to a TILE like the others):
+    // a warm tan base speckled with lighter/darker grains for texture.
+    g = this.gfx();
+    g.fillStyle(0xe8d5a2, 1);
+    g.fillRect(0, 0, 16, 16);
+    const grains: Array<[number, number]> = [
+      [2, 3], [11, 2], [6, 7], [13, 9], [4, 12], [9, 13], [1, 9], [14, 5],
+    ];
+    g.fillStyle(0xf2e6c2, 1);
+    for (const [x, y] of grains) g.fillRect(x, y, 2, 2);
+    g.fillStyle(0xd8c089, 1);
+    for (const [x, y] of grains) g.fillRect((x + 5) % 16, (y + 7) % 16, 1, 1);
+    g.generateTexture('sand', 16, 16);
+    g.destroy();
   }
 
   private drawStar(

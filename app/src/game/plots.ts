@@ -20,10 +20,16 @@ export const HS_H = HS_IH + 2; // 18
 export const COLS = 5;
 export const ROWS = 2;
 export const MARGIN_X = 8; // tiles of grass left/right of the neighbourhood (room for the pond)
-export const MARGIN_TOP = 3; // tiles above the first row
-export const MARGIN_BOTTOM = 4; // tiles below the last row
+export const MARGIN_TOP = 3; // tiles of grass above the first row
+export const MARGIN_BOTTOM = 4; // tiles of grass below the last row
 export const GAP_X = 2; // grass/path gap between homestead columns
 export const GAP_Y = 4; // gap between the two rows (leaves room for the avenue)
+
+// The land is an island: a ring of ocean (+ a sand beach just inside it) wraps
+// the whole grid. Homesteads sit on the grass well within the beach.
+export const SHORE = 3; // ocean tiles at the very edge
+export const BEACH = 2; // sand beach tiles just inside the ocean
+export const ISLAND_BORDER = SHORE + BEACH; // grass starts this many tiles in
 
 // Sub-area layout *relative to a homestead interior's top-left (ix, iy)*.
 //   HOUSE        top-left            CHICKEN PEN   top-right (coop crowns it)
@@ -61,8 +67,8 @@ function makeHomestead(index: number): Homestead {
   const row = Math.floor(index / COLS);
   // Interior top-left: skip the margin + the left fence (+1), then stride by
   // footprint + gap for each preceding column/row.
-  const ix = MARGIN_X + 1 + col * (HS_W + GAP_X);
-  const iy = MARGIN_TOP + 1 + row * (HS_H + GAP_Y);
+  const ix = ISLAND_BORDER + MARGIN_X + 1 + col * (HS_W + GAP_X);
+  const iy = ISLAND_BORDER + MARGIN_TOP + 1 + row * (HS_H + GAP_Y);
   const r = (x: number, y: number, w: number, h: number): Rect => ({
     x0: ix + x, y0: iy + y, x1: ix + x + w - 1, y1: iy + y + h - 1,
   });
@@ -124,7 +130,8 @@ export const NEIGHBORS: Neighbor[] = NEIGHBOR_HOMESTEADS.map((h) => ({
   owner: h.owner,
 }));
 
-// World size needed to hold the whole grid, with a margin on every side.
-// (constants.ts re-exports these as GRID_W / GRID_H so the two never drift.)
-export const WORLD_COLS = MARGIN_X * 2 + COLS * HS_W + (COLS - 1) * GAP_X;
-export const WORLD_ROWS = MARGIN_TOP + ROWS * HS_H + (ROWS - 1) * GAP_Y + MARGIN_BOTTOM;
+// World size needed to hold the whole grid: the homestead grid + grass margins +
+// the island's ocean/beach ring on every side. (constants.ts re-exports these as
+// GRID_W / GRID_H so the two never drift.)
+export const WORLD_COLS = 2 * ISLAND_BORDER + 2 * MARGIN_X + COLS * HS_W + (COLS - 1) * GAP_X;
+export const WORLD_ROWS = 2 * ISLAND_BORDER + MARGIN_TOP + ROWS * HS_H + (ROWS - 1) * GAP_Y + MARGIN_BOTTOM;
