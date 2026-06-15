@@ -605,7 +605,6 @@ body {
 
 /* Buttons / chips share the wooden button frame */
 .ui-skin .btn,
-.ui-skin .iconbtn,
 .ui-skin .slot,
 .ui-skin .badge {
   background: none;
@@ -616,10 +615,25 @@ body {
   text-shadow: none;
 }
 
-/* The square HUD icon buttons use a frame width matching the 8px slice so the
-   icon sits in a roomy centre and isn't cramped/clipped against the wood. */
+/* HUD icon buttons render the FULL wooden button sprite as a stretched
+   background instead of a 9-slice border-image. At 40px the 9-slice was
+   clipping the bevel (cut-off borders) and shrinking the content box so the
+   icon sat off-centre. As a background the whole bevel always shows and the
+   icon centres cleanly on top. */
 .ui-skin .iconbtn {
-  border-width: 8px;
+  background: var(--ui-btn) center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  text-shadow: none;
+  image-rendering: pixelated;
+}
+.ui-skin .iconbtn:hover {
+  background-image: var(--ui-btn-light);
+}
+.ui-skin .iconbtn.active,
+.ui-skin .iconbtn:active {
+  background-image: var(--ui-btn-press);
 }
 
 .ui-skin .badge {
@@ -640,16 +654,13 @@ body {
   padding: 1px 7px;
 }
 
-.ui-skin .btn:hover,
-.ui-skin .iconbtn:hover {
+.ui-skin .btn:hover {
   border-image: var(--ui-btn-light) 8 fill stretch;
   color: var(--ink);
 }
 
 .ui-skin .btn.active,
-.ui-skin .iconbtn.active,
-.ui-skin .btn:active,
-.ui-skin .iconbtn:active {
+.ui-skin .btn:active {
   border-image: var(--ui-btn-press) 8 fill stretch;
 }
 
