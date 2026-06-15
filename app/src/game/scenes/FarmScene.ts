@@ -1740,20 +1740,25 @@ export class FarmScene extends Phaser.Scene {
     return this.pondTiles.has(this.key(tx, ty));
   }
 
-  // Click a water tile within reach → cast. Returns true if the click was a
+  // Click a water tile within reach → cast. Works on the inland pond and on the
+  // surrounding ocean (cast from the beach). Returns true if the click was a
   // fishing attempt (so it doesn't fall through to the tool logic).
   private tryFish(tx: number, ty: number): boolean {
-    if (!this.isPondTile(tx, ty)) return false;
+    const ocean = this.tileZone(tx, ty) === 'ocean';
+    if (!this.isPondTile(tx, ty) && !ocean) return false;
     if (this.casting) return true; // a cast is already in progress; swallow the click
     if (!this.inRange(tx, ty)) {
       this.toast('🎣 Move closer to the water to cast.');
       return true;
     }
-    this.startCast(tx, ty);
+    this.startCast(tx, ty, ocean);
     return true;
   }
 
-  private startCast(tx: number, ty: number) {
+  // The open sea has bigger, more valuable catches than the little pond.
+  private startCast(tx: number, ty: number, ocean = false) {
+    const oceanLuck = ocean ? 1.25 : 1;
+    const oceanValue = ocean ? 1.3 : 1;
     this.casting = true;
     const cx = tx * TILE + TILE / 2;
     const cy = ty * TILE + TILE / 2;
@@ -1771,7 +1776,7 @@ export class FarmScene extends Phaser.Scene {
 
       // Treasure Hunter: a chance to reel a treasure chest instead of a fish.
       if (Math.random() < m.treasureChance) {
-        const coins = Phaser.Math.Between(200, 1200);
+        const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
         this.coins += coins;
         this.earned += coins;
         this.addSkillXp('fishing', 12); // still grants fishing XP
@@ -1790,11 +1795,11 @@ export class FarmScene extends Phaser.Scene {
         return;
       }
 
-      const f = catchFish(m.fishLuckMult);
+      const f = catchFish(m.fishLuckMult * oceanLuck);
       // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
       const legendary = m.legendaryFish && Math.random() < 0.03;
       const baseValue = legendary ? f.value * 12 : f.value;
-      const coins = Math.round(baseValue * m.fishValueMult);
+      const coins = Math.round(baseValue * m.fishValueMult * oceanValue);
       this.coins += coins;
       this.earned += coins;
       this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
