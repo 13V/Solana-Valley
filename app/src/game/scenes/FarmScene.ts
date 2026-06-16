@@ -575,6 +575,8 @@ export class FarmScene extends Phaser.Scene {
   // Solid tilled-dirt tiles (premium Tilled_Dirt_v2 sheet, 11 cols) that tile
   // seamlessly into a filled plot; a few variants add subtle texture.
   private static TILLED_FRAMES = [55, 56, 57];
+  // stonepath.png frames that carry a nice pebble cluster (scattered on paths).
+  private static PEBBLES = [0, 4, 5, 8, 9, 12, 13, 14, 15];
 
   // Island layout: a tile is ocean near the very edge, then a sand beach, then
   // the playable grassy land where the homesteads sit.
@@ -654,11 +656,20 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  private layCobble(x: number, y: number) {
+  private layPath(x: number, y: number) {
     if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) return;
-    if (this.pondTiles.has(this.key(x, y)) || this.pathTiles.has(this.key(x, y))) return;
-    this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'cobble').setScale(2).setDepth(0.5);
-    this.pathTiles.add(this.key(x, y));
+    const k = this.key(x, y);
+    if (this.pondTiles.has(k) || this.pathTiles.has(k)) return;
+    const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
+    this.add.image(cx, cy, 'dirtpath').setScale(2).setDepth(0.5);
+    // Scatter the pack's loose pebbles for a natural, irregular surface.
+    const n = Math.random() < 0.78 ? (Math.random() < 0.28 ? 2 : 1) : 0;
+    for (let i = 0; i < n; i++) {
+      const f = FarmScene.PEBBLES[Math.floor(Math.random() * FarmScene.PEBBLES.length)];
+      const ox = Phaser.Math.Between(-7, 7), oy = Phaser.Math.Between(-7, 7);
+      this.add.image(cx + ox, cy + oy, 'stonepath', f).setScale(2).setDepth(0.55).setFlipX(Math.random() < 0.5);
+    }
+    this.pathTiles.add(k);
   }
 
   // The sunken valley floor: a cobble avenue with lanes up to every gate, a pond
@@ -669,17 +680,17 @@ export class FarmScene extends Phaser.Scene {
     const cx = Math.floor((pz.x0 + pz.x1) / 2);
 
     // Pond crossing the avenue (a bridge carries the road over it).
-    this.buildPond({ x0: cx - 11, y0: avY - 2, x1: cx - 7, y1: avY + 4 }, [avY, avY + 1, avY + 2]);
+    this.buildPond({ x0: cx - 13, y0: avY - 3, x1: cx - 7, y1: avY + 5 }, [avY, avY + 1, avY + 2]);
 
     // Cobble avenue across the whole valley.
     for (let y = avY; y <= avY + 2; y++)
-      for (let x = pz.x0; x <= pz.x1; x++) this.layCobble(x, y);
+      for (let x = pz.x0; x <= pz.x1; x++) this.layPath(x, y);
     // A lane from each homestead gate to the avenue.
     for (const h of HOMESTEADS) {
       const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
       const a = h.openSide === 'S' ? h.interior.y1 + 1 : h.interior.y0 - 1;
       const lo = Math.min(a, avY), hi = Math.max(a, avY + 2);
-      for (let y = lo; y <= hi; y++) { this.layCobble(gx, y); this.layCobble(gx - 1, y); }
+      for (let y = lo; y <= hi; y++) { this.layPath(gx, y); this.layPath(gx - 1, y); }
     }
 
     this.buildMarkets(avY, cx);
@@ -1775,56 +1786,69 @@ export class FarmScene extends Phaser.Scene {
     this.pond = rect;
     const p = rect;
     const bridge = new Set(bridgeRows);
+    // Round the four corners so the pond reads as an organic blob, not a box.
+    const corner = (x: number, y: number) => (x === p.x0 || x === p.x1) && (y === p.y0 || y === p.y1);
+
+    // 1) A sandy bank just outside the water for a soft, natural shore. Skip the
+    //    avenue rows so the path runs clean to the bridge; never cover a path.
+    for (let y = p.y0 - 1; y <= p.y1 + 1; y++) {
+      for (let x = p.x0 - 1; x <= p.x1 + 1; x++) {
+        if (!this.inBounds(x, y) || bridge.has(y)) continue;
+        const isWater = x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1 && !corner(x, y);
+        if (isWater || this.pathTiles.has(this.key(x, y)) || this.tiles[y][x].obstacle) continue;
+        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'sand').setScale(2).setDepth(0.3);
+      }
+    }
+
+    // 2) Water (rounded corners skipped; avenue rows stay walkable for the bridge).
     for (let y = p.y0; y <= p.y1; y++) {
       for (let x = p.x0; x <= p.x1; x++) {
-        if (!this.inBounds(x, y)) continue;
-        const cx = x * TILE + TILE / 2;
-        const cy = y * TILE + TILE / 2;
-        if (this.anims.exists('water-anim')) {
-          this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(4).play('water-anim');
-        } else {
-          this.add.image(cx, cy, 'water', 0).setScale(2).setDepth(4);
-        }
-        if (bridge.has(y)) continue; // bridge rows stay walkable (planks added below)
+        if (!this.inBounds(x, y) || corner(x, y)) continue;
+        const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
+        if (this.anims.exists('water-anim')) this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(3.8).play('water-anim');
+        else this.add.image(cx, cy, 'water', 0).setScale(2).setDepth(3.8);
+        if (bridge.has(y)) continue;
         this.tiles[y][x].obstacle = true;
         this.tiles[y][x].tilled = false;
         this.pondTiles.add(this.key(x, y));
         this.addCollider(cx, cy, TILE * 2, TILE * 2);
       }
     }
-    // A soft rim so the pond reads as inset rather than pasted on.
-    this.add
-      .rectangle((p.x0) * TILE, (p.y0) * TILE, (p.x1 - p.x0 + 1) * TILE, (p.y1 - p.y0 + 1) * TILE)
-      .setOrigin(0, 0)
-      .setStrokeStyle(3, 0x2c66a0, 0.6)
-      .setDepth(4.5);
-    // A wooden bridge carrying the avenue over the pond (horizontal bridge:
-    // 2 = left end, 3 = middle, 4 = right end). These tiles stay walkable.
+
+    // 3) Faint surface ripples (waterobj 12–17) for life.
+    for (const [tx, ty] of [[p.x0 + 1, p.y0 + 1], [p.x1 - 1, p.y1 - 1], [p.x0 + 2, p.y1 - 2]] as Array<[number, number]>) {
+      if (bridge.has(ty) || corner(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.6);
+    }
+
+    // 4) Wooden bridge over the avenue (2 = left end, 3 = mid, 4 = right end).
     for (const y of bridgeRows) {
       if (y < p.y0 || y > p.y1) continue;
       for (let x = p.x0; x <= p.x1; x++) {
+        if (corner(x, y)) continue;
         const frame = x === p.x0 ? 2 : x === p.x1 ? 4 : 3;
         this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'bridge', frame).setScale(2).setDepth(5.5);
         this.pathTiles.add(this.key(x, y));
       }
     }
-    // A couple of lily pads from the waterobj sheet (fallback to a drawn pad).
-    const padKey = this.textures.exists('waterobj') ? 'waterobj' : 'lilypad';
-    const pads: Array<[number, number, number]> = [
-      [p.x0, p.y0, 0],
-      [p.x1, p.y0 + 1, 1],
-      [p.x0 + 1, p.y1, 2],
-    ];
-    for (const [tx, ty, frame] of pads) {
-      if (bridge.has(ty)) continue;
-      const cx = tx * TILE + TILE / 2;
+
+    // 5) Real lily pads (waterobj 8–11), gently bobbing.
+    const lily = (tx: number, ty: number, frame: number) => {
+      if (bridge.has(ty) || corner(tx, ty) || !this.pondTiles.has(this.key(tx, ty))) return;
       const cy = ty * TILE + TILE / 2;
-      const pad = this.add.image(cx, cy, padKey, padKey === 'waterobj' ? frame : 0).setScale(2).setDepth(5);
-      this.tweens.add({
-        targets: pad, y: cy + 2, duration: 1800 + Math.random() * 800,
-        yoyo: true, repeat: -1, ease: 'Sine.inOut',
-      });
-    }
+      const pad = this.add.image(tx * TILE + TILE / 2, cy, 'waterobj', frame).setScale(2).setDepth(4.6);
+      this.tweens.add({ targets: pad, y: cy + 2, duration: 1800 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    };
+    lily(p.x0 + 1, p.y0 + 1, 8); lily(p.x1 - 1, p.y1 - 1, 9); lily(p.x0 + 2, p.y1 - 1, 10);
+
+    // 6) Reeds (waterobj 6–7) + a rock fringing the banks (per-row depth so the
+    //    player passes behind them).
+    const edge = (tx: number, ty: number, frame: number) => {
+      if (!this.inBounds(tx, ty)) return;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', frame).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
+    };
+    edge(p.x0 - 1, p.y0, 6); edge(p.x1 + 1, p.y1, 7); edge(p.x0, p.y1 + 1, 6);
+    edge(p.x1, p.y0 - 1, 7); edge(p.x1 + 1, p.y0 + 1, 3);
   }
 
   private isPondTile(tx: number, ty: number): boolean {

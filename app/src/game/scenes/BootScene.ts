@@ -136,25 +136,19 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('sand', 16, 16);
     g.destroy();
 
-    // A cobblestone path tile (16px): warm grey grout with rounded cobbles in a
-    // brick-ish stagger, lightly shaded so a run of them reads as a stone path.
+    // A natural packed-earth path tile (16px): warm pale dirt flecked with grit,
+    // so a run of them + the pack's scattered pebbles reads as a cosy trail.
     g = this.gfx();
-    g.fillStyle(0x8d8377, 1); // grout
+    g.fillStyle(0xcab797, 1);
     g.fillRect(0, 0, 16, 16);
-    const cobble = (x: number, y: number, w: number, h: number, c: number) => {
-      g.fillStyle(c, 1);
-      g.fillRect(x, y, w, h);
-      g.fillStyle(0xc9c2b4, 0.5); // top highlight
-      g.fillRect(x, y, w, 1);
-    };
-    const stones: Array<[number, number, number, number]> = [
-      [1, 1, 6, 5], [8, 1, 6, 5],
-      [1, 7, 4, 4], [6, 7, 8, 4],
-      [1, 12, 7, 3], [9, 12, 5, 3],
+    const flecks: Array<[number, number]> = [
+      [2, 2], [7, 4], [12, 3], [4, 9], [10, 8], [14, 12], [6, 13], [1, 11], [9, 14], [13, 7],
     ];
-    const tones = [0xb3ab9c, 0xa79e8e, 0xbdb6a8, 0xada595, 0xb8b1a2, 0xa39a8a];
-    stones.forEach((s, i) => cobble(s[0], s[1], s[2], s[3], tones[i % tones.length]));
-    g.generateTexture('cobble', 16, 16);
+    g.fillStyle(0xbca684, 1);
+    for (const [x, y] of flecks) g.fillRect(x, y, 2, 1);
+    g.fillStyle(0xdacbab, 1);
+    for (const [x, y] of flecks) g.fillRect((x + 4) % 16, (y + 6) % 16, 1, 1);
+    g.generateTexture('dirtpath', 16, 16);
     g.destroy();
   }
 
