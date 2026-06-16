@@ -11,11 +11,11 @@ const COLLAPSED_KEY = 'solana-valley:goals-collapsed';
 type Goal = { label: string; done: (s: UiState) => boolean };
 
 const GOALS: Goal[] = [
-  { label: 'Buy your first seed', done: (s) => Object.keys(s.seeds).length > 0 },
+  { label: 'Get your first seed', done: (s) => Object.values(s.seeds).reduce((a, b) => a + b, 0) > 0 },
   { label: 'Harvest a crop', done: (s) => s.progress.harvested > 0 },
   { label: 'Earn 100 coins', done: (s) => s.progress.earned >= 100 },
   { label: 'Reach Level 2', done: (s) => s.progress.level >= 2 },
-  { label: 'Buy a permanent upgrade', done: (s) => Object.keys(s.progress.upgrades).length > 0 },
+  { label: 'Buy a permanent upgrade', done: (s) => Object.values(s.progress.upgrades).some((lvl) => lvl > 0) },
   { label: 'Raise an animal', done: (s) => Object.values(s.animalCounts).reduce((a, b) => a + b, 0) > 0 },
   { label: 'Discover 5 plants', done: (s) => s.progress.discoveredPlants.length >= 5 },
   { label: 'Find a mutation', done: (s) => s.progress.mutationsFound > 0 },

@@ -1,3 +1,5 @@
+import { restartTutorial } from './TutorialCoach';
+
 export function HelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel help">
@@ -31,6 +33,9 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
           Your farm autosaves locally. Connect a Solana wallet (devnet) to see your address &amp; balance —
           on-chain land/items and the $VALLEY token are on the roadmap.
         </p>
+        <button className="btn" onClick={restartTutorial} style={{ marginTop: 4 }}>
+          ↺ Replay tutorial
+        </button>
       </div>
     </div>
   );
