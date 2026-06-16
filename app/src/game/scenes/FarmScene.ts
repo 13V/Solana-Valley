@@ -663,7 +663,7 @@ export class FarmScene extends Phaser.Scene {
     const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
     // Keep the grass and just scatter the pack's loose pebbles on top, so the
     // route reads as a natural pebble trail rather than a hard dirt road.
-    const n = 2 + (Math.random() < 0.5 ? 1 : 0);
+    const n = (Math.random() < 0.8 ? 1 : 0) + (Math.random() < 0.45 ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const f = FarmScene.PEBBLES[Math.floor(Math.random() * FarmScene.PEBBLES.length)];
       const ox = Phaser.Math.Between(-7, 7), oy = Phaser.Math.Between(-7, 7);
@@ -676,20 +676,20 @@ export class FarmScene extends Phaser.Scene {
   // crossed by a bridge, and a row of market stalls + cosy props.
   private buildPlaza() {
     const pz = PLAZA;
-    const avY = Math.floor((pz.y0 + pz.y1) / 2) - 1; // avenue spans avY..avY+2
+    const avY = Math.floor((pz.y0 + pz.y1) / 2) - 1; // avenue spans avY..avY+1
     const cx = Math.floor((pz.x0 + pz.x1) / 2);
 
-    // Pond crossing the avenue (a bridge carries the road over it).
-    this.buildPond({ x0: cx - 13, y0: avY - 3, x1: cx - 7, y1: avY + 5 }, [avY, avY + 1, avY + 2]);
+    // Pond crossing the avenue (a 2-tile wooden bridge carries the road over it).
+    this.buildPond({ x0: cx - 13, y0: avY - 3, x1: cx - 7, y1: avY + 4 }, [avY, avY + 1]);
 
-    // Cobble avenue across the whole valley.
-    for (let y = avY; y <= avY + 2; y++)
+    // Pebble avenue across the whole valley.
+    for (let y = avY; y <= avY + 1; y++)
       for (let x = pz.x0; x <= pz.x1; x++) this.layPath(x, y);
     // A lane from each homestead gate to the avenue.
     for (const h of HOMESTEADS) {
       const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
       const a = h.openSide === 'S' ? h.interior.y1 + 1 : h.interior.y0 - 1;
-      const lo = Math.min(a, avY), hi = Math.max(a, avY + 2);
+      const lo = Math.min(a, avY), hi = Math.max(a, avY + 1);
       for (let y = lo; y <= hi; y++) { this.layPath(gx, y); this.layPath(gx - 1, y); }
     }
 
@@ -1821,12 +1821,16 @@ export class FarmScene extends Phaser.Scene {
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.6);
     }
 
-    // 4) Wooden bridge over the avenue (2 = left end, 3 = mid, 4 = right end).
+    // 4) A 2-tile wooden bridge over the avenue: a top rail row (2/3/4) above a
+    //    bottom rail row (7/8/9), the middle planks repeating across the width.
+    const topRow = Math.min(...bridgeRows);
     for (const y of bridgeRows) {
       if (y < p.y0 || y > p.y1) continue;
+      const top = y === topRow;
       for (let x = p.x0; x <= p.x1; x++) {
         if (corner(x, y)) continue;
-        const frame = x === p.x0 ? 2 : x === p.x1 ? 4 : 3;
+        const end = x === p.x0 ? 0 : x === p.x1 ? 2 : 1;
+        const frame = (top ? [2, 3, 4] : [7, 8, 9])[end];
         this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'bridge', frame).setScale(2).setDepth(5.5);
         this.pathTiles.add(this.key(x, y));
       }
