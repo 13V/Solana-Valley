@@ -37,10 +37,10 @@ export const ISLAND_BORDER = SHORE + BEACH; // grass starts this many tiles in
 // left, chicken house + cow pen on the right, an orchard row along the front.
 export const SUB = {
   house: { cx: 9, baseRow: 3 }, // cottage centre col + base row (top-centre)
-  farm: { x: 1, y: 5, w: 7, h: 8 }, // 7×8 = 56-tile crop bed (left)
+  farm: { x: 1, y: 5, w: 7, h: 10 }, // 7×10 = 70-tile crop bed (left, full height)
   chickenPen: { x: 11, y: 1, w: 7, h: 6 }, // chicken house + run (right-top)
   cowPen: { x: 11, y: 8, w: 7, h: 7 }, // cow pasture (right-bottom)
-  orchard: { x: 1, y: 13, w: 7, h: 1 }, // fruit-tree row along the front
+  orchard: { x: 1, y: 1, w: 7, h: 2 }, // fruit-tree slots tucked top-left (bought trees)
   signCx: 9, // name sign column
 };
 

@@ -50,6 +50,7 @@ export class BootScene extends Phaser.Scene {
     }
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
+    this.load.image('cottage_nice', `${A}cottage_nice.png`); // composed brick cottage
     this.load.image('coop', `${A}coop.png`);
     this.load.image('well', `${A}well.png`);
     // Decorative props.

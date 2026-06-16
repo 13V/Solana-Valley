@@ -894,28 +894,25 @@ export class FarmScene extends Phaser.Scene {
       top: true, bottom: true, left: true, right: true, gap: [gateCx, gateY],
     });
 
-    if (!h.mine) {
-      // An empty, claimable plot for another player: fence (opening to the
-      // plaza), stairs, and an "Available" sign. Assigned to a wallet on join.
-      fence();
-      this.addPlotSign(h.signCx, backY, 'Available', false);
-      this.addSignpost(gateCx, gateY);
-      this.addGateStairs(gateCx, gateY, south);
-      return;
-    }
-
-    // The player's "Cozy Homestead": cottage centrepiece, big crop bed on the
-    // left, chicken house + cow pen on the right, orchard along the front.
-    // House FIRST so its footprint is flagged before the fence autotiles.
+    // Every plot uses the same "Cozy Homestead" design: cottage centrepiece,
+    // chicken house + run, and a cow pen. House FIRST so its footprint is
+    // flagged before the fence autotiles.
     this.placeCottage(h);
     fence();
     this.buildChickenPen(h);
     this.buildCowPen(h);
-    this.placeOrchard(h);
-    this.markPlayerFarm(h.farm);
-    this.addPlotSign(h.signCx, backY, '★ Your Homestead', true);
     this.addSignpost(gateCx, gateY);
     this.addGateStairs(gateCx, gateY, south);
+
+    if (!h.mine) {
+      // A furnished but unclaimed plot — same design, empty crop bed, "Available".
+      this.addPlotSign(h.signCx, backY, 'Available', false);
+      return;
+    }
+
+    // The player's interactive farm: a tinted crop bed that unlocks row-by-row.
+    this.markPlayerFarm();
+    this.addPlotSign(h.signCx, backY, '★ Your Homestead', true);
 
     // Working front gate that swings open on approach.
     const gx = gateCx * TILE + TILE / 2;
@@ -949,8 +946,8 @@ export class FarmScene extends Phaser.Scene {
   private placeCottage(h: Homestead) {
     const cx = h.house.cx * TILE + TILE / 2;
     const base = (h.house.baseRow + 1) * TILE;
-    // A proper cottage (house.png) — visually distinct from the chicken house.
-    this.add.image(cx, base, 'house', 'cottage').setOrigin(0.5, 1).setScale(2).setDepth(base);
+    // A proper brick cottage with a red roof — visually distinct from the coop.
+    this.add.image(cx, base, 'cottage_nice').setOrigin(0.5, 1).setScale(1.7).setDepth(base);
     for (let ty = h.house.baseRow - 3; ty <= h.house.baseRow; ty++) {
       for (let dx = -1; dx <= 1; dx++) {
         const tx = h.house.cx + dx;
@@ -996,29 +993,27 @@ export class FarmScene extends Phaser.Scene {
 
   // Drop a few idle, static animals into a neighbour's pens for life: chickens in
   // the chicken pen, cows in the cow pasture.
-  // The orchard: real swaying fruit trees in the player's homestead.
-  private placeOrchard(h: Homestead) {
-    const slots = Math.min(2, h.orchard.x1 - h.orchard.x0); // 1–2 tree spots
-    for (let i = 0; i < slots; i++) {
-      const tx = h.orchard.x0 + 1 + i * 2;
-      const ty = h.orchard.y1;
-      if (!this.inBounds(tx, ty)) continue;
-      const cx = tx * TILE + TILE / 2;
-      const baseY = ty * TILE + TILE;
-      const tree = this.add.image(cx, baseY + 2, 'biome', 'tree_apple').setOrigin(0.5, 1).setScale(2).setDepth(baseY);
-      this.tweens.add({
-        targets: tree, angle: { from: -1.2, to: 1.2 },
-        duration: 2400 + Math.random() * 800, delay: Math.random() * 1500,
-        yoyo: true, repeat: -1, ease: 'Sine.inOut',
-      });
-    }
+  // How many of the crop bed's rows are unlocked — one more per player level,
+  // growing from the front (gate side) back toward the cottage.
+  private unlockedFarmRows(): number {
+    return Math.min(MY_PLOT.ph, 2 + levelInfo(this.xp).level);
   }
 
-  // Player's crop bed: a soft checkerboard tint marks the plantable slots.
-  private markPlayerFarm(f: Rect) {
-    for (let y = f.y0; y <= f.y1; y++) {
-      for (let x = f.x0; x <= f.x1; x++) {
-        this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c);
+  private isUnlockedFarm(tx: number, ty: number): boolean {
+    if (!isInMyPlot(tx, ty)) return false;
+    return ty >= MY_PLOT.py + MY_PLOT.ph - this.unlockedFarmRows();
+  }
+
+  // Player's crop bed: unlocked rows get the soft checkerboard tint; still-locked
+  // rows are dimmed so the farm visibly grows as you level up.
+  private markPlayerFarm() {
+    const x0 = MY_PLOT.px, x1 = MY_PLOT.px + MY_PLOT.pw - 1;
+    const y0 = MY_PLOT.py, y1 = MY_PLOT.py + MY_PLOT.ph - 1;
+    const top = y1 - this.unlockedFarmRows() + 1;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!this.ground[y] || !this.ground[y][x]) continue;
+        this.ground[y][x].setTint(y >= top ? ((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c) : 0xc3cda4);
       }
     }
   }
@@ -1119,7 +1114,7 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private till(x: number, y: number): boolean {
-    if (!isInMyPlot(x, y)) return false; // can only farm your own plot
+    if (!this.isUnlockedFarm(x, y)) return false; // only unlocked rows of your plot
     const t = this.tiles[y][x];
     if (t.tilled || this.crops.has(this.key(x, y))) return false;
     t.tilled = true;
@@ -1457,6 +1452,10 @@ export class FarmScene extends Phaser.Scene {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
       this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
+      if (this.unlockedFarmRows() > Math.min(MY_PLOT.ph, 2 + before)) {
+        this.markPlayerFarm(); // reveal the newly-unlocked crop row
+        this.toast('🌱 New farm row unlocked!');
+      }
     }
   }
 
