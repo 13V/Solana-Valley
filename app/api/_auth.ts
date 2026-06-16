@@ -25,9 +25,12 @@ export function getServiceKey(): string | undefined {
   return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
-// How far in the past/future a signed timestamp may be. Limits replay of a
-// captured signature to a small window.
-const MAX_AGE_MS = 10 * 60 * 1000; // ~10 minutes
+// How far in the past/future a signed timestamp may be. The client signs ONCE
+// per session and reuses that signature for every autosave, so this window must
+// cover a play session — otherwise sync silently stops once the signature ages
+// out. The signature only authorises writes to the signer's OWN save (sent over
+// HTTPS), so a generous window is an acceptable trade for sign-once UX.
+const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export type AuthInput = {
   wallet?: unknown;
