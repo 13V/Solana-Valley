@@ -51,13 +51,13 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
                     ) : chosen ? (
                       <span
                         className="row-sub"
-                        style={{ display: 'block', color: '#bff58a', borderLeft: '3px solid #7bd66a', paddingLeft: 6 }}
+                        style={{ display: 'block', color: '#2f7d2e', fontWeight: 700, borderLeft: '3px solid #2f7d2e', paddingLeft: 6 }}
                       >
                         ✓ <b>{chosen.name}</b> — {chosen.desc}
                       </span>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span className="row-sub" style={{ color: '#ffe27a' }}>★ Lv {ms.level} — choose a perk:</span>
+                        <span className="row-sub" style={{ color: '#9a6a10', fontWeight: 700 }}>★ Lv {ms.level} — choose a perk:</span>
                         {[ms.a, ms.b].map((p) => (
                           <button
                             key={p.id}
@@ -78,7 +78,7 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
               <div style={{ marginTop: 6 }}>
                 <span
                   className="row-sub"
-                  style={{ display: 'block', opacity: maxed ? 1 : 0.5, color: maxed ? '#ffd21a' : undefined }}
+                  style={{ display: 'block', opacity: maxed ? 1 : 0.72, color: maxed ? '#b5820e' : undefined }}
                 >
                   {maxed ? '🌟' : '🔒'} <b>{s.capstone.name}</b> (Lv 20) — {s.capstone.desc}
                 </span>

@@ -653,6 +653,25 @@ body {
   color: var(--ink-soft);
 }
 
+/* Legibility on the parchment panels: lift the dimmed sub-text to near-full
+   opacity, bump weight, and recolour the green "next level" preview to a dark
+   green that actually reads on tan (the light --accent green did not). */
+.ui-skin .row-sub,
+.ui-skin .row-meta,
+.ui-skin .muted,
+.ui-skin .panel-head .muted {
+  opacity: 0.95;
+  font-weight: 600;
+}
+.ui-skin .row-sub .next {
+  color: #2f7d2e;
+  font-weight: 700;
+}
+.ui-skin .lvltag {
+  opacity: 0.95;
+  color: var(--ink);
+}
+
 .ui-skin .x {
   color: var(--ink);
 }
