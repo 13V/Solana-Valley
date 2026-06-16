@@ -19,14 +19,17 @@ export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills'
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
+// Colorful Sprout Lands game-art icons for the content buttons (coin, seed,
+// basket, chicken, hoe, star, book); help/sound stay crisp monochrome utility
+// glyphs. `emoji` is kept only as the img alt text.
 const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; label: string }> = [
-  { id: 'shop', emoji: '🛒', img: 'assets/sprout-ui/btn_shop.png', label: 'Shop' },
-  { id: 'seeds', emoji: '🌱', img: 'assets/sprout-ui/btn_seeds.png', label: 'Seeds' },
-  { id: 'bag', emoji: '🎒', img: 'assets/sprout-ui/btn_bag.png', label: 'Harvest' },
+  { id: 'shop', emoji: '🛒', img: 'assets/sprout-ui/icon_coin.png', label: 'Shop' },
+  { id: 'seeds', emoji: '🌱', img: 'assets/sprout-ui/tool_seed.png', label: 'Seeds' },
+  { id: 'bag', emoji: '🎒', img: 'assets/sprout-ui/icon_basket.png', label: 'Harvest' },
   { id: 'animals', emoji: '🐔', img: 'assets/sprout-ui/icon_chicken.png', label: 'Animals' },
-  { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/btn_upgrades.png', label: 'Upgrades' },
-  { id: 'skills', emoji: '🎯', label: 'Skills' },
-  { id: 'almanac', emoji: '📖', label: 'Almanac' },
+  { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
+  { id: 'skills', emoji: '🎯', img: 'assets/sprout-ui/icon_star.png', label: 'Skills' },
+  { id: 'almanac', emoji: '📖', img: 'assets/sprout-ui/icon_almanac.png', label: 'Almanac' },
   { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 
