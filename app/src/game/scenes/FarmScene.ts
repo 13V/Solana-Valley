@@ -679,14 +679,15 @@ export class FarmScene extends Phaser.Scene {
     const avY = Math.floor((pz.y0 + pz.y1) / 2) - 1; // avenue spans avY..avY+1
     const cx = Math.floor((pz.x0 + pz.x1) / 2);
 
-    // Pond crossing the avenue (a 2-tile wooden bridge carries the road over it).
-    this.buildPond({ x0: cx - 13, y0: avY - 3, x1: cx - 7, y1: avY + 4 }, [avY, avY + 1]);
+    // An organic pond tucked into the valley floor (built first so paths avoid it).
+    this.buildPond();
 
     // Pebble avenue across the whole valley.
     for (let y = avY; y <= avY + 1; y++)
       for (let x = pz.x0; x <= pz.x1; x++) this.layPath(x, y);
-    // A lane from each homestead gate to the avenue.
+    // A lane from the player's gate to the avenue (neighbours open onto grass).
     for (const h of HOMESTEADS) {
+      if (!h.mine) continue;
       const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
       const a = h.openSide === 'S' ? h.interior.y1 + 1 : h.interior.y0 - 1;
       const lo = Math.min(a, avY), hi = Math.max(a, avY + 1);
@@ -1779,80 +1780,68 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- fishing ------------------------------------------------------------
 
-  // A small pond of animated water just outside the player's homestead. Every
-  // water tile is flagged obstacle + given a collider so the player can't walk
-  // onto it (and clicks route to fishing). Lily pads add a little life.
-  private buildPond(rect: Rect, bridgeRows: number[] = []) {
-    this.pond = rect;
-    const p = rect;
-    const bridge = new Set(bridgeRows);
-    // Round the four corners so the pond reads as an organic blob, not a box.
-    const corner = (x: number, y: number) => (x === p.x0 || x === p.x1) && (y === p.y0 || y === p.y1);
+  // An organic oval pond on the valley floor. No bridge, no sand ring — the
+  // hard waterline is hidden the natural way, by fringing the bank with reeds,
+  // cattails, lily pads and a soft ground shadow. Water tiles are obstacles so
+  // the player fishes from the bank.
+  private buildPond() {
+    const pz = PLAZA;
+    const cx = Math.floor((pz.x0 + pz.x1) / 2) - 2; // a touch left of centre
+    const cyc = Math.floor((pz.y0 + pz.y1) / 2) + 4; // sits below the avenue
+    const rx = 6, ry = 3;
+    this.pond = { x0: cx - rx, y0: cyc - ry, x1: cx + rx, y1: cyc + ry };
+    const inPond = (x: number, y: number, s = 1) => {
+      const dx = (x - cx) / (rx * s), dy = (y - cyc) / (ry * s);
+      return dx * dx + dy * dy <= 1;
+    };
 
-    // 1) A sandy bank just outside the water for a soft, natural shore. Skip the
-    //    avenue rows so the path runs clean to the bridge; never cover a path.
-    for (let y = p.y0 - 1; y <= p.y1 + 1; y++) {
-      for (let x = p.x0 - 1; x <= p.x1 + 1; x++) {
-        if (!this.inBounds(x, y) || bridge.has(y)) continue;
-        const isWater = x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1 && !corner(x, y);
-        if (isWater || this.pathTiles.has(this.key(x, y)) || this.tiles[y][x].obstacle) continue;
-        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'sand').setScale(2).setDepth(0.3);
-      }
-    }
+    // Soft shadow on the grass to ground the pond.
+    this.add
+      .ellipse(cx * TILE + TILE / 2, cyc * TILE + TILE / 2, (2 * rx + 2.4) * TILE, (2 * ry + 1.6) * TILE, 0x244a30, 0.16)
+      .setDepth(0.2);
 
-    // 2) Water (rounded corners skipped; avenue rows stay walkable for the bridge).
-    for (let y = p.y0; y <= p.y1; y++) {
-      for (let x = p.x0; x <= p.x1; x++) {
-        if (!this.inBounds(x, y) || corner(x, y)) continue;
-        const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
-        if (this.anims.exists('water-anim')) this.add.sprite(cx, cy, 'water', 0).setScale(2).setDepth(3.8).play('water-anim');
-        else this.add.image(cx, cy, 'water', 0).setScale(2).setDepth(3.8);
-        if (bridge.has(y)) continue;
+    // Water tiles inside the ellipse (organic shape).
+    for (let y = cyc - ry; y <= cyc + ry; y++) {
+      for (let x = cx - rx; x <= cx + rx; x++) {
+        if (!this.inBounds(x, y) || !inPond(x, y)) continue;
+        const px = x * TILE + TILE / 2, py = y * TILE + TILE / 2;
+        if (this.anims.exists('water-anim')) this.add.sprite(px, py, 'water', 0).setScale(2).setDepth(3.8).play('water-anim');
+        else this.add.image(px, py, 'water', 0).setScale(2).setDepth(3.8);
         this.tiles[y][x].obstacle = true;
         this.tiles[y][x].tilled = false;
         this.pondTiles.add(this.key(x, y));
-        this.addCollider(cx, cy, TILE * 2, TILE * 2);
+        this.addCollider(px, py, TILE * 2, TILE * 2);
       }
     }
 
-    // 3) Faint surface ripples (waterobj 12–17) for life.
-    for (const [tx, ty] of [[p.x0 + 1, p.y0 + 1], [p.x1 - 1, p.y1 - 1], [p.x0 + 2, p.y1 - 2]] as Array<[number, number]>) {
-      if (bridge.has(ty) || corner(tx, ty)) continue;
-      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.6);
-    }
-
-    // 4) A 2-tile wooden bridge over the avenue: a top rail row (2/3/4) above a
-    //    bottom rail row (7/8/9), the middle planks repeating across the width.
-    const topRow = Math.min(...bridgeRows);
-    for (const y of bridgeRows) {
-      if (y < p.y0 || y > p.y1) continue;
-      const top = y === topRow;
-      for (let x = p.x0; x <= p.x1; x++) {
-        if (corner(x, y)) continue;
-        const end = x === p.x0 ? 0 : x === p.x1 ? 2 : 1;
-        const frame = (top ? [2, 3, 4] : [7, 8, 9])[end];
-        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'bridge', frame).setScale(2).setDepth(5.5);
-        this.pathTiles.add(this.key(x, y));
+    // Faint surface ripples (waterobj 12–17).
+    for (const [tx, ty] of [[cx - 2, cyc - 1], [cx + 2, cyc + 1], [cx, cyc]] as Array<[number, number]>) {
+      if (this.pondTiles.has(this.key(tx, ty))) {
+        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
       }
     }
 
-    // 5) Real lily pads (waterobj 8–11), gently bobbing.
+    // Lily pads (waterobj 8–10), gently bobbing.
     const lily = (tx: number, ty: number, frame: number) => {
-      if (bridge.has(ty) || corner(tx, ty) || !this.pondTiles.has(this.key(tx, ty))) return;
-      const cy = ty * TILE + TILE / 2;
-      const pad = this.add.image(tx * TILE + TILE / 2, cy, 'waterobj', frame).setScale(2).setDepth(4.6);
-      this.tweens.add({ targets: pad, y: cy + 2, duration: 1800 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      if (!this.pondTiles.has(this.key(tx, ty))) return;
+      const cyp = ty * TILE + TILE / 2;
+      const pad = this.add.image(tx * TILE + TILE / 2, cyp, 'waterobj', frame).setScale(2).setDepth(4.4);
+      this.tweens.add({ targets: pad, y: cyp + 2, duration: 1800 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     };
-    lily(p.x0 + 1, p.y0 + 1, 8); lily(p.x1 - 1, p.y1 - 1, 9); lily(p.x0 + 2, p.y1 - 1, 10);
+    lily(cx - 3, cyc, 8); lily(cx + 1, cyc - 1, 9); lily(cx + 3, cyc + 1, 10);
 
-    // 6) Reeds (waterobj 6–7) + a rock fringing the banks (per-row depth so the
-    //    player passes behind them).
-    const edge = (tx: number, ty: number, frame: number) => {
-      if (!this.inBounds(tx, ty)) return;
-      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', frame).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
-    };
-    edge(p.x0 - 1, p.y0, 6); edge(p.x1 + 1, p.y1, 7); edge(p.x0, p.y1 + 1, 6);
-    edge(p.x1, p.y0 - 1, 7); edge(p.x1 + 1, p.y0 + 1, 3);
+    // Reeds, cattails & a rock fringing the bank to hide the hard waterline
+    // (per-row depth so the player passes behind them).
+    const fringe: Array<[number, number, number]> = [
+      [cx - rx, cyc, 6], [cx + rx, cyc, 7],
+      [cx - rx + 2, cyc - ry, 7], [cx + rx - 2, cyc - ry, 6],
+      [cx - rx + 2, cyc + ry, 6], [cx + rx - 2, cyc + ry, 7],
+      [cx - 1, cyc - ry, 6], [cx + rx - 3, cyc + ry, 3],
+    ];
+    for (const [tx, ty, f] of fringe) {
+      if (!this.inBounds(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
+    }
   }
 
   private isPondTile(tx: number, ty: number): boolean {
