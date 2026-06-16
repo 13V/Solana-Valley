@@ -653,54 +653,36 @@ export class FarmScene extends Phaser.Scene {
     return FarmScene.TILLED_FRAMES[(x * 7 + y * 13) % 3];
   }
 
-  // Raise each plot band into a grassy plateau (hills cliff autotile) so the two
-  // bands tower over the sunken central plaza — a terraced valley. hills.png (6×6):
-  // grass-top edge TL1/T2/TR3, plain fill 8, side walls L33/R26, and the cliff
-  // (grass-on-dirt) edge BL12/face13·14/BR15. The plaza-facing cliff faces DOWN
-  // on the top band and UP on the bottom band (same frames, flipped vertically —
-  // the sheet has no dedicated dirt-faces-up tile).
+  // Drop a clean, continuous earth cliff at each band's plaza-facing edge so the
+  // two plateaus read as raised above the sunken central plaza. Drawn as smooth
+  // full-width bands (NOT hills autotiles) — the tiled cliff was choppy at 2×,
+  // with visible per-tile seams and a mismatched grass lip. This is one seamless
+  // top-lit dirt face per band: the top band's cliff faces DOWN into the plaza,
+  // the bottom band's faces UP. The base grass above stays put, so the grass→dirt
+  // transition is a single straight line instead of a patchy autotile edge.
   private buildTerraces() {
-    const PAD = 1; // plateau reaches one tile past the fences
+    const PAD = 1;
+    const DIRT_H = 44; // cliff-face height in px
+    const g = this.add.graphics().setDepth(0.4);
     for (let row = 0; row < 2; row++) {
       const b = bandRect(row);
-      const x0 = b.x0 - PAD, x1 = b.x1 + PAD, y0 = b.y0 - PAD, y1 = b.y1 + PAD;
+      const xL = (b.x0 - PAD) * TILE;
+      const w = (b.x1 + PAD + 1) * TILE - xL;
       const flip = row === 1; // bottom band: cliff faces UP toward the plaza
-      const cliffY = flip ? y0 : y1; // plaza-facing edge (dirt cliff)
-      const backY = flip ? y1 : y0;  // outer edge (grass top, away from plaza)
-      const put = (tx: number, ty: number, frame: number, fy = false) => {
-        if (!this.inBounds(tx, ty)) return;
-        this.add
-          .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hills', frame)
-          .setScale(2).setDepth(0.4).setFlipY(fy);
-      };
-
-      // plaza-facing cliff edge + its outer corners (flipped vertically for the
-      // bottom band so the dirt face points UP).
-      put(x0, cliffY, 12, flip); // bottom/top-LEFT corner
-      put(x1, cliffY, 15, flip); // bottom/top-RIGHT corner
-      // single continuous cliff face (13 & 14 are interchangeable centre faces;
-      // alternate them on a band-relative index so the two ends stay symmetric).
-      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, cliffY, (x - x0) % 2 ? 13 : 14, flip);
-
-      // outer (back) grass-top edge + its corners, so the plateau reads as raised.
-      // Flipped vertically on the bottom band so the lit grass rim sits on its
-      // bottom edge.
-      put(x0, backY, 1, flip); // back-LEFT corner
-      put(x1, backY, 3, flip); // back-RIGHT corner
-      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, backY, 2, flip);
-
-      // left/right grass side walls running between the two edges. Their rim is
-      // vertical (top–bottom symmetric), so no flip is needed on either band.
-      const sY0 = Math.min(cliffY, backY) + 1;
-      const sY1 = Math.max(cliffY, backY) - 1;
-      for (let y = sY0; y <= sY1; y++) { put(x0, y, 33); put(x1, y, 26); }
-
-      // soft shadow cast onto the plaza floor just past the cliff (adds depth).
-      const shY = flip ? cliffY - 1 : cliffY + 1;
-      for (let x = x0; x <= x1; x++) {
-        if (this.inBounds(x, shY)) {
-          this.add.rectangle(x * TILE + TILE / 2, shY * TILE + TILE / 2, TILE, 10, 0x14361a, 0.16).setDepth(0.42);
-        }
+      const cliffRow = flip ? b.y0 - PAD : b.y1 + PAD;
+      const yTop = flip ? (cliffRow + 1) * TILE - DIRT_H : cliffRow * TILE;
+      const yBot = yTop + DIRT_H;
+      // smooth top-lit dirt face: warm mid, a sunlit band near the top edge and a
+      // shaded band at the base — no vertical seams.
+      g.fillStyle(0xa87c52, 1); g.fillRect(xL, yTop, w, DIRT_H);   // mid dirt
+      g.fillStyle(0xc59a6a, 1); g.fillRect(xL, yTop + 2, w, 12);   // sunlit upper
+      g.fillStyle(0x7a5536, 1); g.fillRect(xL, yBot - 12, w, 12);  // shaded base
+      // crisp shadow line where the grass plateau overhangs the dirt.
+      g.fillStyle(0x4f3a23, 1); g.fillRect(xL, flip ? yBot - 2 : yTop, w, 3);
+      // soft drop shadow fading onto the sunken plaza floor past the cliff.
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle(0x123018, 0.14 - i * 0.03);
+        g.fillRect(xL, flip ? yTop - 3 * (i + 1) : yBot + 3 * i, w, 3);
       }
     }
   }
