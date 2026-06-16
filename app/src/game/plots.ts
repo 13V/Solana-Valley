@@ -33,13 +33,15 @@ export const BEACH = 2; // sand beach tiles just inside the ocean
 export const ISLAND_BORDER = SHORE + BEACH; // grass starts this many tiles in
 
 // Sub-area layout *relative to a homestead interior's top-left (ix, iy)*.
+// "Cozy Homestead": cottage centrepiece across the back, a big crop bed down the
+// left, chicken house + cow pen on the right, an orchard row along the front.
 export const SUB = {
-  house: { cx: 2, baseRow: 3 }, // cottage centre col + base row (offsets in interior)
-  farm: { x: 1, y: 6, w: 7, h: 7 }, // 7×7 tillable bed (left)
-  chickenPen: { x: 10, y: 1, w: 6, h: 6 }, // chicken pen (coop on top edge)
-  cowPen: { x: 10, y: 9, w: 8, h: 7 }, // cow pasture (bottom-right)
-  orchard: { x: 1, y: 14, w: 6, h: 2 }, // fruit-tree slots under the farm
-  signCx: 6, // name sign column (top edge)
+  house: { cx: 9, baseRow: 3 }, // cottage centre col + base row (top-centre)
+  farm: { x: 1, y: 5, w: 7, h: 8 }, // 7×8 = 56-tile crop bed (left)
+  chickenPen: { x: 11, y: 1, w: 7, h: 6 }, // chicken house + run (right-top)
+  cowPen: { x: 11, y: 8, w: 7, h: 7 }, // cow pasture (right-bottom)
+  orchard: { x: 1, y: 13, w: 7, h: 1 }, // fruit-tree row along the front
+  signCx: 9, // name sign column
 };
 
 export type Homestead = {
