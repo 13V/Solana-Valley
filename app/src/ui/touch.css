@@ -15,7 +15,9 @@
   .touch-joy {
     position: absolute;
     left: 18px;
-    bottom: 18px;
+    /* Sits above the bottom-centre hotbar (≈70px tall) so the 120px base never
+       covers the left tool slot — the base captures touch and would block it. */
+    bottom: 80px;
     display: block;
     z-index: 5;
     pointer-events: none; /* wrapper is inert; the base below opts back in */

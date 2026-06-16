@@ -116,6 +116,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* Lofi background music (own volume + on/off, under the master Sound) */}
+        <MusicControls />
+
         {/* Reduced motion */}
         <div className="row set-row" style={{ borderLeftColor: '#7bd66a' }}>
           <span className="set-label">
@@ -175,6 +178,63 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         <Controls />
       </div>
     </div>
+  );
+}
+
+// Lofi background music — its own volume + on/off, layered under the master
+// Sound volume/mute. State lives in the audio engine (persisted there).
+function MusicControls() {
+  const [vol, setVol] = useState(() => sfx.getMusicVolume());
+  const [on, setOn] = useState(() => sfx.isMusicOn());
+  return (
+    <>
+      <div className="row set-row" style={{ borderLeftColor: '#7bd66a' }}>
+        <span className="set-label">
+          Music volume
+          <span className="set-sub">lofi background</span>
+        </span>
+        <div className="set-volume">
+          <input
+            className="set-slider"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(vol * 100)}
+            aria-label="Music volume"
+            onChange={(e) => {
+              const v = Number(e.target.value) / 100;
+              sfx.resume();
+              sfx.setMusicVolume(v);
+              if (on) sfx.startMusic();
+              setVol(v);
+            }}
+          />
+          <span className="set-vol-val">{Math.round(vol * 100)}%</span>
+        </div>
+      </div>
+      <div className="row set-row" style={{ borderLeftColor: '#7bd66a' }}>
+        <span className="set-label">
+          Music
+          <span className="set-sub">lofi background loop</span>
+        </span>
+        <div className="set-control">
+          <Toggle
+            on={on}
+            onLabel="On"
+            offLabel="Off"
+            ariaLabel="Toggle music"
+            onToggle={() => {
+              const next = !on;
+              sfx.resume();
+              if (next) sfx.startMusic();
+              else sfx.stopMusic();
+              setOn(next);
+            }}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 
