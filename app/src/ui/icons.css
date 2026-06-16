@@ -39,12 +39,12 @@
   vertical-align: -4px;
 }
 
-/* Square HUD buttons center their icon over the wooden button background. The
-   40px button has no border now, so a 22px icon sits centered with clear room
-   inside the sprite's bevel. */
+/* Square HUD buttons center their icon. They're now flat icons sitting on the
+   wooden tray (the .hud-buttons frame), so a 24px icon reads clearly with a
+   soft hover highlight behind it. */
 .iconbtn .btn-ico {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   vertical-align: middle;
 }
 

@@ -615,25 +615,31 @@ body {
   text-shadow: none;
 }
 
-/* HUD icon buttons render the FULL wooden button sprite as a stretched
-   background instead of a 9-slice border-image. At 40px the 9-slice was
-   clipping the bevel (cut-off borders) and shrinking the content box so the
-   icon sat off-centre. As a background the whole bevel always shows and the
-   icon centres cleanly on top. */
-.ui-skin .iconbtn {
-  background: var(--ui-btn) center / 100% 100% no-repeat;
-  border: 0;
+/* New top-bar system: instead of a fragile per-button 9-slice sprite (which
+   clipped/cut off at small sizes no matter what), the whole icon row is ONE
+   wooden TRAY using the same ui_panel frame the modal panels use (that renders
+   cleanly), and each button is a flat icon with a soft hover/press highlight. */
+.ui-skin .hud-buttons {
+  border: 14px solid transparent;
+  border-image: var(--ui-panel) 14 fill stretch;
   border-radius: 0;
+  padding: 0 2px;
+  gap: 0;
+}
+.ui-skin .iconbtn {
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
   color: var(--ink);
   text-shadow: none;
   image-rendering: pixelated;
 }
 .ui-skin .iconbtn:hover {
-  background-image: var(--ui-btn-light);
+  background: rgba(92, 60, 30, 0.16);
 }
 .ui-skin .iconbtn.active,
 .ui-skin .iconbtn:active {
-  background-image: var(--ui-btn-press);
+  background: rgba(92, 60, 30, 0.30);
 }
 
 .ui-skin .badge {
