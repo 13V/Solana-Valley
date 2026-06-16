@@ -572,6 +572,36 @@ export class FarmScene extends Phaser.Scene {
     return (x * 7 + y * 13) % 3; // clean full-grass tiles 0..2
   }
 
+  // Smooth low-frequency field (≈0..1) carving organic grass zones across the map.
+  private grassZone(x: number, y: number): number {
+    const n =
+      Math.sin(x * 0.16 + y * 0.06) * 0.5 +
+      Math.sin(x * 0.05 - y * 0.12) * 0.3 +
+      Math.sin((x + y) * 0.1 + 1.7) * 0.2;
+    return (n + 1) / 2;
+  }
+
+  // Pick the ground tile for an open grass cell: cooler sage patches in the
+  // "low" zones (shaded areas), lush tuft-heavy meadow in the "high" zones, and
+  // mostly-plain grass with the odd v2 detail tile everywhere else.
+  private grassTileAt(x: number, y: number, cx: number, cy: number): Phaser.GameObjects.Image {
+    const h = (x * 73856 + y * 19349) >>> 0;
+    const v = this.grassZone(x, y);
+    let key = 'grass';
+    let frame: number = this.grassFrame(x, y);
+    if (v < 0.32 || (v < 0.37 && h % 2 === 0)) {
+      key = 'grassdark'; // sage shaded patch (dithered edge)
+      frame = FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length];
+    } else if (v > 0.7 && h % 100 < 50) {
+      key = 'grasslayer'; // lush meadow tuft patch
+      frame = FarmScene.GRASS_TUFTS[h % FarmScene.GRASS_TUFTS.length];
+    } else if (h % 100 < 12) {
+      key = 'grassv2'; // odd detail tile in plain grass
+      frame = FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length];
+    }
+    return this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
+  }
+
   // Solid tilled-dirt tiles (premium Tilled_Dirt_v2 sheet, 11 cols) that tile
   // seamlessly into a filled plot; a few variants add subtle texture.
   private static TILLED_FRAMES = [55, 56, 57];
@@ -580,6 +610,8 @@ export class FarmScene extends Phaser.Scene {
   // grassv2 flat detail tiles (tufts/moss/flowers) — weighted to subtle tufts &
   // moss over flowers; their green matches the base grass exactly.
   private static GRASS_DETAIL = [55, 56, 57, 58, 59, 66, 67, 68, 69, 70, 60, 71];
+  // Just the leafy tuft frames (for lush "meadow" patches).
+  private static GRASS_TUFTS = [55, 56, 57, 66, 67, 68];
 
   // Island layout: a tile is ocean near the very edge, then a sand beach, then
   // the playable grassy land where the homesteads sit.
@@ -610,14 +642,7 @@ export class FarmScene extends Phaser.Scene {
         } else if (d < SHORE + BEACH) {
           this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
         } else {
-          // Mostly plain grass, with v2 detail tiles (tufts/moss/flowers)
-          // sprinkled in for natural variety (deterministic per tile).
-          const h = (x * 73856 + y * 19349) >>> 0;
-          if (h % 100 < 14) {
-            this.ground[y][x] = this.add.image(cx, cy, 'grassv2', FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length]).setScale(2).setDepth(0);
-          } else {
-            this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
-          }
+          this.ground[y][x] = this.grassTileAt(x, y, cx, cy);
         }
         // Tilled-soil overlay only where the player can till (their own farm) —
       // avoids tens of thousands of invisible objects on the big valley map.
