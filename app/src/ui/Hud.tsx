@@ -9,10 +9,10 @@ import { pendingChoices } from '../game/skills';
 // Day/night get cropped weather-sheet sprites; dawn/dusk keep their emoji
 // (no clean pixel match in the pack). `emoji` doubles as the img alt text.
 const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
-  dawn: { emoji: '🌅' },
-  day: { emoji: '☀️', img: 'assets/sprout-ui/phase_sun.png' },
-  dusk: { emoji: '🌇' },
-  night: { emoji: '🌙', img: 'assets/sprout-ui/phase_moon.png' },
+  dawn: { emoji: '🌅', img: 'assets/sprout-ui/phase_dawn.png' },
+  day: { emoji: '☀️', img: 'assets/sprout-ui/phase_day.png' },
+  dusk: { emoji: '🌇', img: 'assets/sprout-ui/phase_dusk.png' },
+  night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
 export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | null;
@@ -57,7 +57,7 @@ export function Hud({
       <div className="hud-left">
         <span className="badge">
           {PHASE_ICON[phase].img ? (
-            <img className="btn-ico" src={PHASE_ICON[phase].img} alt={PHASE_ICON[phase].emoji} />
+            <img className="phase-ico" src={PHASE_ICON[phase].img} alt={PHASE_ICON[phase].emoji} />
           ) : (
             PHASE_ICON[phase].emoji
           )}{' '}
