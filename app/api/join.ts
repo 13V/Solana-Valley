@@ -3,13 +3,20 @@ import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth
 
 // POST /api/join
 // Body: { wallet, message, signature }
-// Verifies the wallet signature, then atomically assigns the wallet a STABLE
+// Verifies the wallet signature, then assigns the wallet a (mostly) STABLE
 // (island, plot) seat in the `plots` table using the service-role key
-// (server-only). Idempotent: a wallet that already has a row gets that same row
-// back. Responds:
+// (server-only). Doubles as the HEARTBEAT: an existing wallet's row is refreshed
+// (updated_at = now()) on every call. Responds:
 //   { island, plot, name }
 //
-// `plots` schema (see SQL the user must run):
+// PLOT RECLAMATION (no new DB column): a plot is considered "left/stale" when
+// `now - updated_at > STALE_MS`. A plot is AVAILABLE when it has NO row OR its
+// row is stale. Occupied (fresh) plots stay stable; a left player's plot is
+// reclaimed ONLY when a NEW wallet needs a seat and the target island has no
+// truly-free plot. The client posts a heartbeat (~every 60s) to keep an active
+// player's row fresh; abrupt exits simply age out after STALE_MS.
+//
+// `plots` schema (UNCHANGED — `updated_at` is reused as "last seen"):
 //   create table plots (
 //     wallet     text primary key,
 //     island     int  not null,
@@ -23,8 +30,17 @@ import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth
 
 const PLOTS_PER_ISLAND = 20; // plots 0..19 on each island
 const MAX_ATTEMPTS = 8; // bounded retries when a UNIQUE(island, plot) race loses
+// A plot whose `updated_at` is older than this is treated as abandoned and may
+// be reclaimed by a new player. The client heartbeats well within this window.
+const STALE_MS = 120_000; // ~2 minutes
 
 type PlotRow = { wallet: string; island: number; plot: number; name: string };
+
+// ISO timestamp of the staleness cutoff: rows with updated_at < this are stale
+// (available for reclaim); rows with updated_at >= this are fresh (occupied).
+function staleCutoffIso(now: number): string {
+  return new Date(now - STALE_MS).toISOString();
+}
 
 // Short, human-friendly label for a wallet: first 4 + last 4 base58 chars.
 function shortWallet(wallet: string): string {
@@ -64,56 +80,119 @@ async function fetchExisting(
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }
 
-// Read the lowest free plot (0..19) on ONE specific island, or null if that
-// island is full. Used to honour a caller's island preference so friends can
-// land together.
+// Read the FRESH (non-stale) plots taken on ONE island. Stale rows
+// (updated_at < cutoff) are excluded, so the plots they occupy count as
+// AVAILABLE (free for a new player to reclaim). `cutoffIso` is the staleness
+// boundary: `updated_at=gte.<cutoff>` keeps only currently-occupied rows.
+async function fetchFreshTakenPlots(
+  baseUrl: string,
+  serviceKey: string,
+  island: number,
+  cutoffIso: string,
+): Promise<Set<number>> {
+  const url =
+    `${baseUrl}/rest/v1/plots` +
+    `?island=eq.${island}` +
+    `&updated_at=gte.${encodeURIComponent(cutoffIso)}` +
+    `&select=plot`;
+  const resp = await fetch(url, { method: 'GET', headers: authHeaders(serviceKey) });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    console.error('supabase plots scan failed', resp.status, detail);
+    throw new Error('scan failed');
+  }
+  const rows = (await resp.json()) as Array<{ plot: number }>;
+  return new Set(rows.map((r) => r.plot));
+}
+
+// Read the lowest AVAILABLE plot (0..19) on ONE specific island, or null if that
+// island is full of FRESH occupants. A slot is available when no fresh row holds
+// it (it may still carry a STALE row, which the caller reclaims on insert). Used
+// to honour a caller's island preference so friends can land together.
 async function findFreePlotOnIsland(
   baseUrl: string,
   serviceKey: string,
   island: number,
+  cutoffIso: string,
 ): Promise<{ island: number; plot: number } | null> {
-  const url = `${baseUrl}/rest/v1/plots` + `?island=eq.${island}&select=plot`;
-  const resp = await fetch(url, { method: 'GET', headers: authHeaders(serviceKey) });
-  if (!resp.ok) {
-    const detail = await resp.text().catch(() => '');
-    console.error('supabase plots island scan failed', resp.status, detail);
-    throw new Error('island scan failed');
-  }
-  const rows = (await resp.json()) as Array<{ plot: number }>;
-  const taken = new Set(rows.map((r) => r.plot));
+  const taken = await fetchFreshTakenPlots(baseUrl, serviceKey, island, cutoffIso);
   for (let plot = 0; plot < PLOTS_PER_ISLAND; plot++) {
     if (!taken.has(plot)) return { island, plot };
   }
-  return null; // island full
+  return null; // island full of fresh occupants
 }
 
-// Find the lowest free (island, plot): scan island 0 plots 0..19, then island 1,
-// etc. For each island we read the taken plots once and pick the lowest 0..19 not
-// in that set; if the island is full we advance. Bounded so a pathological state
-// can't loop forever.
+// Find the lowest AVAILABLE (island, plot): scan island 0 plots 0..19, then
+// island 1, etc. Only FRESH rows count as taken, so stale-occupied slots are
+// reclaimable. If an island is full of fresh occupants we advance. Bounded so a
+// pathological state can't loop forever.
 async function findLowestFreeSlot(
   baseUrl: string,
   serviceKey: string,
+  cutoffIso: string,
 ): Promise<{ island: number; plot: number }> {
   // Safety ceiling: with bounded attempts upstream this is plenty of headroom.
   for (let island = 0; island < 10000; island++) {
-    const url =
-      `${baseUrl}/rest/v1/plots` +
-      `?island=eq.${island}&select=plot`;
-    const resp = await fetch(url, { method: 'GET', headers: authHeaders(serviceKey) });
-    if (!resp.ok) {
-      const detail = await resp.text().catch(() => '');
-      console.error('supabase plots scan failed', resp.status, detail);
-      throw new Error('scan failed');
-    }
-    const rows = (await resp.json()) as Array<{ plot: number }>;
-    const taken = new Set(rows.map((r) => r.plot));
+    const taken = await fetchFreshTakenPlots(baseUrl, serviceKey, island, cutoffIso);
     for (let plot = 0; plot < PLOTS_PER_ISLAND; plot++) {
       if (!taken.has(plot)) return { island, plot };
     }
-    // Island full -> try the next one.
+    // Island full of fresh occupants -> try the next one.
   }
   throw new Error('no free slot');
+}
+
+// HEARTBEAT / keep-alive: refresh an existing wallet's `updated_at` to now() so
+// its plot stays fresh (non-stale). Best-effort — a failed refresh just means
+// the row ages slightly until the next heartbeat, so we swallow errors and never
+// block returning the (still-valid) seat. Idempotent.
+async function refreshExisting(
+  baseUrl: string,
+  serviceKey: string,
+  wallet: string,
+): Promise<void> {
+  try {
+    const url = `${baseUrl}/rest/v1/plots` + `?wallet=eq.${encodeURIComponent(wallet)}`;
+    const resp = await fetch(url, {
+      method: 'PATCH',
+      headers: authHeaders(serviceKey, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ updated_at: new Date().toISOString() }),
+    });
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => '');
+      console.error('supabase plots heartbeat failed', resp.status, detail);
+    }
+  } catch (err) {
+    console.error('supabase plots heartbeat error', err);
+  }
+}
+
+// Reclaim a stale slot: delete the row at (island, plot) ONLY if it is still
+// stale (updated_at < cutoff). The guard makes this safe under races — if the
+// holder heartbeated (refreshed) since we scanned, the row is fresh, the delete
+// matches nothing, and the slot stays theirs (our follow-up insert then 409s and
+// we retry elsewhere). A truly-free slot also matches nothing (harmless no-op).
+async function reclaimStaleSlot(
+  baseUrl: string,
+  serviceKey: string,
+  island: number,
+  plot: number,
+  cutoffIso: string,
+): Promise<void> {
+  const url =
+    `${baseUrl}/rest/v1/plots` +
+    `?island=eq.${island}` +
+    `&plot=eq.${plot}` +
+    `&updated_at=lt.${encodeURIComponent(cutoffIso)}`;
+  const resp = await fetch(url, {
+    method: 'DELETE',
+    headers: authHeaders(serviceKey, { Prefer: 'return=minimal' }),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    console.error('supabase plots reclaim delete failed', resp.status, detail);
+    throw new Error('reclaim failed');
+  }
 }
 
 // Try to INSERT a claim for (island, plot). Returns the inserted row on success,
@@ -186,24 +265,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Fast path: already seated -> return the existing assignment (preference is
-    // ignored once a wallet owns a plot, so seats stay stable).
+    // Fast path / HEARTBEAT: already seated -> refresh `updated_at` (so the seat
+    // stays fresh) and return the SAME assignment. Preference is ignored once a
+    // wallet owns a plot, so seats stay stable and a re-POST never reassigns.
     const existing = await fetchExisting(baseUrl, serviceKey, wallet);
     if (existing) {
+      await refreshExisting(baseUrl, serviceKey, wallet);
       res.status(200).json({ island: existing.island, plot: existing.plot, name: existing.name });
       return;
     }
 
-    // Claim a free slot, retrying on a lost UNIQUE(island, plot) race. When an
-    // island is preferred and not yet full we target it; otherwise (or once it
-    // fills) we fall back to the lowest free slot across all islands.
+    // NEW wallet: claim the lowest AVAILABLE slot (truly free OR stale). When an
+    // island is preferred and not yet full of fresh occupants we target it;
+    // otherwise (or once it fills) we fall back to the lowest available slot
+    // across all islands. Recompute the staleness cutoff per attempt so retries
+    // see freshly-aged rows. Retry on a lost UNIQUE(island, plot) race.
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const cutoffIso = staleCutoffIso(Date.now());
+
       let slot: { island: number; plot: number } | null = null;
       if (preferIsland !== null) {
-        slot = await findFreePlotOnIsland(baseUrl, serviceKey, preferIsland);
-        if (!slot) preferIsland = null; // preferred island full -> stop trying it
+        slot = await findFreePlotOnIsland(baseUrl, serviceKey, preferIsland, cutoffIso);
+        if (!slot) preferIsland = null; // preferred island full of fresh -> stop trying it
       }
-      if (!slot) slot = await findLowestFreeSlot(baseUrl, serviceKey);
+      if (!slot) slot = await findLowestFreeSlot(baseUrl, serviceKey, cutoffIso);
+
+      // The slot is free of FRESH rows but may still carry a STALE row. Reclaim
+      // it (guarded delete: only removes a row still older than the cutoff) so
+      // the insert below can take the seat. No-op when the slot is truly free.
+      await reclaimStaleSlot(baseUrl, serviceKey, slot.island, slot.plot, cutoffIso);
+
       const result = await tryClaim(baseUrl, serviceKey, {
         wallet,
         island: slot.island,
@@ -212,14 +303,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       if (result === 'conflict') {
-        // Either our wallet got inserted by a concurrent request, or the slot
-        // was taken. Re-check our own row first (idempotent win), else retry.
+        // Either our wallet got inserted by a concurrent request, OR the slot
+        // was taken / its stale holder refreshed (heartbeat) before we deleted
+        // it. Re-check our own row first (idempotent win), else retry the next
+        // available slot.
         const now = await fetchExisting(baseUrl, serviceKey, wallet);
         if (now) {
           res.status(200).json({ island: now.island, plot: now.plot, name: now.name });
           return;
         }
-        continue; // slot stolen -> find the next free one
+        continue; // slot stolen/kept -> find the next available one
       }
 
       res.status(200).json({ island: result.island, plot: result.plot, name: result.name });

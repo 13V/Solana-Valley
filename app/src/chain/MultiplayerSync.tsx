@@ -15,6 +15,18 @@ import { joinIsland, leaveIsland } from './multiplayer';
 // On wallet change / disconnect / unmount it calls leaveIsland(). Everything is
 // best-effort: any failure silently disables multiplayer (single-player keeps
 // working).
+//
+// HEARTBEAT: while connected, we re-POST /api/join every HEARTBEAT_MS with the
+// SAME cached auth (+ preferIsland = our assigned island). The server's
+// existing-wallet path refreshes our row's `updated_at` (and returns the SAME
+// seat — never reassigns), keeping our plot from going "stale" and being
+// reclaimed by another player. The interval is cleared on wallet change /
+// disconnect / unmount. Abrupt exits (closed tab) just stop heartbeating, so the
+// plot ages out and frees up on its own after the server's stale window.
+
+// Refresh our seat well within the server's STALE_MS (~2 min) window so an
+// active player never looks abandoned.
+const HEARTBEAT_MS = 60_000; // ~1 minute
 
 type JoinResponse = { island: number; plot: number; name: string };
 
@@ -29,6 +41,7 @@ export function MultiplayerSync() {
     }
 
     let cancelled = false;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
       // Reuse the shared, cached signature (single prompt across features).
@@ -80,10 +93,30 @@ export function MultiplayerSync() {
         name: assignment.name,
         plot: assignment.plot,
       });
+
+      // Keep our seat alive: re-POST /api/join (same cached auth, preferIsland =
+      // our island) so the server refreshes our row's `updated_at`. The
+      // existing-wallet path returns the SAME seat and never reassigns, so this
+      // is purely a heartbeat. Best-effort: a failed beat just retries next tick.
+      const assignedIsland = assignment.island;
+      if (cancelled) return; // torn down mid-join -> don't start a stray interval
+      heartbeat = setInterval(() => {
+        void fetch('/api/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...auth, preferIsland: assignedIsland }),
+        }).catch(() => {
+          // network blip -> ignore; the next interval tick re-tries
+        });
+      }, HEARTBEAT_MS);
     })();
 
     return () => {
       cancelled = true;
+      if (heartbeat !== null) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
       leaveIsland();
     };
     // publicKey identity changes when the wallet switches.

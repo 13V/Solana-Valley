@@ -167,6 +167,11 @@ type ForageNode = {
 
 type SaveData = {
   v: number;
+  // When truthy, tiles[]/crops[] coords are stored RELATIVE to the owned
+  // farm-bed origin (top-left tile) rather than as absolute world tiles, so the
+  // farm renders correctly on whichever plot the player is assigned (multiplayer
+  // plot recycling). Absent/falsy ⇒ legacy absolute save (migrated on load).
+  rel?: number;
   coins: number;
   selected: string;
   selectedSeed: string | null;
@@ -2322,17 +2327,22 @@ export class FarmScene extends Phaser.Scene {
   // ---- persistence (localStorage) ----------------------------------------
 
   private saveState() {
+    // Persist tilled tiles + crops RELATIVE to the owned farm-bed origin so they
+    // re-render correctly on whichever plot the player is assigned on load. All
+    // farmable tiles live inside this rect, so its top-left is a valid origin.
+    const origin = this.myFarmRect();
+    const ox = origin.px, oy = origin.py;
     const tiles: SaveData['tiles'] = [];
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < GRID_W; x++) {
         const t = this.tiles[y][x];
-        if (t.tilled) tiles.push([x, y, Math.max(0, t.wetUntil - this.time.now)]);
+        if (t.tilled) tiles.push([x - ox, y - oy, Math.max(0, t.wetUntil - this.time.now)]);
       }
     }
     const crops: SaveData['crops'] = [];
     for (const c of this.crops.values()) {
       crops.push({
-        x: c.tx, y: c.ty, p: c.plant.id, g: Math.round(c.grownMs),
+        x: c.tx - ox, y: c.ty - oy, p: c.plant.id, g: Math.round(c.grownMs),
         m: c.mature, mut: c.mutation?.id ?? null, wet: c.wetAtMature,
         q: c.quality, ma: c.matureAt, wth: c.withered,
         // Persist the regrow cycle's growth duration only when it differs from
@@ -2342,6 +2352,7 @@ export class FarmScene extends Phaser.Scene {
     }
     const data: SaveData = {
       v: SAVE_VERSION,
+      rel: 1, // tiles[]/crops[] coords above are origin-relative offsets
       coins: this.coins,
       selected: this.selected,
       selectedSeed: this.selectedSeed,
@@ -2418,9 +2429,22 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    for (const [x, y, wetRemaining] of data.tiles ?? []) {
-      // Drop tilled tiles saved outside the (possibly relocated) farm so an old
-      // save never leaves stray dirt patches in the new world.
+    // Translate saved tile/crop coords into CURRENT world tiles. Stored coords are
+    // either origin-relative offsets (rel saves) or absolute world tiles anchored
+    // to plot 0's farm origin (legacy). Either way the result is `stored + (dx,dy)`:
+    //   rel:    absolute = currentOrigin + storedOffset           → (dx,dy)=currentOrigin
+    //   legacy: absolute = currentOrigin + (stored - plot0Origin) → (dx,dy)=currentOrigin-plot0Origin
+    // In single-player (plot 0) the legacy delta is (0,0), so coords round-trip
+    // identically (save rel = A - O0; load at O0 + (A - O0) = A).
+    const origin = this.myFarmRect();
+    const plot0 = homesteadPlot(0);
+    const dx = data.rel ? origin.px : origin.px - plot0.px;
+    const dy = data.rel ? origin.py : origin.py - plot0.py;
+
+    for (const [sx, sy, wetRemaining] of data.tiles ?? []) {
+      const x = sx + dx, y = sy + dy;
+      // Drop tilled tiles that fall outside the world or off the (possibly
+      // recycled) farm so a bad offset can't crash and no stray dirt is left.
       if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !this.isInMyFarm(x, y)) continue;
       this.tiles[y][x].tilled = true;
       if (wetRemaining > 0) {
@@ -2436,15 +2460,16 @@ export class FarmScene extends Phaser.Scene {
 
     for (const c of data.crops ?? []) {
       const plant = PLANT_BY_ID[c.p];
-      // Likewise ignore crops saved outside the current farm bounds.
-      if (!plant || !this.inBounds(c.x, c.y) || !this.isInMyFarm(c.x, c.y)) continue;
+      const cx = c.x + dx, cy = c.y + dy; // stored offset → current world tile
+      // Likewise ignore crops that land outside the world or off the current farm.
+      if (!plant || !this.inBounds(cx, cy) || !this.isInMyFarm(cx, cy)) continue;
       const sprite = this.add
-        .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
+        .image(cx * TILE + TILE / 2, cy * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
         .setTint(plant.cropTint ?? 0xffffff)
-        .setDepth(this.cropDepth(c.y) - 1);
+        .setDepth(this.cropDepth(cy) - 1);
       const crop: Crop = {
-        plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,
+        plant, tx: cx, ty: cy, grownMs: c.g, stage: 0,
         mature: false, mutation: null, wetAtMature: false,
         // Default crop-depth fields so old v11 saves (without them) still load.
         quality: (c.q && c.q in QUALITY ? c.q : 'none') as Quality,
@@ -2453,7 +2478,7 @@ export class FarmScene extends Phaser.Scene {
         growMs: c.rg, // undefined on legacy/non-regrow crops → falls back to full duration
         sprite,
       };
-      this.crops.set(this.key(c.x, c.y), crop);
+      this.crops.set(this.key(cx, cy), crop);
       if (c.m) {
         crop.mature = true;
         crop.stage = STAGES - 1;
