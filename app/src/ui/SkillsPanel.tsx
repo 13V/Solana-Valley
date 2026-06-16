@@ -25,7 +25,7 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
           return (
             <div className="row" key={s.id} style={{ borderLeftColor: '#7bd66a', flexDirection: 'column', alignItems: 'stretch' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                <span className="upg-icon">{s.icon}</span>
+                <img className="upg-icon-img" src={s.icon} alt="" />
                 <span className="row-name" style={{ flex: 1 }}>
                   {s.name}{' '}
                   <span className="lvltag">

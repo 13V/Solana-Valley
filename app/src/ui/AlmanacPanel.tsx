@@ -1,6 +1,7 @@
 import { PLANTS, RARITY, MUTATIONS } from '../game/economy';
 import { ACHIEVEMENTS } from '../game/progression';
 import { useGameState } from './useGameState';
+import { CropIcon } from './CropIcon';
 
 export function AlmanacPanel({ onClose }: { onClose: () => void }) {
   const { progress } = useGameState();
@@ -31,7 +32,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
                 key={p.id}
                 style={found ? { borderColor: r.css } : undefined}
               >
-                {found && <img className="crop-ico" src={`assets/crops/${p.id}.png`} alt="" />}
+                {found && <CropIcon id={p.id} className="crop-ico" />}
                 <span className="alm-name">{found ? p.name : '???'}</span>
                 {found && <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>}
               </div>

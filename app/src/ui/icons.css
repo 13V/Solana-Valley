@@ -65,8 +65,8 @@
 
 /* Panel close-button X. */
 .ui-x {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   vertical-align: middle;
 }
 
@@ -86,4 +86,14 @@
 .crop-ico-sm {
   width: 24px;
   height: 24px;
+}
+
+/* Skill / upgrade row icons — real pack sprites (was emoji). */
+.upg-icon-img {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: middle;
 }

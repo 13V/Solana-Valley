@@ -1,6 +1,7 @@
 import { PLANTS, RARITY } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
+import { CropIcon } from './CropIcon';
 
 export function SeedsPanel({ onClose }: { onClose: () => void }) {
   const { seeds, selectedSeed } = useGameState();
@@ -22,7 +23,7 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className={`row ${selectedSeed === p.id ? 'sel' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <img className="crop-ico-sm" src={`assets/crops/seed_${p.id}.png`} alt="" />
+                <CropIcon id={p.id} kind="seed" />
                 <span className="row-name">
                   {p.name}
                   <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>

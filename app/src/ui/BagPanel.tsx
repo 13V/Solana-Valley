@@ -1,6 +1,7 @@
 import { RARITY, cropValue, parseStackKey } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
+import { CropIcon } from './CropIcon';
 
 export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest } = useGameState();
@@ -33,7 +34,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className="row" key={k} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <img className="crop-ico-sm" src={`assets/crops/${plant.id}.png`} alt="" />
+                <CropIcon id={plant.id} />
                 <span className="row-name">
                   {plant.name}
                   <span className="rarity-line">

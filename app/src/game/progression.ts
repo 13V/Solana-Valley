@@ -44,13 +44,13 @@ export type UpgradeDef = {
 const areaDesc = (lvl: number) => ['1 tile', '3×3 tiles', '5×5 tiles', '7×7 tiles'][lvl] ?? 'huge';
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'water', name: 'Watering Can', icon: '💧', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
-  { id: 'hoe', name: 'Hoe', icon: '⛏️', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
-  { id: 'growth', name: 'Fertilizer', icon: '🌿', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
-  { id: 'fortune', name: 'Fortune', icon: '🍀', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck` },
-  { id: 'supply', name: 'Shop Supply', icon: '🛒', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
-  { id: 'sprinkler', name: 'Sprinkler', icon: '💦', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`) },
-  { id: 'market', name: 'Market Stall', icon: '💰', max: 5, cost: (l) => 350 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
+  { id: 'water', name: 'Watering Can', icon: 'assets/sprout-ui/tool_can.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
+  { id: 'hoe', name: 'Hoe', icon: 'assets/sprout-ui/tool_hoe.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
+  { id: 'growth', name: 'Fertilizer', icon: 'assets/sprout-ui/tool_seed.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
+  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck` },
+  { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
+  { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`) },
+  { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 350 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
 ];
 
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(

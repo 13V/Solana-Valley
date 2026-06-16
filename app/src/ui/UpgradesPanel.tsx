@@ -21,7 +21,7 @@ export function UpgradesPanel({ onClose }: { onClose: () => void }) {
           const afford = coins >= cost;
           return (
             <div className="row" key={u.id} style={{ borderLeftColor: '#7bd66a' }}>
-              <span className="upg-icon">{u.icon}</span>
+              <img className="upg-icon-img" src={u.icon} alt="" />
               <span className="row-name">
                 {u.name} <span className="lvltag">Lv {lvl}/{u.max}</span>
                 <span className="row-sub">

@@ -66,7 +66,7 @@ type Milestone = { level: number; a: Perk; b: Perk };
 
 export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; milestones: Milestone[]; capstone: Perk }[] = [
   {
-    id: 'farming', name: 'Farming', icon: '🌾', blurb: 'Harvesting crops.',
+    id: 'farming', name: 'Farming', icon: 'assets/crops/corn.png', blurb: 'Harvesting crops.',
     milestones: [
       { level: 5,
         a: { id: 'cultivator', name: 'Cultivator', desc: '+25% crop sell value', mods: { cropValueMult: 0.25 } },
@@ -81,7 +81,7 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
     capstone: { id: 'master_farmer', name: 'Master Farmer', desc: '15% chance to auto-replant on harvest · +15% value', mods: { autoReplant: true, cropValueMult: 0.15 } },
   },
   {
-    id: 'ranching', name: 'Ranching', icon: '🐄', blurb: 'Collecting eggs, milk & fruit.',
+    id: 'ranching', name: 'Ranching', icon: 'assets/sprout-ui/icon_cow.png', blurb: 'Collecting eggs, milk & fruit.',
     milestones: [
       { level: 5,
         a: { id: 'shepherd', name: 'Shepherd', desc: '+30% product value', mods: { productValueMult: 0.30 } },
@@ -96,7 +96,7 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
     capstone: { id: 'rancher_lord', name: 'Rancher Lord', desc: '+25% value · +6% golden chance', mods: { productValueMult: 0.25, goldenProductChance: 0.06 } },
   },
   {
-    id: 'breeding', name: 'Breeding', icon: '🥚', blurb: 'Raising baby animals.',
+    id: 'breeding', name: 'Breeding', icon: 'assets/sprout-ui/icon_egg.png', blurb: 'Raising baby animals.',
     milestones: [
       { level: 5,
         a: { id: 'fertile', name: 'Fertile', desc: '+2 herd cap', mods: { breedCapBonus: 2 } },
@@ -111,7 +111,7 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
     capstone: { id: 'master_breeder', name: 'Master Breeder', desc: '+25% rare babies · +20% faster', mods: { rareBabyChance: 0.25, breedSpeedMult: 0.20 } },
   },
   {
-    id: 'fishing', name: 'Fishing', icon: '🎣', blurb: 'Casting at the pond.',
+    id: 'fishing', name: 'Fishing', icon: 'assets/sprout-ui/ic_pond.png', blurb: 'Casting at the pond.',
     milestones: [
       { level: 5,
         a: { id: 'angler', name: 'Angler', desc: '+40% fish value', mods: { fishValueMult: 0.40 } },
@@ -126,7 +126,7 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
     capstone: { id: 'legendary_angler', name: 'Legendary Angler', desc: 'Can hook legendary fish · +30% value', mods: { legendaryFish: true, fishValueMult: 0.30 } },
   },
   {
-    id: 'foraging', name: 'Foraging', icon: '🍄', blurb: 'Gathering wild finds.',
+    id: 'foraging', name: 'Foraging', icon: 'assets/sprout-ui/ic_mushroom.png', blurb: 'Gathering wild finds.',
     milestones: [
       { level: 5,
         a: { id: 'gatherer', name: 'Gatherer', desc: '+40% forage value', mods: { forageValueMult: 0.40 } },
