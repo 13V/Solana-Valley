@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSolBalance } from '../chain/useSolBalance';
+import { useMultiplayer } from '../chain/useMultiplayer';
 import { useGameState, useClock } from './useGameState';
+import { bus } from '../game/EventBus';
 import { sfx } from '../game/audio';
 import { pendingChoices } from '../game/skills';
 
@@ -42,9 +44,22 @@ export function Hud({
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
+  const { connected: mpConnected, island, online } = useMultiplayer();
   const { coins, progress, skills, perks } = useGameState();
   const { day, clock, phase } = useClock();
   const perkChoices = pendingChoices(skills, perks).length;
+
+  // Copy a shareable link that seats friends on this same island.
+  const onInvite = () => {
+    const link = `${location.origin}${location.pathname}?island=${island}`;
+    try {
+      const p = navigator.clipboard?.writeText(link);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      // clipboard unavailable / blocked — still confirm the action below
+    }
+    bus.emit('toast', 'Invite link copied — friends join your island!');
+  };
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
@@ -122,6 +137,25 @@ export function Hud({
         </button>
       </div>
       <div className="hud-right">
+        {mpConnected && (
+          <span className="island-group">
+            <span
+              className="badge"
+              style={{ fontFamily: 'var(--pixel-font)' }}
+              title={`${online} of 20 plots filled on island ${island}`}
+            >
+              🏝 Island {island} · {online}/20
+            </span>
+            <button
+              className="btn sm"
+              style={{ fontFamily: 'var(--pixel-font)' }}
+              title="Copy an invite link so friends join your island"
+              onClick={onInvite}
+            >
+              Invite
+            </button>
+          </span>
+        )}
         {addr && (
           <span className="badge">
             {addr}

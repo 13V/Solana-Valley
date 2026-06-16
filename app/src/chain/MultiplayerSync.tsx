@@ -35,12 +35,21 @@ export function MultiplayerSync() {
       const auth = await getWalletAuth(publicKey, signMessage);
       if (cancelled || !auth) return;
 
+      // Honour an invite link (?island=N): ask /api/join to seat us on that
+      // island if it has room (server falls back when full / on bad input).
+      const islandParam = new URLSearchParams(location.search).get('island');
+      const preferIsland = islandParam !== null ? Number(islandParam) : NaN;
+      const requestBody: Record<string, unknown> = { ...auth };
+      if (Number.isInteger(preferIsland) && preferIsland >= 0) {
+        requestBody.preferIsland = preferIsland;
+      }
+
       let assignment: JoinResponse | null = null;
       try {
         const resp = await fetch('/api/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(auth),
+          body: JSON.stringify(requestBody),
         });
         if (!resp.ok) return; // best-effort: disable multiplayer silently
         const json = (await resp.json()) as Partial<JoinResponse>;

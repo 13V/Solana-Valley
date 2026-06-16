@@ -72,6 +72,13 @@ body {
   gap: 8px;
 }
 
+/* Multiplayer island indicator + Invite button cluster (in the right group). */
+.island-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Day/night widget cluster: the framed sun/moon scene on top, coin + level
    stats beneath it. */
 .hud-left {

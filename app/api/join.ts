@@ -64,6 +64,29 @@ async function fetchExisting(
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }
 
+// Read the lowest free plot (0..19) on ONE specific island, or null if that
+// island is full. Used to honour a caller's island preference so friends can
+// land together.
+async function findFreePlotOnIsland(
+  baseUrl: string,
+  serviceKey: string,
+  island: number,
+): Promise<{ island: number; plot: number } | null> {
+  const url = `${baseUrl}/rest/v1/plots` + `?island=eq.${island}&select=plot`;
+  const resp = await fetch(url, { method: 'GET', headers: authHeaders(serviceKey) });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    console.error('supabase plots island scan failed', resp.status, detail);
+    throw new Error('island scan failed');
+  }
+  const rows = (await resp.json()) as Array<{ plot: number }>;
+  const taken = new Set(rows.map((r) => r.plot));
+  for (let plot = 0; plot < PLOTS_PER_ISLAND; plot++) {
+    if (!taken.has(plot)) return { island, plot };
+  }
+  return null; // island full
+}
+
 // Find the lowest free (island, plot): scan island 0 plots 0..19, then island 1,
 // etc. For each island we read the taken plots once and pick the lowest 0..19 not
 // in that set; if the island is full we advance. Bounded so a pathological state
@@ -152,17 +175,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const wallet = auth.wallet;
   const name = shortWallet(wallet);
 
+  // Optional island preference (e.g. an invite link): claim a seat on this
+  // island if it has room. Coerce to a non-negative integer; ignore anything
+  // else. `preferIsland` is null once the island fills, so we fall back.
+  let preferIsland: number | null = null;
+  const raw = body.preferIsland;
+  if (typeof raw === 'number' || typeof raw === 'string') {
+    const n = Number(raw);
+    if (Number.isInteger(n) && n >= 0) preferIsland = n;
+  }
+
   try {
-    // Fast path: already seated -> return the existing assignment.
+    // Fast path: already seated -> return the existing assignment (preference is
+    // ignored once a wallet owns a plot, so seats stay stable).
     const existing = await fetchExisting(baseUrl, serviceKey, wallet);
     if (existing) {
       res.status(200).json({ island: existing.island, plot: existing.plot, name: existing.name });
       return;
     }
 
-    // Claim the lowest free slot, retrying on a lost UNIQUE(island, plot) race.
+    // Claim a free slot, retrying on a lost UNIQUE(island, plot) race. When an
+    // island is preferred and not yet full we target it; otherwise (or once it
+    // fills) we fall back to the lowest free slot across all islands.
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      const slot = await findLowestFreeSlot(baseUrl, serviceKey);
+      let slot: { island: number; plot: number } | null = null;
+      if (preferIsland !== null) {
+        slot = await findFreePlotOnIsland(baseUrl, serviceKey, preferIsland);
+        if (!slot) preferIsland = null; // preferred island full -> stop trying it
+      }
+      if (!slot) slot = await findLowestFreeSlot(baseUrl, serviceKey);
       const result = await tryClaim(baseUrl, serviceKey, {
         wallet,
         island: slot.island,
