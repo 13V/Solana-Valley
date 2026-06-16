@@ -661,9 +661,9 @@ export class FarmScene extends Phaser.Scene {
     const k = this.key(x, y);
     if (this.pondTiles.has(k) || this.pathTiles.has(k)) return;
     const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
-    this.add.image(cx, cy, 'dirtpath').setScale(2).setDepth(0.5);
-    // Scatter the pack's loose pebbles for a natural, irregular surface.
-    const n = Math.random() < 0.78 ? (Math.random() < 0.28 ? 2 : 1) : 0;
+    // Keep the grass and just scatter the pack's loose pebbles on top, so the
+    // route reads as a natural pebble trail rather than a hard dirt road.
+    const n = 2 + (Math.random() < 0.5 ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const f = FarmScene.PEBBLES[Math.floor(Math.random() * FarmScene.PEBBLES.length)];
       const ox = Phaser.Math.Between(-7, 7), oy = Phaser.Math.Between(-7, 7);
