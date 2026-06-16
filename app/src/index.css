@@ -541,9 +541,9 @@ body {
 /* ===================================================================== */
 :root {
   --ui-panel: url('/assets/sprout-ui/ui_panel.png');
-  --ui-btn: url('/assets/sprout-ui/ui_btn.png');
-  --ui-btn-press: url('/assets/sprout-ui/ui_btn_press.png');
-  --ui-btn-light: url('/assets/sprout-ui/ui_btn_light.png');
+  --ui-btn: url('/assets/sprout-ui/btn_pk.png');
+  --ui-btn-press: url('/assets/sprout-ui/btn_pk_press.png');
+  --ui-btn-light: url('/assets/sprout-ui/btn_pk_light.png');
   /* Recessed inventory-slot sprites (from the Sprout Lands pack) for the hotbar. */
   --slot: url('/assets/sprout-ui/slot_light.png');
   --slot-hover: url('/assets/sprout-ui/slot_med.png');

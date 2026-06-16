@@ -156,7 +156,7 @@ h4 {
   background: none !important;
   background-color: transparent !important;
   border: 9px solid transparent !important;
-  border-image: url('/assets/sprout-ui/ui_btn.png') 8 fill stretch !important;
+  border-image: url('/assets/sprout-ui/btn_pk.png') 8 fill stretch !important;
   border-radius: 0 !important;
   color: var(--ink, #4a3526) !important;
   font-family: var(--pixel-font) !important;
@@ -174,12 +174,12 @@ h4 {
 .wallet-adapter-button:not([disabled]):hover {
   background: none !important;
   background-color: transparent !important;
-  border-image: url('/assets/sprout-ui/ui_btn_light.png') 8 fill stretch !important;
+  border-image: url('/assets/sprout-ui/btn_pk_light.png') 8 fill stretch !important;
   color: var(--ink, #4a3526) !important;
 }
 
 .wallet-adapter-button:not([disabled]):active {
-  border-image: url('/assets/sprout-ui/ui_btn_press.png') 8 fill stretch !important;
+  border-image: url('/assets/sprout-ui/btn_pk_press.png') 8 fill stretch !important;
 }
 
 .wallet-adapter-button[disabled] {
