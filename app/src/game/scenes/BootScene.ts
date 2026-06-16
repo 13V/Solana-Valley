@@ -68,6 +68,9 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
     // Elevation (grassy-plateau cliffs), a wooden bridge, and loose stone decals.
     this.load.spritesheet('hills', `${A}hills.png`, { frameWidth: 16, frameHeight: 16 });
+    // Premium "New tiles" raised grass-hill autotile (11×7) — proper cozy cliff
+    // edges for the raised plot bands. 9-slice: TL0 T1 TR2 / L11 C12 R13 / BL22 B23 BR24.
+    this.load.spritesheet('hillv2', `${A}hillv2.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('bridge', `${A}bridge.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('stonepath', `${A}stonepath.png`, { frameWidth: 16, frameHeight: 16 });
   }
