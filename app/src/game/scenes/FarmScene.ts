@@ -479,10 +479,10 @@ export class FarmScene extends Phaser.Scene {
   }
 
   // Premium character sheet (8 frames/row). Rows 0–3 = idle, 4–7 = walk, each
-  // ordered down/up/left/right. First frame of each idle row doubles as the
-  // standing pose.
-  private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 16, right: 24 };
-  private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 48, right: 56 };
+  // ordered down/up/RIGHT/LEFT in the sheet (same order as the tool rows below).
+  // First frame of each idle row doubles as the standing pose.
+  private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 24, right: 16 };
+  private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 56, right: 48 };
   // Tool swings: rows 12–15 (hoe) and 20–23 (watering can), each 8 frames,
   // ordered down/up/right/left in the sheet.
   private static TOOL_ROW: Record<'hoe' | 'water', Record<Dir, number>> = {
@@ -654,30 +654,48 @@ export class FarmScene extends Phaser.Scene {
   }
 
   // Raise each plot band into a grassy plateau (hills cliff autotile) so the two
-  // bands tower over the sunken central plaza — a terraced valley. hills.png (6×6)
-  // frames: TL1 T2 TR3 / L7 C8 R9 / BL12 cliff13·14 BR15.
+  // bands tower over the sunken central plaza — a terraced valley. hills.png (6×6):
+  // grass-top edge TL1/T2/TR3, plain fill 8, side walls L33/R26, and the cliff
+  // (grass-on-dirt) edge BL12/face13·14/BR15. The plaza-facing cliff faces DOWN
+  // on the top band and UP on the bottom band (same frames, flipped vertically —
+  // the sheet has no dedicated dirt-faces-up tile).
   private buildTerraces() {
     const PAD = 1; // plateau reaches one tile past the fences
     for (let row = 0; row < 2; row++) {
       const b = bandRect(row);
       const x0 = b.x0 - PAD, x1 = b.x1 + PAD, y0 = b.y0 - PAD, y1 = b.y1 + PAD;
       const flip = row === 1; // bottom band: cliff faces UP toward the plaza
-      const cliffY = flip ? y0 : y1;
+      const cliffY = flip ? y0 : y1; // plaza-facing edge (dirt cliff)
+      const backY = flip ? y1 : y0;  // outer edge (grass top, away from plaza)
       const put = (tx: number, ty: number, frame: number, fy = false) => {
         if (!this.inBounds(tx, ty)) return;
         this.add
           .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hills', frame)
           .setScale(2).setDepth(0.4).setFlipY(fy);
       };
-      // plaza-facing cliff edge + its corners
-      put(x0, cliffY, 12, flip);
-      put(x1, cliffY, 15, flip);
-      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, cliffY, 13 + (x % 2), flip);
-      // side edges running back from the cliff
-      const sY0 = flip ? y0 + 1 : y0;
-      const sY1 = flip ? y1 : y1 - 1;
-      for (let y = sY0; y <= sY1; y++) { put(x0, y, 7); put(x1, y, 9); }
-      // soft shadow cast onto the plaza floor just past the cliff (adds depth)
+
+      // plaza-facing cliff edge + its outer corners (flipped vertically for the
+      // bottom band so the dirt face points UP).
+      put(x0, cliffY, 12, flip); // bottom/top-LEFT corner
+      put(x1, cliffY, 15, flip); // bottom/top-RIGHT corner
+      // single continuous cliff face (13 & 14 are interchangeable centre faces;
+      // alternate them on a band-relative index so the two ends stay symmetric).
+      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, cliffY, (x - x0) % 2 ? 13 : 14, flip);
+
+      // outer (back) grass-top edge + its corners, so the plateau reads as raised.
+      // Flipped vertically on the bottom band so the lit grass rim sits on its
+      // bottom edge.
+      put(x0, backY, 1, flip); // back-LEFT corner
+      put(x1, backY, 3, flip); // back-RIGHT corner
+      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, backY, 2, flip);
+
+      // left/right grass side walls running between the two edges. Their rim is
+      // vertical (top–bottom symmetric), so no flip is needed on either band.
+      const sY0 = Math.min(cliffY, backY) + 1;
+      const sY1 = Math.max(cliffY, backY) - 1;
+      for (let y = sY0; y <= sY1; y++) { put(x0, y, 33); put(x1, y, 26); }
+
+      // soft shadow cast onto the plaza floor just past the cliff (adds depth).
       const shY = flip ? cliffY - 1 : cliffY + 1;
       for (let x = x0; x <= x1; x++) {
         if (this.inBounds(x, shY)) {
