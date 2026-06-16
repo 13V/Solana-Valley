@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
+# Primary hosting moved to Vercel (see vercel.json). This Pages deploy is kept
+# as a manual fallback only — run it from the Actions tab when needed. The
+# automatic push trigger is disabled so pushes deploy via Vercel instead.
 on:
-  push:
-    branches: [claude/loving-cannon-ayy18g, main]
   workflow_dispatch: {}
 
 permissions:
