@@ -2,6 +2,7 @@ import { PLANTS, RARITY, MUTATIONS } from '../game/economy';
 import { ACHIEVEMENTS } from '../game/progression';
 import { useGameState } from './useGameState';
 import { CropIcon } from './CropIcon';
+import { Tooltip, PlantTipBody } from './Tooltip';
 
 export function AlmanacPanel({ onClose }: { onClose: () => void }) {
   const { progress } = useGameState();
@@ -32,9 +33,18 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
                 key={p.id}
                 style={found ? { borderColor: r.css } : undefined}
               >
-                {found && <CropIcon id={p.id} className="crop-ico" />}
-                <span className="alm-name">{found ? p.name : '???'}</span>
-                {found && <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>}
+                {found ? (
+                  <Tooltip
+                    className="ui-tip-trigger col"
+                    content={<PlantTipBody plant={p} progress={progress} showBuy={false} />}
+                  >
+                    <CropIcon id={p.id} className="crop-ico" />
+                    <span className="alm-name">{p.name}</span>
+                    <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>
+                  </Tooltip>
+                ) : (
+                  <span className="alm-name">???</span>
+                )}
               </div>
             );
           })}

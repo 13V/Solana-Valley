@@ -1,0 +1,165 @@
+/* ===================================================================== */
+/* "What next?" goals checklist HUD — a narrow panel pinned to the left   */
+/* edge, below the top HUD bar and clear of the bottom hotbar.            */
+/* Scoped entirely under .goals-hud so it can't leak into other UI.       */
+/* ===================================================================== */
+
+.goals-hud {
+  position: absolute;
+  left: 8px;
+  top: 232px; /* clears the top-left HUD stack (day/night widget + coins/level) */
+  width: 190px;
+  /* Sits inside the .overlay (pointer-events: none); only this panel
+     captures clicks so the rest of the screen stays clickable. */
+  pointer-events: auto;
+  box-sizing: border-box;
+  font-family: var(--pixel-font, ui-monospace, system-ui, sans-serif);
+  color: var(--ink, #4a3526);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.3;
+  user-select: none;
+  /* Default (no UI skin) fallback look. */
+  background: rgba(20, 14, 8, 0.82);
+  border: 1px solid rgba(108, 74, 43, 0.55);
+  border-radius: 8px;
+  padding: 8px 10px;
+  z-index: 5;
+}
+
+/* Cozy Sprout Lands skin: reuse the wood ui_frame as a border-image,
+   mirroring the .panel pattern but thinner for this compact panel. */
+.ui-skin .goals-hud {
+  background: none;
+  border: 16px solid transparent;
+  border-image: url('/assets/sprout-ui/ui_frame.png') 28 fill stretch;
+  border-radius: 0;
+  padding: 0;
+  color: var(--ink, #4a3526);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+
+/* When skinned, the frame's border IS the padding, so inset content. */
+.ui-skin .goals-hud .goals-inner {
+  padding: 2px 4px 4px;
+}
+
+.goals-inner {
+  display: block;
+}
+
+/* Header doubles as the collapse toggle. */
+.goals-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  font-size: 13px;
+  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.4);
+}
+
+.goals-head:hover .goals-title {
+  text-decoration: underline;
+}
+
+.goals-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.goals-count {
+  font-size: 11px;
+  opacity: 0.85;
+  font-weight: 700;
+}
+
+/* Little chevron that flips when collapsed. */
+.goals-caret {
+  font-size: 10px;
+  opacity: 0.75;
+  transition: transform 0.12s ease;
+}
+.goals-hud.is-collapsed .goals-caret {
+  transform: rotate(-90deg);
+}
+
+.goals-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.goals-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Icon slot keeps a fixed width so labels line up. */
+.goals-mark {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goals-mark img {
+  width: 17px;
+  height: 17px;
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* Dim empty marker (CSS circle) for not-yet-done goals — reads cleaner
+   than the pixel dot at this tiny size. */
+.goals-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid rgba(74, 53, 38, 0.45);
+  background: rgba(74, 53, 38, 0.12);
+  box-sizing: border-box;
+}
+
+.goals-label {
+  flex: 1 1 auto;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Done rows: keep the text but soften it and add a strike. */
+.goals-item.is-done .goals-label {
+  opacity: 0.62;
+  text-decoration: line-through;
+}
+
+.goals-alldone {
+  margin-top: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--ink-soft, #5c4226);
+}
+
+/* Compact spacing when collapsed: header only. */
+.goals-hud.is-collapsed .goals-list,
+.goals-hud.is-collapsed .goals-alldone {
+  display: none;
+}

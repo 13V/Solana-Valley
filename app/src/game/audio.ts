@@ -6,6 +6,7 @@
 // mode) degrades silently rather than throwing.
 
 const MUTE_KEY = 'solana-valley:muted';
+const VOLUME_KEY = 'solana-valley:volume';
 
 // A single tone scheduled relative to a start time. We synthesize each sound as
 // a handful of these so they stay short and snappy.
@@ -83,14 +84,21 @@ const RECIPES: Record<SoundName, Tone[]> = {
   click: [{ freq: 1200, type: 'square', start: 0, dur: 0.03, gain: 0.05 }],
 };
 
+function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private muted = false;
+  private volume = 1; // 0..1, independent of mute (mute overrides volume).
   private failed = false; // AudioContext unavailable; stop trying.
 
   constructor() {
     this.muted = this.readMuted();
+    this.volume = this.readVolume();
   }
 
   private readMuted(): boolean {
@@ -99,6 +107,22 @@ class Sfx {
     } catch {
       return false;
     }
+  }
+
+  private readVolume(): number {
+    try {
+      const raw = localStorage.getItem(VOLUME_KEY);
+      if (raw == null) return 1;
+      const v = Number(raw);
+      return Number.isFinite(v) ? clamp01(v) : 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  // The level the master gain should sit at given mute + volume state.
+  private targetGain(): number {
+    return this.muted ? 0 : this.volume;
   }
 
   // Lazily create the AudioContext on first use. Returns null if unavailable.
@@ -114,7 +138,7 @@ class Sfx {
       }
       this.ctx = new Ctor();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 1;
+      this.master.gain.value = this.targetGain();
       this.master.connect(this.ctx.destination);
     } catch {
       this.failed = true;
@@ -146,16 +170,37 @@ class Sfx {
     } catch {
       // storage may be unavailable; mute still applies for the session
     }
-    if (this.master && this.ctx) {
-      // Ramp to avoid clicks on toggle.
-      try {
-        const now = this.ctx.currentTime;
-        this.master.gain.cancelScheduledValues(now);
-        this.master.gain.setValueAtTime(this.master.gain.value, now);
-        this.master.gain.linearRampToValueAtTime(b ? 0 : 1, now + 0.02);
-      } catch {
-        this.master.gain.value = b ? 0 : 1;
-      }
+    this.applyGain();
+  }
+
+  getVolume(): number {
+    return this.volume;
+  }
+
+  // Set the SFX volume (0..1, clamped) and persist it. When muted, the audible
+  // level stays 0 — mute overrides volume — but the new value is remembered for
+  // when mute is lifted.
+  setVolume(v: number): void {
+    this.volume = clamp01(v);
+    try {
+      localStorage.setItem(VOLUME_KEY, String(this.volume));
+    } catch {
+      // storage may be unavailable; volume still applies for the session
+    }
+    this.applyGain();
+  }
+
+  // Ramp the master gain to the current mute/volume target, avoiding clicks.
+  private applyGain(): void {
+    if (!this.master || !this.ctx) return;
+    const target = this.targetGain();
+    try {
+      const now = this.ctx.currentTime;
+      this.master.gain.cancelScheduledValues(now);
+      this.master.gain.setValueAtTime(this.master.gain.value, now);
+      this.master.gain.linearRampToValueAtTime(target, now + 0.02);
+    } catch {
+      this.master.gain.value = target;
     }
   }
 

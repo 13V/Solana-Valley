@@ -15,7 +15,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | 'settings' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
@@ -112,6 +112,13 @@ export function Hud({
             src={`assets/sprout-ui/btn_sound_${muted ? 'off' : 'on'}.png`}
             alt={muted ? '🔇' : '🔊'}
           />
+        </button>
+        <button
+          className={`iconbtn ${panel === 'settings' ? 'active' : ''}`}
+          title="Settings"
+          onClick={() => onToggle('settings')}
+        >
+          <img className="btn-ico" src="assets/sprout-ui/set_gear.png" alt="⚙️" />
         </button>
       </div>
       <div className="hud-right">

@@ -1,0 +1,222 @@
+/* Settings panel — scoped styles for the slider, toggles, segmented options,
+   plus the global accessibility hooks (text size, reduced motion, colourblind).
+   Imported by SettingsPanel.tsx. Does NOT touch index.css / theme.css. */
+
+/* ---- Panel layout ---------------------------------------------------- */
+.settings-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.set-row .set-label {
+  flex: 1 1 130px;
+  min-width: 120px;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.set-row .set-sub {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.set-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  justify-content: flex-end;
+}
+
+/* ---- Volume slider --------------------------------------------------- */
+.set-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+}
+
+.set-volume .set-vol-val {
+  width: 38px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reset the native control, then paint an on-theme tan groove + green fill and
+   the pack's rounded pill knob. Cross-browser via WebKit + Firefox pseudos. */
+.set-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+}
+.set-slider:focus {
+  outline: none;
+}
+
+/* WebKit / Blink track + thumb */
+.set-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 6px;
+  background: #c9a06a;
+  border: 1px solid #6c4a2b;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.set-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 16px;
+  margin-top: -4px; /* center 16px thumb on 10px track (+1px border) */
+  border: none;
+  border-radius: 6px;
+  background: url('/assets/sprout-ui/set_knob.png') center / 100% 100% no-repeat,
+    #e0c089;
+  image-rendering: pixelated;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Firefox track + thumb + progress fill */
+.set-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 6px;
+  background: #c9a06a;
+  border: 1px solid #6c4a2b;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.set-slider::-moz-range-progress {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #6cc24a, #4f9e34);
+}
+.set-slider::-moz-range-thumb {
+  width: 22px;
+  height: 16px;
+  border: none;
+  border-radius: 6px;
+  background: url('/assets/sprout-ui/set_knob.png') center / 100% 100% no-repeat,
+    #e0c089;
+  image-rendering: pixelated;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- Toggle (mute / reduced motion): label + check/X button ---------- */
+.set-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  color: inherit;
+}
+.set-toggle .set-toggle-ico {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  display: block;
+}
+.set-toggle .set-toggle-state {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: left;
+  opacity: 0.85;
+}
+.set-toggle:hover .set-toggle-ico {
+  transform: scale(1.08);
+}
+
+/* ---- Segmented option buttons (text size / colourblind) -------------- */
+.set-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.set-seg .btn.sm.set-opt {
+  padding: 2px 8px;
+}
+/* Selected option uses the same green the SkillsPanel uses for chosen perks. */
+.set-seg .btn.sm.set-opt.sel,
+.ui-skin .set-seg .btn.sm.set-opt.sel {
+  color: #fff;
+  background: #2f7d2e;
+  border-color: #2f7d2e;
+  box-shadow: 0 0 0 2px rgba(47, 125, 46, 0.35);
+}
+
+/* Keep the green readable on the wooden skin button frame too. */
+.ui-skin .set-seg .btn.sm.set-opt.sel {
+  border-image: none;
+  background: #2f7d2e;
+}
+
+/* ===================================================================== */
+/* Global accessibility hooks (classes set on <html> by applySettings)    */
+/* ===================================================================== */
+
+/* Text size: the app sizes fonts in px, so bump the major UI text by class.
+   ~ -10% / +15% around normal. Kept conservative so layout doesn't break. */
+html.txt-lg .panel,
+html.txt-lg .panel-head h3,
+html.txt-lg .badge,
+html.txt-lg .row-name,
+html.txt-lg .row-sub,
+html.txt-lg .btn,
+html.txt-lg .slot-label,
+html.txt-lg .toast {
+  font-size: calc(1em * 1.15);
+}
+html.txt-sm .panel,
+html.txt-sm .panel-head h3,
+html.txt-sm .badge,
+html.txt-sm .row-name,
+html.txt-sm .row-sub,
+html.txt-sm .btn,
+html.txt-sm .slot-label,
+html.txt-sm .toast {
+  font-size: calc(1em * 0.9);
+}
+
+/* Reduced motion: collapse animations + transitions app-wide. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Colourblind: apply the matching SVG colour-matrix filter to the whole app.
+   Off = no filter. The .game-root canvas + .overlay both get it so HUD and the
+   Phaser scene are simulated consistently. */
+html.cb-prot .app {
+  filter: url(#cb-prot);
+}
+html.cb-deut .app {
+  filter: url(#cb-deut);
+}
+html.cb-trit .app {
+  filter: url(#cb-trit);
+}

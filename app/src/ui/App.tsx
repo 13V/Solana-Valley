@@ -11,7 +11,10 @@ import { UpgradesPanel } from './UpgradesPanel';
 import { SkillsPanel } from './SkillsPanel';
 import { AlmanacPanel } from './AlmanacPanel';
 import { HelpPanel } from './HelpPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { GoalsHud } from './GoalsHud';
 import { Toasts } from './Toasts';
+import './settings'; // self-applies saved accessibility/volume settings on load
 
 const HELP_SEEN_KEY = 'solana-valley:seen-help';
 
@@ -61,6 +64,8 @@ export function App() {
           {panel === 'skills' && <SkillsPanel onClose={close} />}
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
+          {panel === 'settings' && <SettingsPanel onClose={close} />}
+          <GoalsHud />
           <Hotbar />
           <Toasts />
         </div>

@@ -2,9 +2,10 @@ import { RARITY, cropValue, parseStackKey } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
+import { Tooltip, StackTipBody, makeStackStats } from './Tooltip';
 
 export function BagPanel({ onClose }: { onClose: () => void }) {
-  const { harvest } = useGameState();
+  const { harvest, progress } = useGameState();
   let total = 0;
   const rows = Object.keys(harvest).map((k) => {
     const { plant, mutation, wet } = parseStackKey(k);
@@ -34,17 +35,25 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className="row" key={k} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <CropIcon id={plant.id} />
-                <span className="row-name">
-                  {plant.name}
-                  <span className="rarity-line">
-                    {mutation.id !== 'normal' && (
-                      <span className="mut" style={{ color: mutation.css }}>{mutation.name}</span>
-                    )}
-                    {wet && <span className="mut wet">Wet</span>}
+                <Tooltip
+                  content={
+                    <StackTipBody
+                      stats={makeStackStats(plant, mutation, wet, count, unit, progress)}
+                    />
+                  }
+                >
+                  <CropIcon id={plant.id} />
+                  <span className="row-name">
+                    {plant.name}
+                    <span className="rarity-line">
+                      {mutation.id !== 'normal' && (
+                        <span className="mut" style={{ color: mutation.css }}>{mutation.name}</span>
+                      )}
+                      {wet && <span className="mut wet">Wet</span>}
+                    </span>
                   </span>
-                </span>
-                <span className="row-meta">{unit.toLocaleString()}🪙 ea</span>
+                  <span className="row-meta">{unit.toLocaleString()}🪙 ea</span>
+                </Tooltip>
                 <span className="stock">×{count}</span>
                 <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
               </div>

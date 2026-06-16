@@ -1,0 +1,178 @@
+/* =====================================================================
+   Live-stat tooltips. Scoped under .ui-tip so nothing here leaks into the
+   rest of the UI. The bubble renders in a portal on <body>; .ui-skin lives on
+   <html>, so the 9-slice frame + ink palette still apply through inheritance.
+   Pixel art stays crisp via image-rendering: pixelated on the border-image.
+   ===================================================================== */
+
+/* The default trigger wrapper for a panel ROW. The row is `display:flex` and
+   the wrapped icon/name/meta used to be direct flex items (with .row-name
+   flex:1). We mirror that: the wrapper is a grow-to-fill flex item that re-lays
+   its children with the same gap, so the row looks identical — but now there's
+   a real box to measure and to receive hover/touch events. */
+.ui-tip-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 auto;
+  min-width: 0; /* allow children to shrink instead of overflowing the row */
+  cursor: help;
+}
+/* The wrapped .row-name keeps growing inside the trigger. */
+.ui-tip-trigger > .row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Column variant for the Almanac grid cell (a flex column). Fills the cell and
+   keeps the icon/name/rarity stacked + centered exactly as before. */
+.ui-tip-trigger.col {
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* A small standalone info affordance (the "i" badge) used where wrapping the
+   whole row isn't clean. */
+.ui-tip-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(74, 53, 38, 0.14);
+  color: var(--ink, #4a3526);
+  font-family: var(--pixel-font, monospace);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  cursor: help;
+  flex: none;
+  padding: 0;
+}
+.ui-tip-info:hover,
+.ui-tip-info:focus-visible {
+  background: rgba(74, 53, 38, 0.28);
+  outline: none;
+}
+
+/* ---- the floating bubble -------------------------------------------- */
+.ui-tip {
+  position: fixed;
+  z-index: 9999; /* above panels (overlay) + toasts */
+  max-width: 240px;
+  min-width: 160px;
+  padding: 6px 9px;
+  pointer-events: none; /* never steal clicks from the row underneath */
+  font-family: var(--pixel-font, ui-monospace, monospace);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink, #4a3526);
+  font-size: 12px;
+  line-height: 1.45;
+  /* Fallback chrome when the premium skin isn't loaded. */
+  background: #efe6cf;
+  border: 2px solid #6e4a2b;
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  /* gentle fade/pop in */
+  animation: ui-tip-in 90ms ease-out;
+}
+
+@keyframes ui-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* When the Sprout Lands skin is on, swap the fallback box for the wooden
+   9-slice frame (same asset/slice the .panel uses). */
+.ui-skin .ui-tip {
+  background: none;
+  border: 16px solid transparent;
+  border-image: var(--ui-frame, url('/assets/sprout-ui/ui_frame.png')) 28 fill
+    stretch;
+  border-radius: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  padding: 2px 6px;
+}
+
+/* ---- bubble contents ------------------------------------------------ */
+.ui-tip-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.ui-tip-name {
+  font-weight: 700;
+}
+.ui-tip-rar {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ui-tip-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  white-space: nowrap;
+}
+.ui-tip-line .k {
+  opacity: 0.8;
+}
+.ui-tip-line .v {
+  font-weight: 700;
+}
+/* a value that reflects a live upgrade boost (vs. base) */
+.ui-tip-line .v.boosted {
+  color: #2e7d32;
+}
+
+.ui-tip-sub {
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(74, 53, 38, 0.3);
+  font-size: 11px;
+}
+.ui-tip-sub-head {
+  opacity: 0.8;
+  margin-bottom: 1px;
+}
+
+.ui-tip-mut {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ui-tip-mut .mname {
+  font-weight: 700;
+}
+.ui-tip-mut .modds {
+  opacity: 0.85;
+}
+
+.ui-tip-locked {
+  color: #b04a2b;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.ui-tip-note {
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.7;
+  white-space: normal;
+}
