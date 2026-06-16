@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth';
+import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth.js';
 
 // POST /api/save
 // Body: { wallet, message, signature, data }
