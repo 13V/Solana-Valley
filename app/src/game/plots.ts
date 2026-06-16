@@ -1,11 +1,12 @@
-// Solana Valley world: a tidy neighbourhood of 10 fenced "homesteads" laid out
-// in a 5×2 grid. Each homestead is a self-contained mini-farm with FOUR areas:
-// a HOUSE (cottage), a big 7×7 CROP FARM, a CHICKEN PEN (with coop) and a
-// separate COW PEN (open pasture), plus a little ORCHARD for fruit trees.
-// You own homestead #0 (fully playable); the other 9 are decorative neighbours
-// so the neighbourhood reads as alive. Everything is flat.
+// Solana Valley world: a terraced valley. TWO raised plateau BANDS of fenced
+// homesteads — 10 across the top, 10 across the bottom — face each other across
+// a wide sunken central PLAZA (the valley floor) full of stone paths, a pond,
+// markets and decorations. Every homestead's fence opens toward the plaza.
+// You own homestead #0 (top-left, fully playable); the other 19 are decorative
+// neighbours so the valley reads as a living town.
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number }; // tile coords, inclusive
+export type OpenSide = 'N' | 'S';
 
 // ---- homestead geometry (tiles) -----------------------------------------
 // Interior of one homestead (inside the fence). Sub-areas are placed relative
@@ -16,14 +17,14 @@ export const HS_IH = 16; // interior height
 export const HS_W = HS_IW + 2; // 21
 export const HS_H = HS_IH + 2; // 18
 
-// Grid arrangement.
-export const COLS = 5;
+// Grid arrangement: 10 columns × 2 bands.
+export const COLS = 10;
 export const ROWS = 2;
-export const MARGIN_X = 8; // tiles of grass left/right of the neighbourhood (room for the pond)
-export const MARGIN_TOP = 3; // tiles of grass above the first row
-export const MARGIN_BOTTOM = 4; // tiles of grass below the last row
+export const MARGIN_X = 4; // tiles of grass left/right of the neighbourhood
+export const MARGIN_TOP = 3; // grass above the top band
+export const MARGIN_BOTTOM = 3; // grass below the bottom band
 export const GAP_X = 2; // grass/path gap between homestead columns
-export const GAP_Y = 4; // gap between the two rows (leaves room for the avenue)
+export const GAP_Y = 16; // the central PLAZA between the two bands (valley floor)
 
 // The land is an island: a ring of ocean (+ a sand beach just inside it) wraps
 // the whole grid. Homesteads sit on the grass well within the beach.
@@ -32,20 +33,19 @@ export const BEACH = 2; // sand beach tiles just inside the ocean
 export const ISLAND_BORDER = SHORE + BEACH; // grass starts this many tiles in
 
 // Sub-area layout *relative to a homestead interior's top-left (ix, iy)*.
-//   HOUSE        top-left            CHICKEN PEN   top-right (coop crowns it)
-//   7×7 FARM     left, under house   COW PEN       bottom-right (open pasture)
-//   ORCHARD      bottom-left, under the farm
 export const SUB = {
   house: { cx: 2, baseRow: 3 }, // cottage centre col + base row (offsets in interior)
   farm: { x: 1, y: 6, w: 7, h: 7 }, // 7×7 tillable bed (left)
   chickenPen: { x: 10, y: 1, w: 6, h: 6 }, // chicken pen (coop on top edge)
   cowPen: { x: 10, y: 9, w: 8, h: 7 }, // cow pasture (bottom-right)
   orchard: { x: 1, y: 14, w: 6, h: 2 }, // fruit-tree slots under the farm
-  signCx: 6, // name sign column (top edge) — sits in the gap between house & coop
+  signCx: 6, // name sign column (top edge)
 };
 
 export type Homestead = {
   index: number;
+  col: number; row: number; // grid position
+  openSide: OpenSide; // which fence side faces the central plaza
   ix: number; iy: number; // interior top-left (tile)
   interior: Rect; // full interior rect (inside the fence)
   house: { cx: number; baseRow: number };
@@ -60,6 +60,7 @@ export type Homestead = {
 
 const NAMES = [
   'You', 'Maya', 'Leo', 'Aria', 'Finn', 'Noor', 'Kai', 'Luna', 'Milo', 'Sage',
+  'Iris', 'Otto', 'Wren', 'Hugo', 'Beau', 'Cleo', 'Remy', 'Nova', 'Theo', 'Juno',
 ];
 
 function makeHomestead(index: number): Homestead {
@@ -74,6 +75,8 @@ function makeHomestead(index: number): Homestead {
   });
   return {
     index,
+    col, row,
+    openSide: row === 0 ? 'S' : 'N', // top band opens down, bottom band opens up
     ix, iy,
     interior: { x0: ix, y0: iy, x1: ix + HS_IW - 1, y1: iy + HS_IH - 1 },
     house: { cx: ix + SUB.house.cx, baseRow: iy + SUB.house.baseRow },
@@ -93,10 +96,24 @@ export const HOMESTEADS: Homestead[] = Array.from({ length: COLS * ROWS }, (_, i
 export const PLAYER = HOMESTEADS[0];
 export const NEIGHBOR_HOMESTEADS = HOMESTEADS.filter((h) => !h.mine);
 
+// Footprint-inclusive rectangle (incl. fence ring) covering every plot in a
+// band row — used to render each band as one raised plateau (terrace).
+export function bandRect(row: number): Rect {
+  const firstIx = ISLAND_BORDER + MARGIN_X + 1;
+  const lastIx = ISLAND_BORDER + MARGIN_X + 1 + (COLS - 1) * (HS_W + GAP_X);
+  const iy = ISLAND_BORDER + MARGIN_TOP + 1 + row * (HS_H + GAP_Y);
+  return { x0: firstIx - 1, y0: iy - 1, x1: lastIx + HS_IW, y1: iy + HS_IH };
+}
+
+// The sunken central plaza (valley floor) between the two bands, inclusive.
+export const PLAZA: Rect = {
+  x0: bandRect(0).x0,
+  y0: bandRect(0).y1 + 1,
+  x1: bandRect(0).x1,
+  y1: bandRect(1).y0 - 1,
+};
+
 // ---- the player's homestead (drives farming + producers) -----------------
-// MY_PLOT = the player's 7×7 crop bed (where hoe/plant/water/harvest work).
-// HOME.chickenPen / HOME.cowPen = where animals spawn/wander (routed by type).
-// HOME.orchard = where fruit trees go.
 export const HOME = {
   houseCx: PLAYER.house.cx,
   houseBaseRow: PLAYER.house.baseRow,

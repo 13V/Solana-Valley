@@ -59,6 +59,10 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('furniture', `${A}furniture.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('boats', `${A}boats.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
+    // Elevation (grassy-plateau cliffs), a wooden bridge, and loose stone decals.
+    this.load.spritesheet('hills', `${A}hills.png`, { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('bridge', `${A}bridge.png`, { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('stonepath', `${A}stonepath.png`, { frameWidth: 16, frameHeight: 16 });
   }
 
   create() {
@@ -130,6 +134,27 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xd8c089, 1);
     for (const [x, y] of grains) g.fillRect((x + 5) % 16, (y + 7) % 16, 1, 1);
     g.generateTexture('sand', 16, 16);
+    g.destroy();
+
+    // A cobblestone path tile (16px): warm grey grout with rounded cobbles in a
+    // brick-ish stagger, lightly shaded so a run of them reads as a stone path.
+    g = this.gfx();
+    g.fillStyle(0x8d8377, 1); // grout
+    g.fillRect(0, 0, 16, 16);
+    const cobble = (x: number, y: number, w: number, h: number, c: number) => {
+      g.fillStyle(c, 1);
+      g.fillRect(x, y, w, h);
+      g.fillStyle(0xc9c2b4, 0.5); // top highlight
+      g.fillRect(x, y, w, 1);
+    };
+    const stones: Array<[number, number, number, number]> = [
+      [1, 1, 6, 5], [8, 1, 6, 5],
+      [1, 7, 4, 4], [6, 7, 8, 4],
+      [1, 12, 7, 3], [9, 12, 5, 3],
+    ];
+    const tones = [0xb3ab9c, 0xa79e8e, 0xbdb6a8, 0xada595, 0xb8b1a2, 0xa39a8a];
+    stones.forEach((s, i) => cobble(s[0], s[1], s[2], s[3], tones[i % tones.length]));
+    g.generateTexture('cobble', 16, 16);
     g.destroy();
   }
 
