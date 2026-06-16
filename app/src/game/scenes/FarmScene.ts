@@ -2167,7 +2167,9 @@ export class FarmScene extends Phaser.Scene {
       perks: this.perks,
     };
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      const json = JSON.stringify(data);
+      localStorage.setItem(SAVE_KEY, json);
+      bus.emit('saved', json); // notify cloud-save sync (best-effort, debounced)
     } catch {
       // storage may be unavailable (private mode); ignore
     }

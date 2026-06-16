@@ -8,6 +8,7 @@ export interface GameEvents {
   state: UiState;
   clock: ClockState;
   toast: string;
+  saved: string; // the save JSON string, emitted right after it's written to localStorage (for cloud sync)
   action: 'till' | 'plant' | 'water' | 'harvest' | 'sell'; // a core gameplay action just succeeded (for onboarding)
   'ui:selectTool': string; // 'hoe' | 'can' | 'seed'
   'ui:selectSeed': string; // plant id -> also switches to the seed tool

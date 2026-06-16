@@ -15,6 +15,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { GoalsHud } from './GoalsHud';
 import { TutorialCoach } from './TutorialCoach';
 import { TouchControls } from './TouchControls';
+import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { Toasts } from './Toasts';
 import './settings'; // self-applies saved accessibility/volume settings on load
 
@@ -57,6 +58,7 @@ export function App() {
       <div className="app">
         <div ref={containerRef} className="game-root" />
         <div className="overlay">
+          <CloudSaveSync />
           <Hud panel={panel} onToggle={toggle} />
           {panel === 'shop' && <Shop onClose={close} />}
           {panel === 'seeds' && <SeedsPanel onClose={close} />}
