@@ -193,6 +193,10 @@ Grounding for the ideas below — what exists today and where it's thin.
 - **VRF** for provably-fair rare drops. 🟦
 
 ### 🪙 `$SPROUT` token utility & tokenomics
+> 📄 **Designed in detail:** [`TOKENOMICS.md`](TOKENOMICS.md) — revenue-funded
+> rewards (`$SPROUT` broad + SOL top prizes), gated behind
+> [`ANTI-CHEAT.md`](ANTI-CHEAT.md).
+
 - **Sinks**: premium seeds, land expansion, cosmetic mints, marketplace fees,
   prestige, burn-to-reroll. **Faucets**: rare harvests, events, achievements.
   Keep faucet/sink balanced. 🏔️

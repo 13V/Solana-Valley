@@ -150,7 +150,7 @@ solana-valley/
 │       ├── ui/                  # React overlay: HUD, hotbar, shop/seeds/bag/help
 │       └── chain/               # Solana wallet provider + hooks
 ├── programs/                    # Anchor program (token/land/market) — planned
-└── docs/                        # ARCHITECTURE.md, ROADMAP.md, IDEAS.md
+└── docs/                        # ARCHITECTURE · ROADMAP · IDEAS · TOKENOMICS · ANTI-CHEAT
 ```
 
 ## How the blockchain fits in
@@ -162,7 +162,9 @@ game already routes economy actions through a typed event bus, so the on-chain
 transaction handlers can drop in without restructuring gameplay. Details in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); build order in
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the wider idea/content backlog in
-[`docs/IDEAS.md`](docs/IDEAS.md); the Anchor plan in
+[`docs/IDEAS.md`](docs/IDEAS.md); the player-rewards / token design in
+[`docs/TOKENOMICS.md`](docs/TOKENOMICS.md) (and its prerequisite
+[`docs/ANTI-CHEAT.md`](docs/ANTI-CHEAT.md)); the Anchor plan in
 [`programs/README.md`](programs/README.md).
 
 > Devnet only for now — nothing here touches real funds.
