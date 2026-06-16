@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import type { Plant } from '../game/economy';
+import { QUALITY, type Plant } from '../game/economy';
 import type { Progress } from '../game/types';
 import {
   formatDuration,
@@ -238,7 +238,7 @@ export function PlantTipBody({
 
       <div className="ui-tip-sub">
         <div className="ui-tip-sub-head">
-          Mutation odds{s.fortuneBoosted ? ' (Fortune)' : ''}:
+          Mutation odds{s.fortuneBoosted ? ' (Fortune)' : ''} — rare variants:
         </div>
         {s.mutations.map((m) => (
           <div className="ui-tip-mut" key={m.id}>
@@ -250,8 +250,17 @@ export function PlantTipBody({
         ))}
       </div>
 
-      <div className="ui-tip-note">
-        Quality: crops roll ★ stars that multiply their value.
+      <div className="ui-tip-sub">
+        <div className="ui-tip-sub-head">Quality stars — every harvest:</div>
+        {(['silver', 'gold', 'iridium'] as const).map((q) => (
+          <div className="ui-tip-mut" key={q}>
+            <span className="mname" style={{ color: QUALITY[q].css }}>
+              {'★'.repeat(QUALITY[q].stars)} {QUALITY[q].label}
+            </span>
+            <span className="modds">×{QUALITY[q].mult}</span>
+          </div>
+        ))}
+        <div className="ui-tip-note">Better odds with Fertilizer &amp; Farming. Stacks with mutation.</div>
       </div>
 
       {typeof plant.regrow === 'number' && plant.regrow > 0 && (
