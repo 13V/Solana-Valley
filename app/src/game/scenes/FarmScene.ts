@@ -1088,6 +1088,7 @@ export class FarmScene extends Phaser.Scene {
       if (did) {
         this.playAction('hoe');
         sfx.play('till'); // once per click, not per tilled tile
+        bus.emit('action', 'till');
       }
     } else if (this.selected === 'can') {
       let did = false;
@@ -1097,6 +1098,7 @@ export class FarmScene extends Phaser.Scene {
       if (did) {
         this.playAction('water');
         sfx.play('water'); // once per click, not per watered tile
+        bus.emit('action', 'water');
       }
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
@@ -1177,6 +1179,7 @@ export class FarmScene extends Phaser.Scene {
       scale: { start: 1, end: 0 },
     }, 6);
     sfx.play('plant');
+    bus.emit('action', 'plant');
     this.emitState();
   }
 
@@ -1246,6 +1249,7 @@ export class FarmScene extends Phaser.Scene {
     const crop = this.crops.get(k);
     if (!crop || !crop.mature) return;
     sfx.play('harvest');
+    bus.emit('action', 'harvest');
     const mods = this.mods();
     const m = crop.mutation ?? MUTATION_BY_ID.normal;
     const value = cropValue(crop.plant, m, crop.wetAtMature);
@@ -1404,6 +1408,7 @@ export class FarmScene extends Phaser.Scene {
     this.coins += value;
     this.earned += value;
     sfx.play('sell');
+    bus.emit('action', 'sell');
     this.checkAchievements();
     this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)`);
     this.emitState();
@@ -1424,6 +1429,7 @@ export class FarmScene extends Phaser.Scene {
     this.coins += total;
     this.earned += total;
     sfx.play('sell');
+    bus.emit('action', 'sell');
     this.checkAchievements();
     this.toast(`Sold everything (+${total}🪙)`);
     this.emitState();

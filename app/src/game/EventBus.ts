@@ -8,6 +8,7 @@ export interface GameEvents {
   state: UiState;
   clock: ClockState;
   toast: string;
+  action: 'till' | 'plant' | 'water' | 'harvest' | 'sell'; // a core gameplay action just succeeded (for onboarding)
   'ui:selectTool': string; // 'hoe' | 'can' | 'seed'
   'ui:selectSeed': string; // plant id -> also switches to the seed tool
   'ui:buySeed': string; // plant id
