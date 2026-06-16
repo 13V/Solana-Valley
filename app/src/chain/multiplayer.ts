@@ -1,0 +1,223 @@
+// Real-time multiplayer engine built on Supabase Realtime (Presence +
+// Broadcast). There is no game server:
+//   - PRESENCE tracks who is online on an island (the roster). Each client
+//     tracks { id, name, plot } under its own wallet-keyed presence key.
+//   - BROADCAST carries high-frequency position updates ('pos' events) between
+//     peers (self: false, so we never receive our own).
+//
+// This module bridges Supabase <-> the in-game EventBus. It NEVER throws into the
+// game: every network/runtime failure is swallowed so single-player keeps
+// working. Multiplayer is purely additive.
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { supabase } from './supabase';
+import { bus } from '../game/EventBus';
+
+// Identity of the local player on the island.
+type Self = { id: string; name: string; plot: number };
+
+// Shape we track in presence (mirrors Self).
+type PresenceMeta = { id: string; name: string; plot: number };
+
+// Broadcast 'pos' payload (a moved player).
+type PosPayload = { id: string; x: number; y: number; facing: string };
+
+// Throttle local position broadcasts to ~10/sec.
+const POS_INTERVAL_MS = 100;
+
+// Module-level singletons for the single active island connection. We only ever
+// occupy one island at a time (the one /api/join assigned us).
+let channel: RealtimeChannel | null = null;
+let current: Self | null = null;
+
+// Unsubscribe handle for the bus 'mp:self' listener.
+let offSelf: (() => void) | null = null;
+
+// Throttle state for outgoing position broadcasts.
+let lastSentAt = 0;
+let lastSent: PosPayload | null = null;
+let pending: PosPayload | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+// The set of remote ids we last reported as present, so on each presence sync we
+// can diff and emit 'mp:leave' for anyone who dropped.
+let knownRemote = new Set<string>();
+
+// True when two position payloads are identical (same tile + facing) -> skip the
+// redundant broadcast.
+function samePos(a: PosPayload | null, b: PosPayload): boolean {
+  return !!a && a.x === b.x && a.y === b.y && a.facing === b.facing && a.id === b.id;
+}
+
+// Send a position payload over broadcast, guarded.
+function sendPos(p: PosPayload): void {
+  if (!channel) return;
+  lastSentAt = Date.now();
+  lastSent = p;
+  pending = null;
+  try {
+    // Returns a promise; ignore the ack so a slow/failed send can't reject into
+    // the game loop.
+    void channel.send({ type: 'broadcast', event: 'pos', payload: p });
+  } catch {
+    // ignore — best effort
+  }
+}
+
+// Handle a local-player pose from the game, throttled to POS_INTERVAL_MS and
+// de-duplicated when unchanged.
+function onSelfPose(pose: { x: number; y: number; facing: string }): void {
+  if (!channel || !current) return;
+  const payload: PosPayload = { id: current.id, x: pose.x, y: pose.y, facing: pose.facing };
+
+  // Skip if nothing changed since the last thing we sent or queued.
+  if (samePos(lastSent, payload) || samePos(pending, payload)) return;
+
+  const now = Date.now();
+  const elapsed = now - lastSentAt;
+  if (elapsed >= POS_INTERVAL_MS) {
+    sendPos(payload);
+    return;
+  }
+
+  // Within the throttle window: remember the latest and schedule a trailing
+  // flush so the final position always lands.
+  pending = payload;
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      if (pending) sendPos(pending);
+    }, POS_INTERVAL_MS - elapsed);
+  }
+}
+
+// Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
+// remote peer that disappeared since the last sync.
+function handlePresenceSync(): void {
+  if (!channel || !current) return;
+  let roster: PresenceMeta[] = [];
+  try {
+    const state = channel.presenceState<PresenceMeta>();
+    // Each key maps to an array of presences (one per open tab for that key).
+    for (const presences of Object.values(state)) {
+      const first = presences[0];
+      if (!first || typeof first.id !== 'string') continue;
+      roster.push({ id: first.id, name: first.name, plot: first.plot });
+    }
+  } catch {
+    return; // malformed state -> leave roster untouched
+  }
+
+  // De-dupe by id (defensive) and emit the full roster (includes self).
+  const byId = new Map<string, PresenceMeta>();
+  for (const m of roster) byId.set(m.id, m);
+  roster = Array.from(byId.values());
+  bus.emit('mp:roster', roster);
+
+  // Diff against the previously-known REMOTE ids and announce leavers.
+  const nowRemote = new Set<string>();
+  for (const m of roster) {
+    if (m.id !== current.id) nowRemote.add(m.id);
+  }
+  for (const id of knownRemote) {
+    if (!nowRemote.has(id)) bus.emit('mp:leave', { id });
+  }
+  knownRemote = nowRemote;
+}
+
+// Join an island channel as `self`. Idempotent-ish: any existing connection is
+// torn down first. Best-effort; never throws.
+export function joinIsland(island: number, self: Self): void {
+  try {
+    // Drop any prior connection so switching islands is clean.
+    leaveIsland();
+
+    current = self;
+    knownRemote = new Set<string>();
+    lastSent = null;
+    pending = null;
+    lastSentAt = 0;
+
+    const ch = supabase.channel(`island:${island}`, {
+      config: {
+        presence: { key: self.id },
+        broadcast: { self: false },
+      },
+    });
+    channel = ch;
+
+    // Presence sync -> rebuild roster + emit leaves.
+    ch.on('presence', { event: 'sync' }, () => {
+      handlePresenceSync();
+    });
+
+    // Remote position updates -> tell the game.
+    ch.on('broadcast', { event: 'pos' }, (msg) => {
+      const p = (msg as { payload?: unknown }).payload as PosPayload | undefined;
+      if (
+        !p ||
+        typeof p.id !== 'string' ||
+        typeof p.x !== 'number' ||
+        typeof p.y !== 'number' ||
+        typeof p.facing !== 'string'
+      ) {
+        return;
+      }
+      // Ignore any stray echo of ourselves (broadcast self:false should prevent
+      // this, but guard anyway).
+      if (current && p.id === current.id) return;
+      bus.emit('mp:move', p);
+    });
+
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        // Announce our presence once the channel is live.
+        void ch.track({ id: self.id, name: self.name, plot: self.plot });
+      }
+    });
+
+    // Forward throttled local poses to the channel.
+    offSelf = bus.on('mp:self', onSelfPose);
+  } catch {
+    // Any failure -> ensure we don't leave half-initialised state around.
+    leaveIsland();
+  }
+}
+
+// Leave the current island: untrack presence, remove the channel, and clear all
+// listeners/state. Safe to call when not connected.
+export function leaveIsland(): void {
+  if (offSelf) {
+    try {
+      offSelf();
+    } catch {
+      // ignore
+    }
+    offSelf = null;
+  }
+
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
+  const ch = channel;
+  channel = null;
+  current = null;
+  knownRemote = new Set<string>();
+  lastSent = null;
+  pending = null;
+  lastSentAt = 0;
+
+  if (ch) {
+    try {
+      void ch.untrack();
+    } catch {
+      // ignore
+    }
+    try {
+      void supabase.removeChannel(ch);
+    } catch {
+      // ignore
+    }
+  }
+}

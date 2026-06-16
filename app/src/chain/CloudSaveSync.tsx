@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import bs58 from 'bs58';
 import { bus } from '../game/EventBus';
+import { getWalletAuth, clearWalletAuth } from './walletAuth';
 import {
-  buildSignMessage,
   loadCloudSave,
   saveCloudSave,
   applyCloudSaveAndReload,
@@ -23,50 +22,25 @@ const SAVE_DEBOUNCE_MS = 5000;
 export function CloudSaveSync() {
   const { publicKey, signMessage, connected } = useWallet();
 
-  // Cached signed session for the current wallet (sign once per session).
-  const sessionRef = useRef<SignedSession | null>(null);
-  // Wallet address the cached session belongs to (re-sign if this changes).
-  const signedForRef = useRef<string | null>(null);
   // Latest save JSON pending upload, plus its debounce timer.
   const pendingRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Whether we've shown the "synced" toast yet this session (don't spam).
   const toastedRef = useRef(false);
 
-  // Acquire (or reuse) a signed session for the connected wallet.
-  // Returns null if signing is unavailable or the user rejects.
+  // Acquire (or reuse) a signed session for the connected wallet via the SHARED
+  // wallet-auth helper, so cloud-save and multiplayer trigger a single signature
+  // prompt. Returns null if signing is unavailable or the user rejects.
   const ensureSession = useRef<() => Promise<SignedSession | null>>(async () => null);
-  ensureSession.current = async () => {
-    if (!publicKey || !signMessage) return null;
-    const wallet = publicKey.toBase58();
-
-    // Reuse the cached signature unless the wallet changed.
-    if (sessionRef.current && signedForRef.current === wallet) {
-      return sessionRef.current;
-    }
-
-    const message = buildSignMessage(wallet);
-    try {
-      const sigBytes = await signMessage(new TextEncoder().encode(message));
-      const signature = bs58.encode(sigBytes);
-      const session: SignedSession = { wallet, message, signature };
-      sessionRef.current = session;
-      signedForRef.current = wallet;
-      return session;
-    } catch {
-      // User rejected or wallet errored — disable cloud save gracefully.
-      return null;
-    }
-  };
+  ensureSession.current = async () => getWalletAuth(publicKey, signMessage);
 
   // On connect (and whenever the wallet changes): sign, then pull the cloud
   // save and restore it locally if it's the one to trust.
   useEffect(() => {
     if (!connected || !publicKey || !signMessage) {
-      // Disconnected or no signing support: drop any cached session so a
-      // different wallet re-signs.
-      sessionRef.current = null;
-      signedForRef.current = null;
+      // Disconnected or no signing support: drop any cached auth so a different
+      // wallet re-signs.
+      clearWalletAuth();
       return;
     }
 

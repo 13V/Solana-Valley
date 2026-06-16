@@ -136,6 +136,47 @@ export function isInMyPlot(tx: number, ty: number): boolean {
   return tx >= MY_PLOT.px && tx < MY_PLOT.px + MY_PLOT.pw && ty >= MY_PLOT.py && ty < MY_PLOT.py + MY_PLOT.ph;
 }
 
+// ---- multiplayer helpers (dynamic owned plot) ----------------------------
+// A homestead's crop bed expressed the same way HOME.plot is (origin + size in
+// tiles) so the same "is this my farm" maths works for ANY assigned plot index.
+export type PlotRect = { px: number; py: number; pw: number; ph: number };
+
+// Clamp an out-of-range index to a valid homestead so a bad assignment never
+// throws (defaults to the player's home plot #0).
+function safeIndex(index: number): number {
+  return Number.isInteger(index) && index >= 0 && index < HOMESTEADS.length ? index : 0;
+}
+
+// The crop-bed rect (origin + size, tiles) for a given homestead index.
+export function homesteadPlot(index: number): PlotRect {
+  const f = HOMESTEADS[safeIndex(index)].farm;
+  return { px: f.x0, py: f.y0, pw: f.x1 - f.x0 + 1, ph: f.y1 - f.y0 + 1 };
+}
+
+// True if (tx,ty) sits inside the given crop-bed rect.
+export function isInPlot(rect: PlotRect, tx: number, ty: number): boolean {
+  return tx >= rect.px && tx < rect.px + rect.pw && ty >= rect.py && ty < rect.py + rect.ph;
+}
+
+// The walkable gate tile (the fence gap that opens onto the plaza) for a
+// homestead. Mirrors buildHomestead's gate maths: gate column is the interior
+// centre; the gate row is one tile outside the plaza-facing fence.
+export function homesteadGateTile(index: number): { tx: number; ty: number } {
+  const h = HOMESTEADS[safeIndex(index)];
+  const it = h.interior;
+  const gateCx = Math.floor((it.x0 + it.x1) / 2);
+  const gateY = h.openSide === 'S' ? it.y1 + 1 : it.y0 - 1;
+  return { tx: gateCx, ty: gateY };
+}
+
+// The centre tile of the sunken central plaza (the multiplayer spawn point).
+export function plazaCenterTile(): { tx: number; ty: number } {
+  return {
+    tx: Math.floor((PLAZA.x0 + PLAZA.x1) / 2),
+    ty: Math.floor((PLAZA.y0 + PLAZA.y1) / 2),
+  };
+}
+
 // ---- neighbours (kept for back-compat with code that scans plot interiors) -
 export type Neighbor = {
   px: number; py: number; pw: number; ph: number; // crop-bed interior

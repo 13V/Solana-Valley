@@ -48,15 +48,18 @@ import {
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
   HOME,
-  MY_PLOT,
-  isInMyPlot,
   HOMESTEADS,
   SHORE,
   BEACH,
   bandRect,
   PLAZA,
+  homesteadPlot,
+  isInPlot,
+  homesteadGateTile,
+  plazaCenterTile,
   type Homestead,
   type Rect,
+  type PlotRect,
 } from '../plots';
 import {
   EMPTY_SKILLS,
@@ -99,6 +102,18 @@ type Crop = {
   star?: Phaser.GameObjects.Text; // quality star marker on high-quality ripe crops
 };
 type Dir = 'down' | 'up' | 'left' | 'right';
+
+// A remote player's avatar: the shared 'pchar' sprite (animated exactly like the
+// local player), a floating name label, and the target pose we lerp toward each
+// frame as `mp:move` updates stream in.
+type RemotePlayer = {
+  sprite: Phaser.GameObjects.Sprite;
+  label: Phaser.GameObjects.Text;
+  targetX: number;
+  targetY: number;
+  facing: Dir;
+  name: string;
+};
 
 // The player's two animal pens + orchard in *pixel* coords (derived from HOME).
 // These drive where bought/bred animals spawn and how far they may wander.
@@ -252,6 +267,24 @@ export class FarmScene extends Phaser.Scene {
   private persist = true;
   private unsubs: Array<() => void> = [];
 
+  // ---- multiplayer ----------------------------------------------------------
+  // Which homestead the local player owns/farms. Defaults to #0 (single-player);
+  // a `mp:assigned` event re-points it to the server-assigned plot.
+  private myPlotIndex = 0;
+  // id -> remote avatar. Visual only (no collision); upserted on `mp:move`.
+  private remotePlayers = new Map<string, RemotePlayer>();
+  // Last pose we broadcast, so `mp:self` only fires on change + throttled.
+  private lastSelfPose = { x: 0, y: 0, facing: 'down' as Dir };
+  private lastSelfEmit = 0;
+  // The Roblox-style "go to your plot" guide: dashed ground markers + a bouncing
+  // arrow over the player. Null when not connected / already arrived.
+  private guide: {
+    markers: Phaser.GameObjects.Image[];
+    arrow: Phaser.GameObjects.Text;
+    gx: number; // gate pixel target
+    gy: number;
+  } | null = null;
+
   constructor() {
     super('Farm');
   }
@@ -268,9 +301,10 @@ export class FarmScene extends Phaser.Scene {
     this.buildPlots(); // fenced homesteads; fences open toward the central plaza
     this.placeDecorations(); // scatter nature across the remaining open grass
 
+    const spawn = this.myFarmRect();
     this.player = this.physics.add.sprite(
-      (MY_PLOT.px + MY_PLOT.pw / 2) * TILE,
-      (MY_PLOT.py + MY_PLOT.ph - 1) * TILE,
+      (spawn.px + spawn.pw / 2) * TILE,
+      (spawn.py + spawn.ph - 1) * TILE,
       'pchar',
       0,
     );
@@ -409,7 +443,18 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
+      // ---- multiplayer (no-ops in single-player: these never fire) ----------
+      bus.on('mp:assigned', ({ plot }) => this.onAssigned(plot)),
+      bus.on('mp:roster', (players) => this.onRoster(players)),
+      bus.on('mp:move', (m) => this.onRemoteMove(m)),
+      bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
     );
+    // Tear down every remote avatar + the ground guide on scene shutdown.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
+      this.remotePlayers.clear();
+      this.clearGuide();
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
       this.unsubs = [];
@@ -449,6 +494,23 @@ export class FarmScene extends Phaser.Scene {
 
   private recomputeMods() {
     this.modCache = activeModifiers(this.skills, this.perks);
+  }
+
+  // ---- owned-plot geometry (driven by myPlotIndex) ------------------------
+  // The player's current crop-bed rect (origin + size in tiles). Everything that
+  // used the old MY_PLOT constant reads this so it follows a multiplayer
+  // assignment. Defaults to homestead #0 in single-player.
+  private myFarmRect(): PlotRect {
+    return homesteadPlot(this.myPlotIndex);
+  }
+
+  private isInMyFarm(tx: number, ty: number): boolean {
+    return isInPlot(this.myFarmRect(), tx, ty);
+  }
+
+  // The walkable gate tile of the player's current homestead.
+  private myGateTile(): { tx: number; ty: number } {
+    return homesteadGateTile(this.myPlotIndex);
   }
 
   // Debug snapshot used by the screenshot harness.
@@ -677,8 +739,8 @@ export class FarmScene extends Phaser.Scene {
         }
         // Tilled-soil overlay only where the player can till (their own farm) —
       // avoids tens of thousands of invisible objects on the big valley map.
-      if (isInMyPlot(x, y)) {
-        this.overlay[y][x] = this.add.image(cx, cy, 'tilled', 42).setScale(2).setDepth(1).setVisible(false);
+      if (this.isInMyFarm(x, y)) {
+        this.overlay[y][x] = this.ensureOverlay(x, y);
       }
       }
     }
@@ -1032,19 +1094,21 @@ export class FarmScene extends Phaser.Scene {
   // How many of the crop bed's rows are unlocked — one more per player level,
   // growing from the front (gate side) back toward the cottage.
   private unlockedFarmRows(): number {
-    return Math.min(MY_PLOT.ph, 2 + levelInfo(this.xp).level);
+    return Math.min(this.myFarmRect().ph, 2 + levelInfo(this.xp).level);
   }
 
   private isUnlockedFarm(tx: number, ty: number): boolean {
-    if (!isInMyPlot(tx, ty)) return false;
-    return ty >= MY_PLOT.py + MY_PLOT.ph - this.unlockedFarmRows();
+    const f = this.myFarmRect();
+    if (!isInPlot(f, tx, ty)) return false;
+    return ty >= f.py + f.ph - this.unlockedFarmRows();
   }
 
   // Player's crop bed: unlocked rows get the soft checkerboard tint; still-locked
   // rows are dimmed so the farm visibly grows as you level up.
   private markPlayerFarm() {
-    const x0 = MY_PLOT.px, x1 = MY_PLOT.px + MY_PLOT.pw - 1;
-    const y0 = MY_PLOT.py, y1 = MY_PLOT.py + MY_PLOT.ph - 1;
+    const f = this.myFarmRect();
+    const x0 = f.px, x1 = f.px + f.pw - 1;
+    const y0 = f.py, y1 = f.py + f.ph - 1;
     const top = y1 - this.unlockedFarmRows() + 1;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
@@ -1093,6 +1157,19 @@ export class FarmScene extends Phaser.Scene {
 
   private cropDepth(ty: number): number {
     return ty * TILE + TILE;
+  }
+
+  // Lazily create (or reuse) the tilled-dirt overlay image for a farm tile.
+  // Overlays only exist on the player's own crop bed; when the owned plot is
+  // re-pointed (multiplayer) we create the new plot's overlays on demand.
+  private ensureOverlay(x: number, y: number): Phaser.GameObjects.Image {
+    const existing = this.overlay[y]?.[x];
+    if (existing) return existing;
+    const cx = x * TILE + TILE / 2;
+    const cy = y * TILE + TILE / 2;
+    const ov = this.add.image(cx, cy, 'tilled', 42).setScale(2).setDepth(1).setVisible(false);
+    this.overlay[y][x] = ov;
+    return ov;
   }
 
   private setGroundTexture(x: number, y: number) {
@@ -1408,7 +1485,7 @@ export class FarmScene extends Phaser.Scene {
     this.toast(`Harvested ${qLabel}${mutLabel}${plant.name}${doubled ? ' ×2' : ''}${witherTag} (worth ${value}🪙)`);
     // Master Farmer capstone: a chance to instantly re-till + re-plant for free.
     // Skip for regrow crops — they're already replanting themselves.
-    if (!regrew && mods.autoReplant && Math.random() < 0.15 && isInMyPlot(tx, ty)) {
+    if (!regrew && mods.autoReplant && Math.random() < 0.15 && this.isInMyFarm(tx, ty)) {
       this.autoReplant(tx, ty, plant);
     }
     this.emitState();
@@ -1673,7 +1750,7 @@ export class FarmScene extends Phaser.Scene {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
       this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
-      if (this.unlockedFarmRows() > Math.min(MY_PLOT.ph, 2 + before)) {
+      if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 2 + before)) {
         this.markPlayerFarm(); // reveal the newly-unlocked crop row
         this.toast('🌱 New farm row unlocked!');
       }
@@ -2149,7 +2226,7 @@ export class FarmScene extends Phaser.Scene {
       !this.tiles[ty][tx].obstacle &&
       this.tileZone(tx, ty) === 'land' &&
       !this.inAnyHomestead(tx, ty) &&
-      !isInMyPlot(tx, ty) &&
+      !this.isInMyFarm(tx, ty) &&
       !this.isPondTile(tx, ty) &&
       !this.crops.has(this.key(tx, ty))
     );
@@ -2344,7 +2421,7 @@ export class FarmScene extends Phaser.Scene {
     for (const [x, y, wetRemaining] of data.tiles ?? []) {
       // Drop tilled tiles saved outside the (possibly relocated) farm so an old
       // save never leaves stray dirt patches in the new world.
-      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !isInMyPlot(x, y)) continue;
+      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !this.isInMyFarm(x, y)) continue;
       this.tiles[y][x].tilled = true;
       if (wetRemaining > 0) {
         this.tiles[y][x].wetUntil = this.time.now + wetRemaining;
@@ -2360,7 +2437,7 @@ export class FarmScene extends Phaser.Scene {
     for (const c of data.crops ?? []) {
       const plant = PLANT_BY_ID[c.p];
       // Likewise ignore crops saved outside the current farm bounds.
-      if (!plant || !this.inBounds(c.x, c.y) || !isInMyPlot(c.x, c.y)) continue;
+      if (!plant || !this.inBounds(c.x, c.y) || !this.isInMyFarm(c.x, c.y)) continue;
       const sprite = this.add
         .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
@@ -2513,6 +2590,287 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // ---- multiplayer: remote avatars ----------------------------------------
+
+  // Deterministic hue per player id so remote avatars are visually distinct.
+  // Returns a soft pastel tint (kept light so the sheet stays readable).
+  private tintForId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const hue = (h >>> 0) % 360;
+    return Phaser.Display.Color.HSVToRGB(hue / 360, 0.45, 1).color;
+  }
+
+  // Create a brand-new remote avatar (shared 'pchar' sheet + name label),
+  // distinguished by an id-hashed tint. Visual only — no physics body.
+  private createRemote(id: string, name: string, x: number, y: number, facing: Dir): RemotePlayer {
+    const sprite = this.add.sprite(x, y, 'pchar', FarmScene.IDLE_ROW[facing]);
+    sprite.setOrigin(0.5, 0.72).setScale(1.85).setTint(this.tintForId(id));
+    sprite.play(`idle-${facing}`, true);
+    const label = this.add
+      .text(x, y, name, {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '12px', color: '#ffffff',
+        stroke: '#2a1f12', strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1);
+    const rp: RemotePlayer = { sprite, label, targetX: x, targetY: y, facing, name };
+    this.remotePlayers.set(id, rp);
+    this.depthSortRemote(rp);
+    return rp;
+  }
+
+  // Narrow the bus's loose `facing: string` into our strict Dir union, defaulting
+  // to 'down' on anything unexpected (the bus contract is a plain string).
+  private toDir(facing: string): Dir {
+    return facing === 'up' || facing === 'left' || facing === 'right' ? facing : 'down';
+  }
+
+  // A remote player moved: create their avatar if new, else update the target
+  // pose we interpolate toward each frame (and their facing/name).
+  private onRemoteMove({ id, x, y, facing }: { id: string; x: number; y: number; facing: string }) {
+    const dir = this.toDir(facing);
+    const rp = this.remotePlayers.get(id);
+    if (!rp) {
+      this.createRemote(id, id.slice(0, 4), x, y, dir);
+      return;
+    }
+    rp.targetX = x;
+    rp.targetY = y;
+    rp.facing = dir;
+  }
+
+  private removeRemote(id: string) {
+    const rp = this.remotePlayers.get(id);
+    if (!rp) return;
+    rp.sprite.destroy();
+    rp.label.destroy();
+    this.remotePlayers.delete(id);
+  }
+
+  // Presence sync: the roster is the full list of who's on the island. Remove any
+  // avatar no longer present, and refresh names for those that are. (We don't
+  // pre-spawn avatars here — positions arrive via mp:move — but we DO drop stale
+  // ones so leavers vanish even if a mp:leave was missed.)
+  private onRoster(players: Array<{ id: string; name: string; plot: number }>) {
+    const present = new Set(players.map((p) => p.id));
+    for (const id of [...this.remotePlayers.keys()]) {
+      if (!present.has(id)) this.removeRemote(id);
+    }
+    for (const p of players) {
+      const rp = this.remotePlayers.get(p.id);
+      if (rp && p.name && rp.name !== p.name) {
+        rp.name = p.name;
+        rp.label.setText(p.name);
+      }
+    }
+  }
+
+  // Keep a remote avatar + its label y-sorted with the world (same scheme the
+  // local player uses), and float the label just above the head.
+  private depthSortRemote(rp: RemotePlayer) {
+    rp.sprite.setDepth(rp.sprite.y + 18);
+    rp.label.setPosition(rp.sprite.x, rp.sprite.y - 26);
+    rp.label.setDepth(rp.sprite.y + 19);
+  }
+
+  // Smoothly move every remote avatar toward its target each frame and play the
+  // matching walk/idle anim (same keys as the local player). Called from update.
+  private updateRemotes(delta: number) {
+    if (!this.remotePlayers.size) return;
+    // Frame-rate-independent smoothing factor.
+    const t = 1 - Math.pow(0.001, delta / 1000);
+    for (const rp of this.remotePlayers.values()) {
+      const dx = rp.targetX - rp.sprite.x;
+      const dy = rp.targetY - rp.sprite.y;
+      const dist = Math.hypot(dx, dy);
+      const moving = dist > 1.5;
+      if (moving) {
+        rp.sprite.x += dx * t;
+        rp.sprite.y += dy * t;
+      } else {
+        rp.sprite.x = rp.targetX;
+        rp.sprite.y = rp.targetY;
+      }
+      // Play walk while closing distance, idle once arrived — keyed exactly like
+      // the local player so remote avatars animate identically. `play(..., true)`
+      // ignores the call if that exact key is already running, so re-issuing each
+      // frame is cheap and naturally handles a facing change mid-walk.
+      rp.sprite.play(`${moving ? 'walk' : 'idle'}-${rp.facing}`, true);
+      this.depthSortRemote(rp);
+    }
+  }
+
+  // ---- multiplayer: broadcast self ----------------------------------------
+
+  // Throttle (~10/sec) and only when the pose actually changed, tell the net
+  // layer where the local player is so it can broadcast. No-op cost when nobody
+  // is listening (single-player: the bus has no `mp:self` subscribers).
+  private broadcastSelf(time: number) {
+    if (time - this.lastSelfEmit < 100) return;
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    const last = this.lastSelfPose;
+    if (x === last.x && y === last.y && this.facing === last.facing) return;
+    this.lastSelfEmit = time;
+    this.lastSelfPose = { x, y, facing: this.facing };
+    bus.emit('mp:self', { x, y, facing: this.facing });
+  }
+
+  // ---- multiplayer: dynamic owned plot + spawn + guide --------------------
+
+  // The server assigned us a plot. Re-point ownership (clear the old farm tint,
+  // set up the new crop bed + overlays + gate), drop the player at the plaza
+  // centre, and draw a ground guide leading to the new plot's gate.
+  private onAssigned(plot: number) {
+    const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : 0;
+    if (next !== this.myPlotIndex) {
+      this.clearFarmTint(this.myPlotIndex); // un-tint the previously-owned bed
+      this.myPlotIndex = next;
+      this.ensureFarmOverlays();            // create the new bed's tilled overlays
+      this.markPlayerFarm();                // tint + unlock-rows on the new bed
+      this.moveGateTo(next);                // relocate the swinging gate
+    }
+    // Always (re)spawn at the plaza centre and guide the player to the gate.
+    this.spawnAtPlaza();
+    this.showGuideToGate();
+  }
+
+  // Reset a homestead's crop-bed ground tint back to plain (used when leaving an
+  // old owned plot so it no longer reads as "yours").
+  private clearFarmTint(index: number) {
+    const f = homesteadPlot(index);
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw; x++) {
+        this.ground[y]?.[x]?.clearTint();
+      }
+    }
+  }
+
+  // Make sure tilled-dirt overlays exist across the currently-owned crop bed
+  // (overlays are created lazily so a re-pointed plot becomes tillable).
+  private ensureFarmOverlays() {
+    const f = this.myFarmRect();
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw; x++) {
+        if (this.inBounds(x, y)) this.ensureOverlay(x, y);
+      }
+    }
+  }
+
+  // Relocate the swinging front gate sprite to a homestead's gate tile (or
+  // create it if it doesn't exist yet — e.g. assigned before #0's gate built).
+  private moveGateTo(index: number) {
+    const { tx, ty } = homesteadGateTile(index);
+    const gx = tx * TILE + TILE / 2;
+    const gy = ty * TILE + TILE / 2;
+    if (!this.anims.exists('gate-open')) {
+      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
+      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
+    }
+    if (!this.gate) {
+      this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+    } else {
+      this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0);
+    }
+    this.gateOpen = false;
+  }
+
+  // Teleport the local player to the centre of the plaza (the multiplayer spawn).
+  private spawnAtPlaza() {
+    const c = plazaCenterTile();
+    this.player.setPosition(c.tx * TILE + TILE / 2, c.ty * TILE + TILE / 2);
+    this.player.setVelocity(0, 0);
+    this.facing = 'down';
+    this.player.anims.play('idle-down', true);
+  }
+
+  // Roblox-style wayfinding: a glowing dashed trail of ground markers from the
+  // player to the assigned plot's gate, plus a bouncing arrow over the player.
+  // Cheap straight/elbow route (the plaza is open, so no pathfinding needed).
+  private showGuideToGate() {
+    this.clearGuide();
+    const { tx, ty } = this.myGateTile();
+    const gx = tx * TILE + TILE / 2;
+    const gy = ty * TILE + TILE / 2;
+    const sx = this.player.x;
+    const sy = this.player.y;
+
+    // Elbow route: walk horizontally to the gate column, then vertically to it.
+    // Sample evenly-spaced points along the two legs and drop a marker at each.
+    const markers: Phaser.GameObjects.Image[] = [];
+    const STEP = TILE; // one marker per tile
+    const dropMarker = (x: number, y: number) => {
+      const m = this.add
+        .image(x, y, 'glow')
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xffe27a)
+        .setScale(0.42)
+        .setAlpha(0.0)
+        .setDepth(0.7); // just above the ground, below props/crops
+      this.tweens.add({ targets: m, alpha: 0.75, scale: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: markers.length * 60 });
+      markers.push(m);
+    };
+    const legSteps = (from: number, to: number) => Math.max(1, Math.round(Math.abs(to - from) / STEP));
+    const hSteps = legSteps(sx, gx);
+    for (let i = 1; i <= hSteps; i++) dropMarker(sx + ((gx - sx) * i) / hSteps, sy);
+    const vSteps = legSteps(sy, gy);
+    for (let i = 1; i <= vSteps; i++) dropMarker(gx, sy + ((gy - sy) * i) / vSteps);
+
+    // A bouncing floating arrow above the player pointing toward the gate.
+    const arrow = this.add
+      .text(this.player.x, this.player.y - 56, '⬇', {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '28px', color: '#ffe27a',
+        stroke: '#2a1f12', strokeThickness: 5,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(120001);
+    this.tweens.add({ targets: arrow, y: arrow.y - 10, duration: 480, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+
+    this.guide = { markers, arrow, gx, gy };
+  }
+
+  // Update the floating arrow to point from the player toward the gate, fade the
+  // ground markers the player has already passed, and remove the whole guide once
+  // the player reaches the gate (or steps inside the plot).
+  private updateGuide() {
+    const g = this.guide;
+    if (!g) return;
+    const dx = g.gx - this.player.x;
+    const dy = g.gy - this.player.y;
+    const dist = Math.hypot(dx, dy);
+    const ptx = Math.floor(this.player.x / TILE);
+    const pty = Math.floor(this.player.y / TILE);
+    if (dist < TILE * 1.2 || this.isInMyFarm(ptx, pty)) {
+      this.clearGuide();
+      return;
+    }
+    // Arrow hovers over the player's head and rotates toward the gate.
+    g.arrow.setPosition(this.player.x, this.player.y - 56);
+    g.arrow.setRotation(Math.atan2(dy, dx) - Math.PI / 2); // glyph points down at 0
+    // Dim markers the player has already walked past so the trail "burns down".
+    for (const m of g.markers) {
+      if (m.active && Phaser.Math.Distance.Between(this.player.x, this.player.y, m.x, m.y) < TILE * 0.9) {
+        this.tweens.killTweensOf(m);
+        m.destroy();
+      }
+    }
+    g.markers = g.markers.filter((m) => m.active);
+  }
+
+  private clearGuide() {
+    if (!this.guide) return;
+    for (const m of this.guide.markers) {
+      this.tweens.killTweensOf(m);
+      m.destroy();
+    }
+    this.tweens.killTweensOf(this.guide.arrow);
+    this.guide.arrow.destroy();
+    this.guide = null;
+  }
+
   update(time: number, delta: number) {
     // movement: keyboard (arrows + remappable keys) wins; otherwise fall back to
     // the shared virtual joystick / gamepad vector. All three feed the same path.
@@ -2548,6 +2906,13 @@ export class FarmScene extends Phaser.Scene {
       this.player.anims.play(`idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
+
+    // Multiplayer: broadcast our pose (throttled/on-change), interpolate remote
+    // avatars, and advance the spawn→gate ground guide. All no-ops when nobody
+    // else is connected (no remotes, no guide, no `mp:self` subscribers).
+    this.broadcastSelf(time);
+    this.updateRemotes(delta);
+    this.updateGuide();
 
     // Swing the orchard gate open when the farmer is near.
     if (this.gate) {
@@ -2629,7 +2994,7 @@ export class FarmScene extends Phaser.Scene {
     const tx = Math.floor(p.worldX / TILE);
     const ty = Math.floor(p.worldY / TILE);
     if (this.pointerInside && this.inBounds(tx, ty)) {
-      const canFarm = this.inRange(tx, ty) && isInMyPlot(tx, ty);
+      const canFarm = this.inRange(tx, ty) && this.isInMyFarm(tx, ty);
       this.highlight
         .setVisible(true)
         .setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)

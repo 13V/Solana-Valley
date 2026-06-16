@@ -8,6 +8,8 @@
 // service-role key. Cloud save is strictly best-effort on top of localStorage —
 // any network/signing failure must never break gameplay.
 
+import { buildAuthMessage, type WalletAuth } from './walletAuth';
+
 // Must match SAVE_KEY in app/src/game/scenes/FarmScene.ts (the localStorage key
 // the game reads/writes). Kept in sync manually since that const isn't exported.
 export const SAVE_KEY = 'solana-valley:save';
@@ -16,22 +18,21 @@ export const SAVE_KEY = 'solana-valley:save';
 // can't loop forever within one tab session.
 const RELOAD_GUARD_KEY = 'solana-valley:cloud-reloaded';
 
-export type SignedSession = {
-  wallet: string;
-  message: string;
-  signature: string; // base58
-};
+// A signed auth triple. Structurally identical to (and aliased from) the shared
+// WalletAuth so cloud-save and multiplayer can pass the SAME signed session
+// through — the user only ever signs once per wallet.
+export type SignedSession = WalletAuth;
 
 export type LoadResponse = {
   data: unknown | null;
   updated_at: string | null;
 };
 
-// Build the canonical message the wallet signs. It embeds the wallet address
-// and a fresh ISO timestamp so the server can bind the signature to this wallet
-// and reject stale replays.
+// Build the canonical message the wallet signs. Delegates to the shared
+// walletAuth helper so cloud-save and multiplayer sign the exact same message
+// (single signature prompt). Kept as a named export for existing callers.
 export function buildSignMessage(wallet: string, now: Date = new Date()): string {
-  return `Solana Valley cloud save\nwallet: ${wallet}\nts: ${now.toISOString()}`;
+  return buildAuthMessage(wallet, now);
 }
 
 // Read the game's current local save as a raw JSON string (or null).

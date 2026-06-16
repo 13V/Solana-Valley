@@ -18,6 +18,14 @@ export interface GameEvents {
   'ui:buyUpgrade': string; // upgrade id
   'ui:buyAnimal': string; // animal id
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
+
+  // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
+  'mp:self': { x: number; y: number; facing: string }; // FarmScene -> network (throttled): local player pose
+  'mp:assigned': { island: number; plot: number }; // network -> FarmScene, after /api/join assigns a stable plot
+  'mp:roster': Array<{ id: string; name: string; plot: number }>; // network -> FarmScene: who's online (presence sync)
+  'mp:move': { id: string; x: number; y: number; facing: string }; // network -> FarmScene: a remote player moved
+  'mp:leave': { id: string }; // network -> FarmScene: a remote player left
+  'mp:status': string; // network -> UI: human-readable status line (also mirrored to 'toast')
 }
 
 type Handler<T> = (payload: T) => void;
