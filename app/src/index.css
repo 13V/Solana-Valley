@@ -538,6 +538,10 @@ body {
   --ui-btn: url('/assets/sprout-ui/ui_btn.png');
   --ui-btn-press: url('/assets/sprout-ui/ui_btn_press.png');
   --ui-btn-light: url('/assets/sprout-ui/ui_btn_light.png');
+  /* Recessed inventory-slot sprites (from the Sprout Lands pack) for the hotbar. */
+  --slot: url('/assets/sprout-ui/slot_light.png');
+  --slot-hover: url('/assets/sprout-ui/slot_med.png');
+  --slot-active: url('/assets/sprout-ui/slot_dark.png');
   --ink: #4a3526;
   --ink-soft: #6e5740;
 }
@@ -615,32 +619,31 @@ body {
   text-shadow: none;
 }
 
-/* Top bar = the Sprout Lands hotbar design: one long wooden PANEL (ui_panel)
-   holding individual square icon SLOTS (the ui_btn frame, same as the bottom
-   hotbar's .slot — which renders cleanly at this size). */
+/* Top bar = the pack's hotbar: a long wooden ui_panel tray holding the pack's
+   real recessed inventory SLOT sprites (slot_light), one per icon. Hover/press
+   swap to the medium/dark slot. Icons center on top. */
 .ui-skin .hud-buttons {
-  border: 12px solid transparent;
+  border: 11px solid transparent;
   border-image: var(--ui-panel) 14 fill stretch;
   border-radius: 0;
-  padding: 2px;
-  gap: 4px;
+  padding: 3px;
+  gap: 3px;
   align-items: center;
 }
 .ui-skin .iconbtn {
-  background: none;
-  border: 8px solid transparent;
-  border-image: var(--ui-btn) 8 fill stretch;
+  background: var(--slot) center / 100% 100% no-repeat;
+  border: 0;
   border-radius: 0;
   color: var(--ink);
   text-shadow: none;
   image-rendering: pixelated;
 }
 .ui-skin .iconbtn:hover {
-  border-image: var(--ui-btn-light) 8 fill stretch;
+  background-image: var(--slot-hover);
 }
 .ui-skin .iconbtn.active,
 .ui-skin .iconbtn:active {
-  border-image: var(--ui-btn-press) 8 fill stretch;
+  background-image: var(--slot-active);
 }
 
 .ui-skin .badge {
