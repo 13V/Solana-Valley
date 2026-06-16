@@ -23,10 +23,12 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
       </div>
       <div className="alm-body">
         <h4>Plants — {plantPct}% discovered</h4>
+        <p className="muted alm-note">★ Crops roll quality stars that multiply their value · ♻ marks multi-harvest crops</p>
         <div className="alm-grid">
           {PLANTS.map((p) => {
             const found = dp.has(p.id);
             const r = RARITY[p.rarity];
+            const regrows = typeof p.regrow === 'number' && p.regrow > 0;
             return (
               <div
                 className={`alm-cell ${found ? '' : 'locked'}`}
@@ -41,6 +43,7 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
                     <CropIcon id={p.id} className="crop-ico" />
                     <span className="alm-name">{p.name}</span>
                     <span className="alm-rar" style={{ color: r.css }}>{p.rarity}</span>
+                    {regrows && <span className="alm-regrow">♻ Multi-harvest</span>}
                   </Tooltip>
                 ) : (
                   <span className="alm-name">???</span>

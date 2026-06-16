@@ -250,6 +250,16 @@ export function PlantTipBody({
         ))}
       </div>
 
+      <div className="ui-tip-note">
+        Quality: crops roll ★ stars that multiply their value.
+      </div>
+
+      {typeof plant.regrow === 'number' && plant.regrow > 0 && (
+        <div className="ui-tip-note">
+          ♻ Multi-harvest — regrows every {formatDuration(plant.regrow)}.
+        </div>
+      )}
+
       {s.locked && (
         <div className="ui-tip-locked">🔒 Unlocks at Lv {s.unlockLevel}</div>
       )}
@@ -261,14 +271,29 @@ export function PlantTipBody({
   );
 }
 
-// Harvest (bag) body: realised unit value (mutation × wet already baked into
-// `baseUnit`), quantity, and total. Reflects the Market Stall sale boost.
+// Harvest (bag) body: realised unit value (mutation × wet × quality × wilt
+// already baked into `baseUnit`), quantity, and total. Reflects the Market
+// Stall sale boost.
 export function StackTipBody({
   stats,
 }: {
   stats: StackStats;
 }) {
-  const { plant, mutation, wet, count, unitValue, total, saleBoosted } = stats;
+  const {
+    plant,
+    mutation,
+    wet,
+    quality,
+    qualityMult,
+    qualityStars,
+    qualityCss,
+    qualityLabel,
+    withered,
+    count,
+    unitValue,
+    total,
+    saleBoosted,
+  } = stats;
   return (
     <>
       <div className="ui-tip-title">
@@ -280,10 +305,26 @@ export function StackTipBody({
         )}
       </div>
 
+      {quality !== 'none' && (
+        <div className="ui-tip-line">
+          <span className="k">Quality</span>
+          <span className="v" style={{ color: qualityCss }}>
+            {'★'.repeat(qualityStars)} {qualityLabel} ×{qualityMult}
+          </span>
+        </div>
+      )}
+
       {wet && (
         <div className="ui-tip-line">
           <span className="k">Wet bonus</span>
           <span className="v">×1.5</span>
+        </div>
+      )}
+
+      {withered && (
+        <div className="ui-tip-line">
+          <span className="k">Wilted</span>
+          <span className="v" style={{ color: '#a9743f' }}>×0.4</span>
         </div>
       )}
 
@@ -321,6 +362,8 @@ export function makeStackStats(
   count: number,
   baseUnitValue: number,
   progress?: Progress,
+  quality: StackStats['quality'] = 'none',
+  withered = false,
 ): StackStats {
-  return stackStats(plant, mutation, wet, count, baseUnitValue, progress);
+  return stackStats(plant, mutation, wet, count, baseUnitValue, progress, quality, withered);
 }

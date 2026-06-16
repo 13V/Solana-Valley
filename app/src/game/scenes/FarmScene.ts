@@ -23,9 +23,12 @@ import {
   cropValue,
   stackKey,
   rollShop,
+  rollQuality,
+  QUALITY,
   MUTATION_BY_ID,
   type Plant,
   type Mutation,
+  type Quality,
 } from '../economy';
 import {
   ACHIEVEMENTS,
@@ -84,9 +87,16 @@ type Crop = {
   mature: boolean;
   mutation: Mutation | null;
   wetAtMature: boolean;
+  quality: Quality;
+  matureAt: number; // this.time.now (ms) when the crop became ripe
+  withered: boolean;
+  // ms this cycle takes to ripen. Defaults to plant.growthSeconds*1000; after a
+  // regrow harvest it becomes plant.regrow*1000 so the next cycle is shorter.
+  growMs?: number;
   sprite: Phaser.GameObjects.Image;
   glow?: Phaser.GameObjects.Image;
   sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
+  star?: Phaser.GameObjects.Text; // quality star marker on high-quality ripe crops
 };
 type Dir = 'down' | 'up' | 'left' | 'right';
 
@@ -151,7 +161,9 @@ type SaveData = {
   timeMs: number;
   restockMs: number;
   tiles: Array<[number, number, number]>; // x, y, wetRemainingMs (tilled implied)
-  crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean }>;
+  // q/ma/wth/rg are optional so old v11 saves (without crop-depth fields) still
+  // load. rg = regrow-cycle growth duration (ms) when the crop is mid-regrow.
+  crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean; q?: Quality; ma?: number; wth?: boolean; rg?: number }>;
   // progression
   xp: number;
   upgrades: Upgrades;
@@ -1186,7 +1198,8 @@ export class FarmScene extends Phaser.Scene {
       .setTint(plant.cropTint ?? 0xffffff)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
-      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
+      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false,
+      quality: 'none', matureAt: 0, withered: false, sprite,
     });
     // Thrifty: a chance the seed isn't consumed when planting.
     if (Math.random() < this.mods().seedSaveChance) {
@@ -1211,7 +1224,27 @@ export class FarmScene extends Phaser.Scene {
     crop.stage = STAGES - 1;
     crop.mutation = this.forcedMutation ?? pickMutation(fortuneLuck(this.upgrades.fortune) * this.mods().mutationLuckMult);
     crop.wetAtMature = this.isWet(crop.tx, crop.ty);
+    crop.quality = rollQuality(this.qualityLuck());
+    crop.matureAt = this.time.now;
+    crop.withered = false;
     this.applyMatureVisuals(crop, true);
+  }
+
+  // Quality-roll luck from the Fertilizer upgrade (`growth`) + the Farming skill.
+  // mods().cropValueMult is 1 at base and climbs with farming level/perks, so its
+  // excess over 1 is a clean "how good am I at farming" bonus.
+  private qualityLuck(): number {
+    const farmingBonus = Math.max(0, this.mods().cropValueMult - 1);
+    return 1 + this.upgrades.growth * 0.5 + farmingBonus;
+  }
+
+  // Withering is ON unless the toggle (owned by the UI) is explicitly set to '0'.
+  private witherEnabled(): boolean {
+    try {
+      return localStorage.getItem('solana-valley:crop-wither') !== '0';
+    } catch {
+      return true;
+    }
   }
 
   // Sprite tint + glow + sparkle for a mature crop. Shared by fresh maturity
@@ -1260,11 +1293,53 @@ export class FarmScene extends Phaser.Scene {
         })
         .setDepth(this.cropDepth(crop.ty) + 1);
 
-      if (announce) {
-        const label = m.id !== 'normal' ? `${m.name} ` : '';
-        this.toast(`✨ ${label}${crop.plant.name} is ready!`);
-      }
     }
+
+    // Tasteful quality marker: a small coloured ★ above silver+ crops.
+    this.applyQualityStar(crop);
+
+    if (announce) {
+      const mutLabel = m.id !== 'normal' ? `${m.name} ` : '';
+      const q = QUALITY[crop.quality];
+      const qLabel = q.stars ? `${q.label} ${'★'.repeat(q.stars)} ` : '';
+      const special = m.id !== 'normal' || rank >= 3 || crop.quality !== 'none';
+      if (special) this.toast(`✨ ${qLabel}${mutLabel}${crop.plant.name} is ready!`);
+    }
+  }
+
+  // Small star above a ripe crop indicating its quality tier (none = no star).
+  // Rebuilt fresh; cleared on harvest/regrow/wither via removeCrop / clearStar.
+  private applyQualityStar(crop: Crop) {
+    crop.star?.destroy();
+    crop.star = undefined;
+    const q = QUALITY[crop.quality];
+    if (q.stars <= 0) return;
+    const cx = crop.tx * TILE + TILE / 2;
+    const cy = crop.ty * TILE + TILE / 2;
+    crop.star = this.add
+      .text(cx, cy - 24, '★'.repeat(q.stars), {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '12px', color: q.css,
+        stroke: '#2a1f12', strokeThickness: 3,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(this.cropDepth(crop.ty) + 2);
+  }
+
+  // A ripe crop left too long wilts: brown desaturated tint, glow/sparkle/star
+  // removed. Gentle — it stays harvestable, just worth 40%.
+  private applyWitherVisuals(crop: Crop) {
+    crop.glow?.destroy(); crop.glow = undefined;
+    crop.sparkle?.destroy(); crop.sparkle = undefined;
+    crop.star?.destroy(); crop.star = undefined;
+    this.rainbowCrops.delete(crop);
+    crop.sprite.setFrame(crop.plant.cropRow * 5 + (STAGES - 1));
+    crop.sprite.setTint(0x8a6b4a); // wilted brown
+  }
+
+  // Growth duration (ms) for the crop's current cycle: full the first time, then
+  // the shorter `regrow` window after a multi-harvest reset.
+  private cropGrowMs(crop: Crop): number {
+    return crop.growMs ?? crop.plant.growthSeconds * 1000;
   }
 
   private harvest(tx: number, ty: number) {
@@ -1275,8 +1350,8 @@ export class FarmScene extends Phaser.Scene {
     bus.emit('action', 'harvest');
     const mods = this.mods();
     const m = crop.mutation ?? MUTATION_BY_ID.normal;
-    const value = cropValue(crop.plant, m, crop.wetAtMature);
-    const sk = stackKey(crop.plant.id, m.id, crop.wetAtMature);
+    const value = cropValue(crop.plant, m, crop.wetAtMature, crop.quality, crop.withered);
+    const sk = stackKey(crop.plant.id, m.id, crop.wetAtMature, crop.quality, crop.withered);
     // Bountiful / Master Farmer: a chance this harvest yields two of the crop.
     const doubled = Math.random() < mods.cropDoubleChance;
     this.harvestInv[sk] = (this.harvestInv[sk] ?? 0) + (doubled ? 2 : 1);
@@ -1304,8 +1379,17 @@ export class FarmScene extends Phaser.Scene {
     }
 
     const plant = crop.plant;
-    this.removeCrop(crop);
-    this.crops.delete(k);
+    const wasWithered = crop.withered;
+    const harvestedQuality = crop.quality;
+    // Multi-harvest: a regrow crop that hasn't wilted is reset for another cycle
+    // rather than removed; a wilted one (or a non-regrow crop) is taken out.
+    const regrew = plant.regrow != null && !wasWithered;
+    if (regrew) {
+      this.regrowCrop(crop);
+    } else {
+      this.removeCrop(crop);
+      this.crops.delete(k);
+    }
 
     this.harvested += 1;
     this.discoveredPlants.add(plant.id);
@@ -1317,13 +1401,41 @@ export class FarmScene extends Phaser.Scene {
     this.addSkillXp('farming', harvestXp(value)); // Farming skill grows per harvest
     this.checkAchievements();
 
-    const label = m.id !== 'normal' ? `${m.name} ` : '';
-    this.toast(`Harvested ${label}${plant.name}${doubled ? ' ×2' : ''} (worth ${value}🪙)`);
+    const mutLabel = m.id !== 'normal' ? `${m.name} ` : '';
+    const q = QUALITY[harvestedQuality];
+    const qLabel = q.stars ? `${q.label} ${'★'.repeat(q.stars)} ` : '';
+    const witherTag = wasWithered ? ' (wilted)' : '';
+    this.toast(`Harvested ${qLabel}${mutLabel}${plant.name}${doubled ? ' ×2' : ''}${witherTag} (worth ${value}🪙)`);
     // Master Farmer capstone: a chance to instantly re-till + re-plant for free.
-    if (mods.autoReplant && Math.random() < 0.15 && isInMyPlot(tx, ty)) {
+    // Skip for regrow crops — they're already replanting themselves.
+    if (!regrew && mods.autoReplant && Math.random() < 0.15 && isInMyPlot(tx, ty)) {
       this.autoReplant(tx, ty, plant);
     }
     this.emitState();
+  }
+
+  // Multi-harvest reset: keep the crop + its tile, but send it back to a growing
+  // state. Its next cycle uses the (shorter) `regrow` duration, so it ripens
+  // again in ~regrow seconds rather than the full growthSeconds.
+  private regrowCrop(crop: Crop) {
+    crop.glow?.destroy(); crop.glow = undefined;
+    crop.sparkle?.destroy(); crop.sparkle = undefined;
+    crop.star?.destroy(); crop.star = undefined;
+    this.rainbowCrops.delete(crop);
+    crop.mature = false;
+    crop.mutation = null;
+    crop.quality = 'none';
+    crop.withered = false;
+    crop.matureAt = 0;
+    crop.grownMs = 0;
+    crop.stage = 0;
+    crop.growMs = (crop.plant.regrow ?? crop.plant.growthSeconds) * 1000;
+    crop.sprite.clearTint();
+    crop.sprite.setTint(crop.plant.cropTint ?? 0xffffff);
+    crop.sprite.setFrame(crop.plant.cropRow * 5); // back to first growing frame
+    const cx = crop.tx * TILE + TILE / 2;
+    const cy = crop.ty * TILE + TILE / 2;
+    this.floatText(cx, cy - 16, '🌱 regrow', '#bff58a');
   }
 
   // Free re-till + re-plant of the same crop on a just-harvested tile (Master
@@ -1339,7 +1451,8 @@ export class FarmScene extends Phaser.Scene {
       .setTint(plant.cropTint ?? 0xffffff)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
-      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
+      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false,
+      quality: 'none', matureAt: 0, withered: false, sprite,
     });
     this.floatText(tx * TILE + TILE / 2, ty * TILE - 16, '🌱 replant', '#bff58a');
   }
@@ -1363,6 +1476,7 @@ export class FarmScene extends Phaser.Scene {
     crop.sprite.destroy();
     crop.glow?.destroy();
     crop.sparkle?.destroy();
+    crop.star?.destroy();
     this.rainbowCrops.delete(crop);
   }
 
@@ -1420,9 +1534,11 @@ export class FarmScene extends Phaser.Scene {
   private sellStack(key: string) {
     const count = this.harvestInv[key] ?? 0;
     if (count <= 0) return;
-    const [plantId, mutId, wet] = key.split('|');
+    // Tolerant parse: legacy 3-/4-part keys default quality 'none', withered '0'.
+    const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+    const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const value = Math.round(
-      cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') *
+      cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
         this.mods().cropValueMult,
@@ -1440,8 +1556,9 @@ export class FarmScene extends Phaser.Scene {
   private sellAll() {
     let total = 0;
     for (const [key, count] of Object.entries(this.harvestInv)) {
-      const [plantId, mutId, wet] = key.split('|');
-      total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
+      const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+      const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
+      total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
     }
     total = Math.round(total * marketBonus(this.upgrades.market) * this.mods().cropValueMult);
     if (total <= 0) {
@@ -2140,6 +2257,10 @@ export class FarmScene extends Phaser.Scene {
       crops.push({
         x: c.tx, y: c.ty, p: c.plant.id, g: Math.round(c.grownMs),
         m: c.mature, mut: c.mutation?.id ?? null, wet: c.wetAtMature,
+        q: c.quality, ma: c.matureAt, wth: c.withered,
+        // Persist the regrow cycle's growth duration only when it differs from
+        // the plant's default, so the timer stays correct across reloads.
+        rg: c.growMs,
       });
     }
     const data: SaveData = {
@@ -2247,7 +2368,13 @@ export class FarmScene extends Phaser.Scene {
         .setDepth(this.cropDepth(c.y) - 1);
       const crop: Crop = {
         plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,
-        mature: false, mutation: null, wetAtMature: false, sprite,
+        mature: false, mutation: null, wetAtMature: false,
+        // Default crop-depth fields so old v11 saves (without them) still load.
+        quality: (c.q && c.q in QUALITY ? c.q : 'none') as Quality,
+        matureAt: c.ma ?? this.time.now,
+        withered: c.wth ?? false,
+        growMs: c.rg, // undefined on legacy/non-regrow crops → falls back to full duration
+        sprite,
       };
       this.crops.set(this.key(c.x, c.y), crop);
       if (c.m) {
@@ -2255,9 +2382,10 @@ export class FarmScene extends Phaser.Scene {
         crop.stage = STAGES - 1;
         crop.mutation = MUTATION_BY_ID[c.mut ?? 'normal'] ?? MUTATION_BY_ID.normal;
         crop.wetAtMature = c.wet;
-        this.applyMatureVisuals(crop, false);
+        if (crop.withered) this.applyWitherVisuals(crop);
+        else this.applyMatureVisuals(crop, false);
       } else {
-        const ns = Math.min(STAGES - 1, Math.floor((c.g / (plant.growthSeconds * 1000)) * (STAGES - 1)));
+        const ns = Math.min(STAGES - 1, Math.floor((c.g / this.cropGrowMs(crop)) * (STAGES - 1)));
         crop.stage = ns;
         crop.sprite.setFrame(plant.cropRow * 5 + ns);
       }
@@ -2435,12 +2563,24 @@ export class FarmScene extends Phaser.Scene {
 
     this.updateAnimals(time);
 
-    // crop growth
+    // crop growth + withering
+    const witherOn = this.witherEnabled();
     for (const crop of this.crops.values()) {
-      if (crop.mature) continue;
+      if (crop.mature) {
+        // A ripe, un-harvested crop wilts after a generous window. Gentle: it
+        // loses value but is NOT destroyed and stays harvestable.
+        if (witherOn && !crop.withered) {
+          const witherMs = Math.max(90_000, crop.plant.growthSeconds * 1000);
+          if (time - crop.matureAt > witherMs) {
+            crop.withered = true;
+            this.applyWitherVisuals(crop);
+          }
+        }
+        continue;
+      }
       const wet = this.isWet(crop.tx, crop.ty);
       crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth) * this.mods().cropGrowthMult;
-      const total = crop.plant.growthSeconds * 1000;
+      const total = this.cropGrowMs(crop);
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
         crop.stage = ns;

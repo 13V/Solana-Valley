@@ -49,6 +49,9 @@ export type Plant = {
   cropRow: number; // row in the Sprout Lands "Farming Plants" sheet (5 stages/row)
   color: number; // glow / particle tint
   cropTint?: number; // optional base tint of the crop sprite (for palette variants)
+  // If set, the crop REGROWS this many seconds after harvest instead of being
+  // removed (multi-harvest). ~50% of growthSeconds keeps the follow-up cycle snappy.
+  regrow?: number;
 };
 
 // Roster mapped to the premium "Farming Plants" sprite rows (r2..r14), tiered
@@ -60,12 +63,12 @@ export const PLANTS: Plant[] = [
   { id: 'lettuce', name: 'Lettuce', rarity: 'Common', seedCost: 15, baseValue: 31, growthSeconds: 28, cropRow: 7, color: 0x86c34a },
   { id: 'turnip', name: 'Turnip', rarity: 'Common', seedCost: 20, baseValue: 41, growthSeconds: 32, cropRow: 10, color: 0xe7dcc0 },
   // Uncommon
-  { id: 'tomato', name: 'Tomato', rarity: 'Uncommon', seedCost: 36, baseValue: 78, growthSeconds: 42, cropRow: 4, color: 0xe2402c },
+  { id: 'tomato', name: 'Tomato', rarity: 'Uncommon', seedCost: 36, baseValue: 78, growthSeconds: 42, cropRow: 4, color: 0xe2402c, regrow: 22 },
   { id: 'cauliflower', name: 'Cauliflower', rarity: 'Uncommon', seedCost: 46, baseValue: 100, growthSeconds: 47, cropRow: 3, color: 0xeae3c8 },
-  { id: 'eggplant', name: 'Eggplant', rarity: 'Uncommon', seedCost: 56, baseValue: 124, growthSeconds: 52, cropRow: 5, color: 0x7a3fb0 },
+  { id: 'eggplant', name: 'Eggplant', rarity: 'Uncommon', seedCost: 56, baseValue: 124, growthSeconds: 52, cropRow: 5, color: 0x7a3fb0, regrow: 26 },
   // Rare
   { id: 'beet', name: 'Beetroot', rarity: 'Rare', seedCost: 85, baseValue: 195, growthSeconds: 64, cropRow: 12, color: 0x8e2f6a },
-  { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 120, baseValue: 282, growthSeconds: 78, cropRow: 14, color: 0x4fae4a },
+  { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 120, baseValue: 282, growthSeconds: 78, cropRow: 14, color: 0x4fae4a, regrow: 34 },
   // Legendary
   { id: 'corn', name: 'Corn', rarity: 'Legendary', seedCost: 210, baseValue: 560, growthSeconds: 104, cropRow: 8, color: 0xf4c948 },
   { id: 'pumpkin', name: 'Pumpkin', rarity: 'Legendary', seedCost: 300, baseValue: 820, growthSeconds: 124, cropRow: 9, color: 0xe8862b },
@@ -149,10 +152,52 @@ export function pickMutation(luck = 1): Mutation {
   return MUTATIONS[0];
 }
 
+// ---- quality stars ------------------------------------------------------
+
+// Every harvest rolls a quality tier that multiplies its value (orthogonal to
+// mutations). Better odds come from the Fertilizer upgrade + Farming skill via
+// the `luck` arg to rollQuality().
+export type Quality = 'none' | 'silver' | 'gold' | 'iridium';
+
+export const QUALITY: Record<Quality, { mult: number; label: string; stars: number; css: string }> = {
+  none: { mult: 1, label: '', stars: 0, css: '#cfd6dd' },
+  silver: { mult: 1.25, label: 'Silver', stars: 1, css: '#c9d2db' },
+  gold: { mult: 1.5, label: 'Gold', stars: 2, css: '#ffd21a' },
+  iridium: { mult: 2, label: 'Iridium', stars: 3, css: '#b98aff' },
+};
+
+// Base odds ≈ none 80% / silver 14% / gold 5% / iridium 1%. `luck` (>1) scales
+// the non-none weights toward the higher tiers (mirrors pickMutation).
+const QUALITY_WEIGHTS: { q: Quality; w: number }[] = [
+  { q: 'none', w: 80 },
+  { q: 'silver', w: 14 },
+  { q: 'gold', w: 5 },
+  { q: 'iridium', w: 1 },
+];
+
+export function rollQuality(luck = 1): Quality {
+  const weights = QUALITY_WEIGHTS.map((e) => (e.q === 'none' ? e.w : e.w * luck));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < QUALITY_WEIGHTS.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return QUALITY_WEIGHTS[i].q;
+  }
+  return 'none';
+}
+
 // ---- value + shop -------------------------------------------------------
 
-export function cropValue(plant: Plant, mutation: Mutation, wet: boolean): number {
-  return Math.round(plant.baseValue * mutation.mult * (wet ? 1.5 : 1));
+export function cropValue(
+  plant: Plant,
+  mutation: Mutation,
+  wet: boolean,
+  quality: Quality = 'none',
+  withered = false,
+): number {
+  return Math.round(
+    plant.baseValue * mutation.mult * (wet ? 1.5 : 1) * QUALITY[quality].mult * (withered ? 0.4 : 1),
+  );
 }
 
 function randInt(min: number, max: number): number {
@@ -175,12 +220,29 @@ export function rollShop(level = 99): Record<string, number> {
   return stock;
 }
 
-// Stable harvest-stack key so identical (plant + mutation + wet) items stack.
-export function stackKey(plantId: string, mutationId: string, wet: boolean): string {
-  return `${plantId}|${mutationId}|${wet ? 1 : 0}`;
+// Stable harvest-stack key so identical (plant + mutation + wet + quality +
+// withered) items stack. Format: "plantId|mutId|wet|quality|withered" with wet &
+// withered as '0'/'1'. Legacy 3- and 4-part keys remain parseable (see below).
+export function stackKey(
+  plantId: string,
+  mutationId: string,
+  wet: boolean,
+  quality: Quality = 'none',
+  withered = false,
+): string {
+  return `${plantId}|${mutationId}|${wet ? 1 : 0}|${quality}|${withered ? 1 : 0}`;
 }
 
-export function parseStackKey(key: string): { plant: Plant; mutation: Mutation; wet: boolean } {
-  const [plantId, mutationId, wet] = key.split('|');
-  return { plant: PLANT_BY_ID[plantId], mutation: MUTATION_BY_ID[mutationId], wet: wet === '1' };
+export function parseStackKey(
+  key: string,
+): { plant: Plant; mutation: Mutation; wet: boolean; quality: Quality; withered: boolean } {
+  // Tolerant of legacy 3-part (no quality/withered) and 4-part keys.
+  const [plantId, mutationId, wet, q = 'none', wth = '0'] = key.split('|');
+  return {
+    plant: PLANT_BY_ID[plantId],
+    mutation: MUTATION_BY_ID[mutationId],
+    wet: wet === '1',
+    quality: (q as Quality) in QUALITY ? (q as Quality) : 'none',
+    withered: wth === '1',
+  };
 }

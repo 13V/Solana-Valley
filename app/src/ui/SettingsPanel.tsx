@@ -174,6 +174,23 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* Crop withering — ripe crops wilt (lose value) if left too long. */}
+        <div className="row set-row" style={{ borderLeftColor: '#7bd66a' }}>
+          <span className="set-label">
+            Crop withering
+            <span className="set-sub">ripe crops wilt if left too long</span>
+          </span>
+          <div className="set-control">
+            <Toggle
+              on={settings.cropWither}
+              onLabel="On"
+              offLabel="Off"
+              ariaLabel="Crop withering"
+              onToggle={() => update({ cropWither: !settings.cropWither })}
+            />
+          </div>
+        </div>
+
         {/* Controls — remap the movement keys (desktop). Arrow keys always work. */}
         <Controls />
       </div>

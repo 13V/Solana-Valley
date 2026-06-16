@@ -12,6 +12,9 @@ import { sfx } from '../game/audio';
 
 const SETTINGS_KEY = 'solana-valley:settings';
 const REDUCE_MOTION_KEY = 'solana-valley:reduce-motion';
+// Standalone key the game core reads directly to decide if ripe crops wilt.
+// Default ON: only '0' disables withering.
+const CROP_WITHER_KEY = 'solana-valley:crop-wither';
 const FILTER_DEFS_ID = 'cb-filter-defs';
 
 export type TextSize = 'sm' | 'md' | 'lg';
@@ -25,6 +28,9 @@ export type Settings = {
   reduceMotion: boolean;
   textSize: TextSize;
   colorblind: Colorblind;
+  // When on, ripe crops wilt if left too long (reduced sell value). Persisted
+  // to its own localStorage key so the Phaser game core can read it directly.
+  cropWither: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -33,6 +39,7 @@ const DEFAULTS: Settings = {
   reduceMotion: false,
   textSize: 'md',
   colorblind: 'off',
+  cropWither: true,
 };
 
 const TEXT_SCALE: Record<TextSize, number> = { sm: 0.9, md: 1, lg: 1.15 };
@@ -61,6 +68,16 @@ export function loadSettings(): Settings {
     parsed.colorblind === 'trit'
       ? parsed.colorblind
       : 'off';
+  // Crop withering: the standalone key is the source of truth (the game core
+  // reads it directly). Default ON; only an explicit '0' disables it. Fall back
+  // to the bundled settings blob if the standalone key was never written.
+  let cropWither = parsed.cropWither !== false;
+  try {
+    const raw = localStorage.getItem(CROP_WITHER_KEY);
+    if (raw !== null) cropWither = raw !== '0';
+  } catch {
+    // storage unavailable; keep the value from the settings blob / default
+  }
   return {
     // The audio engine is the source of truth for volume + mute.
     volume: clamp01(typeof sfx.getVolume === 'function' ? sfx.getVolume() : DEFAULTS.volume),
@@ -68,6 +85,7 @@ export function loadSettings(): Settings {
     reduceMotion: parsed.reduceMotion === true,
     textSize,
     colorblind,
+    cropWither,
   };
 }
 
@@ -79,6 +97,12 @@ export function saveSettings(s: Settings): void {
   }
   try {
     localStorage.setItem(REDUCE_MOTION_KEY, s.reduceMotion ? '1' : '0');
+  } catch {
+    // ignore
+  }
+  try {
+    // Standalone key the game core reads: '1' on, '0' off.
+    localStorage.setItem(CROP_WITHER_KEY, s.cropWither ? '1' : '0');
   } catch {
     // ignore
   }

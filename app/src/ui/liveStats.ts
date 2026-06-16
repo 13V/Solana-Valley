@@ -12,8 +12,10 @@ import {
   RARITY,
   RARITY_UNLOCK,
   MUTATIONS,
+  QUALITY,
   type Mutation,
   type Plant,
+  type Quality,
   type Rarity,
 } from '../game/economy';
 import {
@@ -158,8 +160,20 @@ export type StackStats = {
   plant: Plant;
   mutation: Mutation;
   wet: boolean;
+  /** Rolled crop quality (none/silver/gold/iridium). */
+  quality: Quality;
+  /** Quality value multiplier (1 for none). */
+  qualityMult: number;
+  /** Quality star count (0 for none). */
+  qualityStars: number;
+  /** CSS colour for the quality stars. */
+  qualityCss: string;
+  /** Human label for the quality ("Gold" etc). */
+  qualityLabel: string;
+  /** Whether this crop wilted (left too long) — applies the 0.4 penalty. */
+  withered: boolean;
   count: number;
-  /** Base sell price for one item (mutation x wet bonus), no Market upgrade. */
+  /** Base sell price for one item (mutation x wet x quality x wilt), no Market upgrade. */
   baseUnitValue: number;
   /** Per-item price after the Market Stall upgrade. */
   unitValue: number;
@@ -175,14 +189,23 @@ export function stackStats(
   count: number,
   baseUnitValue: number,
   progress?: Progress,
+  quality: Quality = 'none',
+  withered = false,
 ): StackStats {
   const marketLvl = upgradeLevel(progress, 'market');
   const market = marketBonus(marketLvl);
   const unitValue = Math.round(baseUnitValue * market);
+  const q = QUALITY[quality];
   return {
     plant,
     mutation,
     wet,
+    quality,
+    qualityMult: q.mult,
+    qualityStars: q.stars,
+    qualityCss: q.css,
+    qualityLabel: q.label,
+    withered,
     count,
     baseUnitValue,
     unitValue,
