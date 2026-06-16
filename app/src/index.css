@@ -72,6 +72,41 @@ body {
   gap: 8px;
 }
 
+/* Day/night widget cluster: the framed sun/moon scene on top, coin + level
+   stats beneath it. */
+.hud-left {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.hud-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daynight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.dn-widget {
+  width: 104px;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  animation: dn-bob 4.5s ease-in-out infinite;
+}
+.dn-date {
+  margin-top: -9px;
+  font-size: 12px;
+  position: relative;
+  z-index: 1;
+}
+@keyframes dn-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
 .badge {
   background: var(--panel);
   border: 1px solid var(--panel-border);

@@ -55,22 +55,20 @@ export function Hud({
   return (
     <div className="hud">
       <div className="hud-left">
-        <span className="badge">
-          {PHASE_ICON[phase].img ? (
-            <img className="phase-ico" src={PHASE_ICON[phase].img} alt={PHASE_ICON[phase].emoji} />
-          ) : (
-            PHASE_ICON[phase].emoji
-          )}{' '}
-          Day {day} · {clock}
-        </span>
-        <span className="badge coins">
-          <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
-          {coins.toLocaleString()}
-        </span>
-        <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
-          <img className="hud-icon" src="assets/sprout-ui/icon_star.png" alt="⭐" /> Lv {progress.level}
-          <span className="xpbar"><span className="xpfill" style={{ width: `${xpPct}%` }} /></span>
-        </span>
+        <div className="daynight" title={`Day ${day} · ${clock}`}>
+          <img className="dn-widget" src={`assets/sprout-ui/dn_${phase}.png`} alt={PHASE_ICON[phase].emoji} />
+          <span className="badge dn-date">Day {day} · {clock}</span>
+        </div>
+        <div className="hud-stats">
+          <span className="badge coins">
+            <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
+            {coins.toLocaleString()}
+          </span>
+          <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
+            <img className="hud-icon" src="assets/sprout-ui/icon_star.png" alt="⭐" /> Lv {progress.level}
+            <span className="xpbar"><span className="xpfill" style={{ width: `${xpPct}%` }} /></span>
+          </span>
+        </div>
       </div>
       <div className="hud-buttons">
         {BUTTONS.map((b) => {
