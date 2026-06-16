@@ -171,6 +171,59 @@
   background: #2f7d2e;
 }
 
+/* ---- Controls (keybind remap) --------------------------------------- */
+/* Let the Controls row grow tall enough for the wrapped key buttons. */
+.set-controls {
+  align-items: flex-start;
+}
+.set-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* Each rebind button stacks the action name over its current key, so the row
+   stays compact while still naming what it binds. */
+.set-keys .btn.sm.set-key {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 8px;
+  min-width: 72px;
+  line-height: 1.1;
+}
+.set-keys .set-key-act {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.set-keys .set-key-cap {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Capturing state: highlight with the same green the segmented options use. */
+.set-keys .btn.sm.set-key.capturing,
+.ui-skin .set-keys .btn.sm.set-key.capturing {
+  color: #fff;
+  background: #2f7d2e;
+  border-color: #2f7d2e;
+  border-image: none;
+  box-shadow: 0 0 0 2px rgba(47, 125, 46, 0.35);
+}
+.set-keys .btn.sm.set-key.capturing .set-key-act {
+  opacity: 0.9;
+}
+
+/* "Reset to WASD" sits at the end of the wrapped key row. */
+.set-keys .btn.sm.set-key-reset {
+  align-self: center;
+  padding: 3px 10px;
+}
+
 /* ===================================================================== */
 /* Global accessibility hooks (classes set on <html> by applySettings)    */
 /* ===================================================================== */

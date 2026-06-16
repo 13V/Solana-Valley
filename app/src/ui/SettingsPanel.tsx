@@ -1,4 +1,12 @@
+import { useEffect, useState } from 'react';
 import { sfx } from '../game/audio';
+import {
+  getKeyBinds,
+  setKeyBind,
+  resetKeyBinds,
+  onKeyBindsChange,
+  type MoveAction,
+} from '../game/input';
 import { useSettings, type TextSize, type Colorblind } from './settings';
 import './settings.css';
 
@@ -14,6 +22,39 @@ const CB_OPTS: Array<{ id: Colorblind; label: string }> = [
   { id: 'deut', label: 'Deuteranopia' },
   { id: 'trit', label: 'Tritanopia' },
 ];
+
+// Movement actions shown in the Controls section, in WASD reading order.
+const MOVE_ACTIONS: Array<{ id: MoveAction; label: string }> = [
+  { id: 'up', label: 'Move up' },
+  { id: 'down', label: 'Move down' },
+  { id: 'left', label: 'Move left' },
+  { id: 'right', label: 'Move right' },
+];
+
+// Pretty-print a stored key for the rebind button. Single chars come in already
+// upper-cased; long names (Arrow*, Space, etc.) are shown a little friendlier.
+const PRETTY_KEY: Record<string, string> = {
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  ' ': 'Space',
+  Spacebar: 'Space',
+};
+function keyLabel(key: string): string {
+  return PRETTY_KEY[key] ?? key;
+}
+
+// Modifier keys can't be bound on their own (they'd swallow real shortcuts).
+const MODIFIER_KEYS = new Set([
+  'Shift',
+  'Control',
+  'Alt',
+  'Meta',
+  'CapsLock',
+  'OS',
+  'AltGraph',
+]);
 
 // Accessibility / presentation settings. Every control persists to localStorage
 // and applies immediately (via useSettings → applySettings), and on page load
@@ -129,6 +170,79 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </div>
+
+        {/* Controls — remap the movement keys (desktop). Arrow keys always work. */}
+        <Controls />
+      </div>
+    </div>
+  );
+}
+
+// Keybind remapping for the 4 movement actions. Click a key button to enter
+// "press a key…" capture mode; the next keydown rebinds it (Escape cancels,
+// modifier-only keys ignored). Arrow keys remain hard-wired in the input module,
+// so this only customises the primary (WASD-style) bindings.
+function Controls() {
+  // Bump on every keybind change so the displayed keys stay fresh; we read
+  // getKeyBinds() fresh each render rather than mirroring it into state.
+  const [, setVersion] = useState(0);
+  const [capturing, setCapturing] = useState<MoveAction | null>(null);
+
+  useEffect(() => onKeyBindsChange(() => setVersion((v) => v + 1)), []);
+
+  // While capturing, the next keydown sets (or cancels) the binding. Capture in
+  // the capture phase and stop propagation so the game doesn't also act on it.
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setCapturing(null);
+        return;
+      }
+      if (MODIFIER_KEYS.has(e.key)) return; // wait for a real key
+      setKeyBind(capturing, e.key.length === 1 ? e.key.toUpperCase() : e.key);
+      sfx.resume();
+      setCapturing(null);
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [capturing]);
+
+  const binds = getKeyBinds();
+
+  return (
+    <div className="row set-row set-controls" style={{ borderLeftColor: '#7bd66a' }}>
+      <span className="set-label">
+        Controls
+        <span className="set-sub">click a key, then press a new one · arrow keys always work</span>
+      </span>
+      <div className="set-control set-keys">
+        {MOVE_ACTIONS.map((a) => (
+          <button
+            key={a.id}
+            className={`btn sm set-key ${capturing === a.id ? 'capturing' : ''}`}
+            aria-label={`${a.label}: ${capturing === a.id ? 'press a key' : keyLabel(binds[a.id])}`}
+            title={`Rebind ${a.label}`}
+            onClick={() => setCapturing((cur) => (cur === a.id ? null : a.id))}
+          >
+            <span className="set-key-act">{a.label}</span>
+            <span className="set-key-cap">
+              {capturing === a.id ? 'press a key…' : keyLabel(binds[a.id])}
+            </span>
+          </button>
+        ))}
+        <button
+          className="btn sm set-key-reset"
+          onClick={() => {
+            resetKeyBinds();
+            setCapturing(null);
+            sfx.resume();
+          }}
+        >
+          Reset to WASD
+        </button>
       </div>
     </div>
   );

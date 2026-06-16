@@ -14,6 +14,7 @@ import { HelpPanel } from './HelpPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { GoalsHud } from './GoalsHud';
 import { TutorialCoach } from './TutorialCoach';
+import { TouchControls } from './TouchControls';
 import { Toasts } from './Toasts';
 import './settings'; // self-applies saved accessibility/volume settings on load
 
@@ -68,6 +69,7 @@ export function App() {
           {panel === 'settings' && <SettingsPanel onClose={close} />}
           <GoalsHud />
           <Hotbar />
+          <TouchControls />
           <TutorialCoach />
           <Toasts />
         </div>

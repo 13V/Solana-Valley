@@ -72,6 +72,7 @@ import { catchFish, fishXp } from '../fishing';
 import { pickForage, forageXp, type Forage } from '../forage';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
+import { virtualMove, getKeyBinds, onKeyBindsChange, type MoveAction } from '../input';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
 type Crop = {
@@ -96,6 +97,25 @@ const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TI
 const CHICKEN_PEN = px(HOME.chickenPen);
 const COW_PEN = px(HOME.cowPen);
 const ORCHARD = px(HOME.orchard);
+
+// Translate a stored bind (a raw keyboard event.key, e.g. 'W', 'ArrowUp', ' ')
+// into a name Phaser's keyboard.addKey() understands. Single letters/digits and
+// Phaser-style names pass through; a few common event.key values are remapped.
+const KEY_NAME_ALIASES: Record<string, string> = {
+  ARROWUP: 'UP',
+  ARROWDOWN: 'DOWN',
+  ARROWLEFT: 'LEFT',
+  ARROWRIGHT: 'RIGHT',
+  ' ': 'SPACE',
+  SPACEBAR: 'SPACE',
+  ESC: 'ESC',
+  ESCAPE: 'ESC',
+};
+function mapKeyName(key: string): string | null {
+  if (!key) return null;
+  const upper = key.toUpperCase();
+  return KEY_NAME_ALIASES[upper] ?? upper;
+}
 
 type Animal = {
   sprite: Phaser.GameObjects.Sprite;
@@ -157,7 +177,11 @@ export class FarmScene extends Phaser.Scene {
 
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
+  // Remappable movement keys, rebuilt from getKeyBinds() whenever binds change.
+  private moveKeys: Partial<Record<MoveAction, Phaser.Input.Keyboard.Key>> = {};
+  // Gamepad face/dpad button states from the previous frame (edge detection so a
+  // held button fires its action once, not every frame).
+  private padPrev: Record<number, boolean> = {};
   private highlight!: Phaser.GameObjects.Image;
   private ambient!: Phaser.GameObjects.Rectangle;
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -333,12 +357,11 @@ export class FarmScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.wasd = {
-      up: kb.addKey('W'),
-      down: kb.addKey('S'),
-      left: kb.addKey('A'),
-      right: kb.addKey('D'),
-    };
+    // Build the remappable movement keys now, and rebuild them live whenever the
+    // bindings change (arrow keys via this.cursors always work in addition).
+    this.buildMoveKeys();
+    const unsubBinds = onKeyBindsChange(() => this.buildMoveKeys());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubBinds);
     ['ONE', 'TWO', 'THREE'].forEach((key, i) => {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
@@ -1435,6 +1458,80 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // (Re)create the Phaser Key objects for the remappable movement binds. Old
+  // keys are removed first so rebinding never leaves duplicate listeners.
+  private buildMoveKeys() {
+    const kb = this.input.keyboard;
+    if (!kb) return;
+    for (const a of Object.keys(this.moveKeys) as MoveAction[]) {
+      const k = this.moveKeys[a];
+      if (k) kb.removeKey(k, true);
+    }
+    this.moveKeys = {};
+    const binds = getKeyBinds();
+    (Object.keys(binds) as MoveAction[]).forEach((a) => {
+      const name = mapKeyName(binds[a]);
+      if (name) this.moveKeys[a] = kb.addKey(name);
+    });
+  }
+
+  // Poll the first connected gamepad for movement (left stick + dpad) and, when
+  // low-risk, tool select / act. Returns a movement vector or null. Everything is
+  // guarded so missing gamepad APIs never throw.
+  private pollGamepad(): { x: number; y: number } | null {
+    let gp: Gamepad | null = null;
+    try {
+      const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
+      if (pads) {
+        for (const p of pads) {
+          if (p) {
+            gp = p;
+            break;
+          }
+        }
+      }
+    } catch {
+      return null;
+    }
+    if (!gp) return null;
+
+    const DEAD = 0.25;
+    const axisX = gp.axes[0] ?? 0;
+    const axisY = gp.axes[1] ?? 0;
+    let x = Math.abs(axisX) > DEAD ? axisX : 0;
+    let y = Math.abs(axisY) > DEAD ? axisY : 0;
+
+    const pressed = (i: number): boolean => {
+      const b = gp!.buttons[i];
+      return !!b && (typeof b === 'object' ? b.pressed : (b as number) > 0.5);
+    };
+    // Dpad (12=up, 13=down, 14=left, 15=right) overrides/augments the stick.
+    if (pressed(12)) y = -1;
+    else if (pressed(13)) y = 1;
+    if (pressed(14)) x = -1;
+    else if (pressed(15)) x = 1;
+
+    // Edge-triggered actions: face buttons select tools, A acts on the tile.
+    const edge = (i: number): boolean => {
+      const now = pressed(i);
+      const was = this.padPrev[i] ?? false;
+      this.padPrev[i] = now;
+      return now && !was;
+    };
+    if (edge(2)) this.setTool('hoe'); // X / square
+    if (edge(1)) this.setTool('can'); // B / circle
+    if (edge(3)) this.setTool('seed'); // Y / triangle
+    if (edge(0)) {
+      // A / cross → use the held tool on the player's current tile.
+      const tx = Math.floor(this.player.x / TILE);
+      const ty = Math.floor(this.player.y / TILE);
+      this.useToolAt(tx, ty);
+    }
+
+    if (x === 0 && y === 0) return null;
+    return { x, y };
+  }
+
   private setTool(id: string) {
     if (id === 'seed' && !this.selectedSeed) {
       const owned = PLANTS.find((p) => (this.seeds[p.id] ?? 0) > 0);
@@ -2287,13 +2384,26 @@ export class FarmScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    // movement
+    // movement: keyboard (arrows + remappable keys) wins; otherwise fall back to
+    // the shared virtual joystick / gamepad vector. All three feed the same path.
+    const mk = this.moveKeys;
     let vx = 0;
     let vy = 0;
-    if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -1;
-    else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = 1;
-    if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -1;
-    else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = 1;
+    if (this.cursors.left.isDown || mk.left?.isDown) vx = -1;
+    else if (this.cursors.right.isDown || mk.right?.isDown) vx = 1;
+    if (this.cursors.up.isDown || mk.up?.isDown) vy = -1;
+    else if (this.cursors.down.isDown || mk.down?.isDown) vy = 1;
+    if (vx === 0 && vy === 0) {
+      // No keyboard movement this frame — use the on-screen joystick vector.
+      vx = virtualMove.x;
+      vy = virtualMove.y;
+    }
+    // Poll the gamepad (left stick + dpad); merges into the same vx/vy.
+    const pad = this.pollGamepad();
+    if (pad) {
+      if (vx === 0) vx = pad.x;
+      if (vy === 0) vy = pad.y;
+    }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
     if (vx !== 0 || vy !== 0) {
