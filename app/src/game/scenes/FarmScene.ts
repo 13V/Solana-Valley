@@ -577,6 +577,9 @@ export class FarmScene extends Phaser.Scene {
   private static TILLED_FRAMES = [55, 56, 57];
   // stonepath.png frames that carry a nice pebble cluster (scattered on paths).
   private static PEBBLES = [0, 4, 5, 8, 9, 12, 13, 14, 15];
+  // grassv2 flat detail tiles (tufts/moss/flowers) — weighted to subtle tufts &
+  // moss over flowers; their green matches the base grass exactly.
+  private static GRASS_DETAIL = [55, 56, 57, 58, 59, 66, 67, 68, 69, 70, 60, 71];
 
   // Island layout: a tile is ocean near the very edge, then a sand beach, then
   // the playable grassy land where the homesteads sit.
@@ -607,7 +610,14 @@ export class FarmScene extends Phaser.Scene {
         } else if (d < SHORE + BEACH) {
           this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
         } else {
-          this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
+          // Mostly plain grass, with v2 detail tiles (tufts/moss/flowers)
+          // sprinkled in for natural variety (deterministic per tile).
+          const h = (x * 73856 + y * 19349) >>> 0;
+          if (h % 100 < 14) {
+            this.ground[y][x] = this.add.image(cx, cy, 'grassv2', FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length]).setScale(2).setDepth(0);
+          } else {
+            this.ground[y][x] = this.add.image(cx, cy, 'grass', this.grassFrame(x, y)).setScale(2).setDepth(0);
+          }
         }
         // Tilled-soil overlay only where the player can till (their own farm) —
       // avoids tens of thousands of invisible objects on the big valley map.

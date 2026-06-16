@@ -12,6 +12,9 @@ export class BootScene extends Phaser.Scene {
   preload() {
     const A = 'assets/sprout/';
     this.load.spritesheet('grass', `${A}grass.png`, { frameWidth: 16, frameHeight: 16 });
+    // Premium v2 grass: same green as the base, with flat detail tiles (tufts,
+    // moss, flowers) sprinkled across the ground for variety.
+    this.load.spritesheet('grassv2', `${A}grassv2.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('tilled', `${A}tilled.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('water', `${A}water.png`, { frameWidth: 16, frameHeight: 16 });
     // Premium character: 8 cols × 24 rows of 48px frames. Locomotion lives in
