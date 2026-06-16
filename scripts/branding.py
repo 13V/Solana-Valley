@@ -55,6 +55,17 @@ GOLD_DARK   = (0xc9, 0x9a, 0x2e)
 GOLD_LIGHT  = (0xff, 0xe9, 0x9c)
 CREAM       = (0xfb, 0xf3, 0xd9)
 
+# mascot cat
+CAT_GREY    = (0x8b, 0x85, 0x97)
+CAT_GREY_SH = (0x6c, 0x67, 0x7c)
+CAT_LIGHT   = (0xab, 0xa6, 0xb8)
+CAT_OUT     = (0x3c, 0x37, 0x49)
+CAP_RED     = (0xc8, 0x4a, 0x3e)
+CAP_RED_SH  = (0x9c, 0x37, 0x2e)
+CAP_RED_LT  = (0xe2, 0x6a, 0x5c)
+EYE         = (0x2b, 0x27, 0x33)
+NOSE        = (0xe6, 0x8d, 0x93)
+
 OUTLINE     = (0x2b, 0x42, 0x2a)  # dark green text outline
 
 WOOD        = (0xb0, 0x6a, 0x43)
@@ -230,52 +241,121 @@ def draw_farmer(cv, cx, baseY, scale=1):
     E(-8, -44, 0, -39, (255, 244, 214))   # crown highlight (soft)
 
 
+def draw_cat(cv, cx, baseY, scale=1):
+    """Original chunky mascot cat (front view, sitting): grey body, little red
+    cap, big eyes, paws. cx = horizontal center, baseY = bottom of the feet."""
+    def R(x, y, w, h, c):
+        cv.rect(cx + x * scale, baseY + y * scale, max(1, w * scale), max(1, h * scale), c)
+
+    def E(x0, y0, x1, y1, c):
+        cv.ellipse(cx + x0 * scale, baseY + y0 * scale,
+                   cx + x1 * scale, baseY + y1 * scale, c)
+
+    def P(pts, c):
+        cv.poly([(cx + px * scale, baseY + py * scale) for px, py in pts], c)
+
+    # tail (behind the body), curling up the right side
+    for a, b, cc, d in [(13, -10, 21, -2), (16, -17, 23, -8), (17, -24, 24, -15)]:
+        E(a, b, cc, d, CAT_OUT); E(a + 1, b + 1, cc - 1, d - 1, CAT_GREY)
+
+    # ears (poke above the cap)
+    for s in (-1, 1):
+        P([(s * 12, -28), (s * 8, -41), (s * 3, -29)], CAT_OUT)
+        P([(s * 11, -29), (s * 8, -39), (s * 4, -29)], CAT_GREY)
+
+    # body: dark silhouette, then grey inset (gives a 1px outline)
+    E(-16, -34, 16, -18, CAT_OUT); R(-16, -30, 32, 30, CAT_OUT); E(-16, -8, 16, 2, CAT_OUT)
+    E(-15, -33, 15, -19, CAT_GREY); R(-15, -29, 30, 28, CAT_GREY); E(-15, -7, 15, 1, CAT_GREY)
+    R(11, -26, 4, 25, CAT_GREY_SH)                 # right-side form shade
+    E(-11, -15, 9, 0, CAT_LIGHT)                   # lighter belly
+
+    # red cap across the top of the head
+    E(-15, -37, 15, -27, CAP_RED); R(-15, -33, 30, 5, CAP_RED)
+    R(-15, -29, 30, 2, CAP_RED_SH)                 # brim shade
+    E(-12, -38, 2, -33, CAP_RED_LT)                # highlight
+    cv.disc(cx, baseY - 40 * scale, max(1, 2 * scale), CREAM)   # pom-pom
+
+    # face
+    E(-10, -26, -3, -19, EYE); E(3, -26, 10, -19, EYE)
+    cv.rect(cx - 9 * scale, baseY - 25 * scale, max(1, scale), max(1, scale), (255, 255, 255))
+    cv.rect(cx + 4 * scale, baseY - 25 * scale, max(1, scale), max(1, scale), (255, 255, 255))
+    P([(-2, -18), (2, -18), (0, -15)], NOSE)       # nose
+    R(-1, -15, 2, 1, CAT_OUT)                      # mouth hint
+
+    # feet (light paws with a dark gap between)
+    R(-1, -5, 2, 5, CAT_OUT)
+    E(-12, -5, -3, 1, CAT_LIGHT); E(3, -5, 12, 1, CAT_LIGHT)
+
+
 # ---------------------------------------------------------------------------
-# PFP 1: farmer avatar
+# circular cozy badge shared by the avatars
 # ---------------------------------------------------------------------------
-def make_pfp_farmer():
-    B, S = 64, 8                          # 64*8 = 512
+def cozy_badge(B):
+    """A circular sky badge — green ring, sky gradient, sun, cloud, and a grass
+    mound with sprouts. Returns (canvas, cx, cy, r, circle_mask) for a subject."""
     cv = Canvas(B, B)
     cx, cy, r = B // 2, B // 2, 31
 
-    # circular badge background: sky gradient inside a green ring
     cv.disc(cx, cy, r + 1, GRASS_DEEP)            # ring
     cv.disc(cx, cy, r - 1, SKY_MID)
-    # sky gradient (clipped to circle by redrawing grass mound after)
-    for yy in range(cy - r, cy + r):
+    for yy in range(cy - r, cy + r):              # sky gradient
         t = (yy - (cy - r)) / (2 * r)
         col = tuple(round(SKY_TOP[k] + (SKY_LOW[k] - SKY_TOP[k]) * t) for k in range(3))
         cv.d.rectangle([cx - r, yy, cx + r, yy], fill=col)
-    # re-mask to circle: punch transparent corners by drawing ring again over a fresh disc
-    mask = Image.new("L", (B, B), 0)
+
+    mask = Image.new("L", (B, B), 0)              # clip everything to the circle
     md = ImageDraw.Draw(mask)
     md.ellipse([cx - r - 1, cy - r - 1, cx + r + 1, cy + r + 1], fill=255)
     bg = cv.img
     cv.img = Image.new("RGBA", (B, B), (0, 0, 0, 0))
     cv.img.paste(bg, (0, 0), mask)
     cv.d = ImageDraw.Draw(cv.img)
-    # green ring outline on top
     cv.d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=GRASS_DEEP, width=2)
 
-    # sun + cloud in the sky
-    cv.disc(cx - 17, cy - 17, 5, SUN_CORE)
+    cv.disc(cx - 17, cy - 17, 5, SUN_CORE)        # sun
     cv.disc(cx - 17, cy - 17, 3, SUN)
-    cv.ellipse(cx + 6, cy - 20, cx + 18, cy - 14, CLOUD)
+    cv.ellipse(cx + 6, cy - 20, cx + 18, cy - 14, CLOUD)   # cloud
     cv.ellipse(cx + 10, cy - 23, cx + 20, cy - 16, CLOUD)
 
-    # grass mound at the bottom of the badge
-    cv.ellipse(cx - r, cy + 6, cx + r, cy + r + 14, GRASS)
+    cv.ellipse(cx - r, cy + 6, cx + r, cy + r + 14, GRASS)  # grass mound
     cv.ellipse(cx - r, cy + 10, cx + r, cy + r + 16, GRASS_DARK)
     for dx in (-22, -8, 16, 24):                  # little sprouts on the mound
         draw_sprout(cv, cx + dx, cy + 16)
+    return cv, cx, cy, r, mask
 
-    # the farmer, centered
-    draw_farmer(cv, cx + 1, cy + 14, scale=1)
 
-    # re-apply circle mask so anything that spilled stays inside
+def _badge_pfp(B, S, draw_subject):
+    """Run cozy_badge, draw the subject, re-clip to the circle, scale up."""
+    cv, cx, cy, r, mask = cozy_badge(B)
+    draw_subject(cv, cx, cy)
     out = Image.new("RGBA", (B, B), (0, 0, 0, 0))
     out.paste(cv.img, (0, 0), mask)
     return out.resize((B * S, B * S), Image.NEAREST)
+
+
+# ---------------------------------------------------------------------------
+# PFP 1: farmer avatar
+# ---------------------------------------------------------------------------
+def make_pfp_farmer():
+    return _badge_pfp(64, 8, lambda cv, cx, cy: draw_farmer(cv, cx + 1, cy + 14))
+
+
+# ---------------------------------------------------------------------------
+# PFP: mascot cat (in the cozy badge)
+# ---------------------------------------------------------------------------
+def make_pfp_mascot():
+    return _badge_pfp(64, 8, lambda cv, cx, cy: draw_cat(cv, cx, cy + 19))
+
+
+def make_mascot_flat():
+    """The mascot cat on a clean brand-green field (no badge) — flexible
+    avatar / sticker."""
+    B, S = 64, 8
+    cv = Canvas(B, B)
+    cv.vgrad(0, 0, B, B, GRASS_LIGHT, GRASS_DARK)
+    cv.ellipse(B // 2 - 15, B - 15, B // 2 + 15, B - 7, GRASS_DEEP)   # ground shadow
+    draw_cat(cv, B // 2, B - 11)
+    return cv.scale(S)
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +495,8 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     jobs = {
         "sprout-valley-pfp.png": make_pfp_farmer,
+        "sprout-valley-mascot.png": make_pfp_mascot,
+        "sprout-valley-mascot-flat.png": make_mascot_flat,
         "sprout-valley-coin.png": make_pfp_coin,
         "sprout-valley-banner.png": make_banner,
     }
