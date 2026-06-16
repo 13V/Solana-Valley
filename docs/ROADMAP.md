@@ -51,6 +51,9 @@ The single-player game is feature-complete and polished:
 - Energy/stamina, tool upgrades, expanding the farm.
 - NPCs, quests, multiplayer/social.
 
+> 💡 The full backlog of gameplay/content/social/token ideas (with a prioritized
+> shortlist and research notes) lives in [`IDEAS.md`](IDEAS.md).
+
 ## M6 — Polish & launch
 
 - Optional hand-drawn art pass over the procedural placeholders.
