@@ -376,8 +376,8 @@ body {
 }
 
 .iconbtn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
@@ -615,31 +615,32 @@ body {
   text-shadow: none;
 }
 
-/* New top-bar system: instead of a fragile per-button 9-slice sprite (which
-   clipped/cut off at small sizes no matter what), the whole icon row is ONE
-   wooden TRAY using the same ui_panel frame the modal panels use (that renders
-   cleanly), and each button is a flat icon with a soft hover/press highlight. */
+/* Top bar = the Sprout Lands hotbar design: one long wooden PANEL (ui_panel)
+   holding individual square icon SLOTS (the ui_btn frame, same as the bottom
+   hotbar's .slot — which renders cleanly at this size). */
 .ui-skin .hud-buttons {
-  border: 14px solid transparent;
+  border: 12px solid transparent;
   border-image: var(--ui-panel) 14 fill stretch;
   border-radius: 0;
-  padding: 0 2px;
-  gap: 0;
+  padding: 2px;
+  gap: 4px;
+  align-items: center;
 }
 .ui-skin .iconbtn {
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
+  background: none;
+  border: 8px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
   color: var(--ink);
   text-shadow: none;
   image-rendering: pixelated;
 }
 .ui-skin .iconbtn:hover {
-  background: rgba(92, 60, 30, 0.16);
+  border-image: var(--ui-btn-light) 8 fill stretch;
 }
 .ui-skin .iconbtn.active,
 .ui-skin .iconbtn:active {
-  background: rgba(92, 60, 30, 0.30);
+  border-image: var(--ui-btn-press) 8 fill stretch;
 }
 
 .ui-skin .badge {
