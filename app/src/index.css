@@ -371,6 +371,12 @@ body {
 }
 
 .hud-buttons {
+  /* Absolutely centered in the screen (badges sit left, wallet right) so the
+     toolbar is always dead-centre regardless of their widths. */
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
   display: flex;
   gap: 4px;
 }
@@ -675,11 +681,12 @@ body {
 }
 
 .ui-skin .slot {
-  border-width: 10px;
+  border-image: var(--slot) 8 fill stretch;
+  border-width: 9px;
 }
 
 .ui-skin .slot.selected {
-  border-image: var(--ui-btn-light) 8 fill stretch;
+  border-image: var(--slot-active) 8 fill stretch;
   box-shadow: none;
 }
 

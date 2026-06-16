@@ -23,8 +23,8 @@ export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills'
 // basket, chicken, hoe, star, book); help/sound stay crisp monochrome utility
 // glyphs. `emoji` is kept only as the img alt text.
 const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; label: string }> = [
-  { id: 'shop', emoji: '🛒', img: 'assets/sprout-ui/icon_coin.png', label: 'Shop' },
-  { id: 'seeds', emoji: '🌱', img: 'assets/sprout-ui/tool_seed.png', label: 'Seeds' },
+  { id: 'shop', emoji: '🛒', img: 'assets/sprout-ui/ic_cart_brown.png', label: 'Shop' },
+  { id: 'seeds', emoji: '🌱', img: 'assets/sprout-ui/ic_plant2_brown.png', label: 'Seeds' },
   { id: 'bag', emoji: '🎒', img: 'assets/sprout-ui/icon_basket.png', label: 'Harvest' },
   { id: 'animals', emoji: '🐔', img: 'assets/sprout-ui/icon_chicken.png', label: 'Animals' },
   { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
