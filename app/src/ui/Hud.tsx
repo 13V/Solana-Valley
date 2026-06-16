@@ -56,7 +56,7 @@ export function Hud({
     <div className="hud">
       <div className="hud-left">
         <div className="daynight" title={`Day ${day} · ${clock}`}>
-          <img className="dn-frame" src={`assets/sprout-ui/widget_${phase}.png?5`} alt={PHASE_ICON[phase].emoji} />
+          <img className="dn-frame" src={`assets/sprout-ui/widget_${phase}.png?6`} alt={PHASE_ICON[phase].emoji} />
           <span className="dn-date">Day {day} · {clock}</span>
         </div>
         <div className="hud-stats">

@@ -89,7 +89,7 @@ body {
    matches the art 1:1. The date string is overlaid on the pill. */
 .daynight {
   position: relative;
-  width: 140px;
+  width: 150px;
   line-height: 0;
   animation: dn-bob 4.5s ease-in-out infinite;
 }
@@ -99,14 +99,16 @@ body {
   display: block;
   image-rendering: pixelated;
 }
-/* Centered over the date pill baked into the widget image. */
+/* Centered over the date pill baked into the widget image (pill center is at
+   ~53.8% / 70% of the 93x100 art). */
 .dn-date {
   position: absolute;
-  left: 55.5%;
-  top: 73.5%;
+  left: 53.8%;
+  top: 70%;
   transform: translate(-50%, -50%);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
+  letter-spacing: -0.2px;
   line-height: 1;
   white-space: nowrap;
   color: #7a5733;
