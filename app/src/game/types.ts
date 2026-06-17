@@ -29,6 +29,7 @@ export type UiState = {
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
   perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
+  fishTree: { unlocked: string[]; pts: number }; // Angler's Tree: unlocked node ids + lifetime points earned
   skin: string; // worn outfit id
   ownedSkins: string[]; // unlocked outfit ids
 };

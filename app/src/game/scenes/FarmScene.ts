@@ -79,6 +79,13 @@ import {
   type WaterKind,
 } from '../fishing';
 import { FishingCast, type CastPhase } from '../fishingCast';
+import {
+  applyFishTree,
+  fishPointsForCatch,
+  spentPoints,
+  prereqMet,
+  FISH_NODE_BY_ID,
+} from '../fishingTree';
 import { pickForage, forageXp, type Forage } from '../forage';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
@@ -154,6 +161,8 @@ type SaveData = {
   animals: Record<string, number>;
   skills: Skills;
   perks: ChosenPerks;
+  fishNodes?: string[]; // Angler's Tree: unlocked node ids (optional — old saves predate it)
+  fishPts?: number; // lifetime fishing points earned
   skin: string; // worn outfit id
   ownedSkins: string[]; // unlocked outfit ids
 };
@@ -212,8 +221,12 @@ export class FarmScene extends Phaser.Scene {
   // skill progression (xp per skill) + chosen milestone perks
   private skills: Skills = { ...EMPTY_SKILLS };
   private perks: ChosenPerks = { ...EMPTY_PERKS };
-  // Aggregated multipliers/flags from skills + perks; recomputed on any change.
-  private modCache: Modifiers = activeModifiers(this.skills, this.perks);
+  // Angler's Tree: unlocked node ids + lifetime fishing points earned.
+  private fishNodes = new Set<string>();
+  private fishPts = 0;
+  // Aggregated multipliers/flags from skills + perks + the Angler's Tree;
+  // recomputed on any change.
+  private modCache: Modifiers = applyFishTree(activeModifiers(this.skills, this.perks), this.fishNodes);
 
   // fishing
   private pond!: Rect; // pond rect in tile coords (inclusive)
@@ -397,6 +410,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
+      bus.on('ui:unlockFishNode', (id) => this.unlockFishNode(id)),
       bus.on('ui:selectSkin', (id) => this.selectSkin(id)),
     );
     this.applySkin(this.skin); // wear the saved outfit (or classic) now the player exists
@@ -439,7 +453,7 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private recomputeMods() {
-    this.modCache = activeModifiers(this.skills, this.perks);
+    this.modCache = applyFishTree(activeModifiers(this.skills, this.perks), this.fishNodes);
   }
 
   // Debug snapshot used by the screenshot harness.
@@ -1635,6 +1649,34 @@ export class FarmScene extends Phaser.Scene {
     this.saveState();
   }
 
+  // Spend fishing points to unlock an Angler's Tree node. Validates the node
+  // exists, isn't already owned, has its prerequisites met, and is affordable;
+  // then applies its bonus to the modifier bag immediately.
+  private unlockFishNode(id: string) {
+    const node = FISH_NODE_BY_ID[id];
+    if (!node) return;
+    if (this.fishNodes.has(id)) return; // already unlocked
+    if (!prereqMet(node, this.fishNodes)) {
+      this.toast('🎣 Unlock the earlier nodes first.');
+      return;
+    }
+    const available = this.fishPts - spentPoints(this.fishNodes);
+    if (available < node.cost) {
+      this.toast(`🎣 Need ${node.cost - available} more fishing point${node.cost - available > 1 ? 's' : ''} — catch more fish!`);
+      return;
+    }
+    this.fishNodes.add(id);
+    this.recomputeMods(); // node bonus applies right away
+    sfx.play('upgrade');
+    this.toast(`🎣 ${node.name} unlocked — ${node.desc}`);
+    this.burst(this.player.x, this.player.y - 16, 'p_star', {
+      speed: { min: 40, max: 110 }, lifespan: 800, scale: { start: 1.1, end: 0 },
+      tint: [0x7bd0ff, 0xbff5ff, 0xffffff],
+    }, 12);
+    this.emitState();
+    this.saveState();
+  }
+
   private checkAchievements() {
     const stats = {
       earned: this.earned,
@@ -1987,9 +2029,12 @@ export class FarmScene extends Phaser.Scene {
     const tip: Record<Dir, { x: number; y: number }> = {
       down: { x: 6, y: -2 }, up: { x: -6, y: -18 }, left: { x: -14, y: -10 }, right: { x: 14, y: -10 },
     };
+    const m = this.mods();
     this.fishingCast.begin({
       origin: () => ({ x: this.player.x + tip[this.facing].x, y: this.player.y + tip[this.facing].y }),
       target: { x: cx, y: cy },
+      biteDelayMult: 1 / Math.max(0.2, m.fishBiteSpeedMult), // Quick Bite shortens the wait
+      hookWindowMult: m.fishHookWindowMult, // Steady Hands widens the click window
       onPhase: (phase) => this.playCastAnim(phase),
       onResolve: (o) => {
         if (o.hooked) {
@@ -2042,6 +2087,7 @@ export class FarmScene extends Phaser.Scene {
       const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
       this.coins += coins;
       this.earned += coins;
+      this.fishPts += Math.max(1, Math.round(3 * m.fishPtMult)); // treasure funds the Angler's Tree
       this.addSkillXp('fishing', 12);
       sfx.play('achievement');
       const frame = TREASURE_FRAMES[Math.floor(Math.random() * TREASURE_FRAMES.length)];
@@ -2056,16 +2102,26 @@ export class FarmScene extends Phaser.Scene {
     const f = catchFish(m.fishLuckMult * oceanLuck, water);
     // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
     const legendary = m.legendaryFish && Math.random() < 0.03;
+    // Double Catch (Angler's Tree): land two at once.
+    const doubled = Math.random() < m.fishDoubleCatchChance;
     const baseValue = legendary ? f.value * 12 : f.value;
-    const coins = Math.round(baseValue * m.fishValueMult * oceanValue);
+    const coins = Math.round(baseValue * m.fishValueMult * oceanValue) * (doubled ? 2 : 1);
     this.coins += coins;
     this.earned += coins;
+    // Fishing points fund the Angler's Tree — rarer fish (and doubles) pay more.
+    let pts = fishPointsForCatch(f.rarity) + (legendary ? 5 : 0);
+    if (doubled) pts *= 2;
+    this.fishPts += Math.max(1, Math.round(pts * m.fishPtMult));
     this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
     sfx.play(legendary ? 'achievement' : 'sell');
     this.popCatch(cx, cy, f.frame, fishColor(f), legendary);
+    if (doubled) this.floatText(cx + 14, cy - 30, '×2!', '#7bd0ff');
     if (legendary) {
       this.floatText(cx, cy - 50, '🌟 LEGENDARY!', '#ffd21a');
-      this.toast(`🌟 LEGENDARY ${f.name}! +${coins}🪙`);
+      this.toast(`🌟 LEGENDARY ${f.name}!${doubled ? ' ×2!' : ''} +${coins}🪙`);
+    } else if (doubled) {
+      this.floatText(cx, cy - 46, f.rarity, fishCss(f));
+      this.toast(`🎣 Double catch — ${f.name} ×2 (${f.rarity})! +${coins}🪙`);
     } else {
       this.floatText(cx, cy - 46, f.rarity, fishCss(f));
       this.toast(`🎣 Caught a ${f.name} (${f.rarity})! +${coins}🪙`);
@@ -2236,6 +2292,8 @@ export class FarmScene extends Phaser.Scene {
       animals: this.animalCounts,
       skills: this.skills,
       perks: this.perks,
+      fishNodes: [...this.fishNodes],
+      fishPts: this.fishPts,
       skin: this.skin,
       ownedSkins: [...this.ownedSkins],
     };
@@ -2276,6 +2334,8 @@ export class FarmScene extends Phaser.Scene {
     this.achievements = new Set(data.achievements ?? []);
     this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
+    this.fishNodes = new Set(data.fishNodes ?? []);
+    this.fishPts = data.fishPts ?? 0;
     this.ownedSkins = new Set([DEFAULT_SKIN, ...(data.ownedSkins ?? [])]);
     this.skin = this.ownedSkins.has(data.skin) ? data.skin : DEFAULT_SKIN;
     this.recomputeMods(); // restored skills/perks change the modifier bag
@@ -2366,6 +2426,7 @@ export class FarmScene extends Phaser.Scene {
       },
       skills: { ...this.skills },
       perks: { ...this.perks },
+      fishTree: { unlocked: [...this.fishNodes], pts: this.fishPts },
       skin: this.skin,
       ownedSkins: [...this.ownedSkins],
     });

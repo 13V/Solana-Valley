@@ -5,6 +5,7 @@ import { useSolBalance } from '../chain/useSolBalance';
 import { useGameState, useClock } from './useGameState';
 import { sfx } from '../game/audio';
 import { pendingChoices } from '../game/skills';
+import { spentPoints } from '../game/fishingTree';
 
 // Day/night get cropped weather-sheet sprites; dawn/dusk keep their emoji
 // (no clean pixel match in the pack). `emoji` doubles as the img alt text.
@@ -15,7 +16,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'wardrobe' | 'help' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'fishtree' | 'almanac' | 'wardrobe' | 'help' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
@@ -29,6 +30,7 @@ const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; la
   { id: 'animals', emoji: '🐔', img: 'assets/sprout-ui/icon_chicken.png', label: 'Animals' },
   { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
   { id: 'skills', emoji: '🎯', img: 'assets/sprout-ui/icon_star.png', label: 'Skills' },
+  { id: 'fishtree', emoji: '🎣', img: 'assets/sprout-ui/ic_pond.png', label: 'Angler' },
   { id: 'almanac', emoji: '📖', img: 'assets/sprout-ui/icon_almanac.png', label: 'Almanac' },
   { id: 'wardrobe', emoji: '🐾', label: 'Cat Coats' },
   { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
@@ -43,9 +45,10 @@ export function Hud({
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
-  const { coins, progress, skills, perks } = useGameState();
+  const { coins, progress, skills, perks, fishTree } = useGameState();
   const { day, clock, phase } = useClock();
   const perkChoices = pendingChoices(skills, perks).length;
+  const fishAvail = (fishTree?.pts ?? 0) - spentPoints(fishTree?.unlocked ?? []);
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
@@ -73,13 +76,15 @@ export function Hud({
       </div>
       <div className="hud-buttons">
         {BUTTONS.map((b) => {
-          const showDot = b.id === 'skills' && perkChoices > 0;
+          const dotCount = b.id === 'skills' ? perkChoices : b.id === 'fishtree' ? fishAvail : 0;
+          const showDot = dotCount > 0;
+          const dotNoun = b.id === 'skills' ? 'perk choice' : 'point';
           return (
             <button
               key={b.id}
               className={`iconbtn ${panel === b.id ? 'active' : ''}`}
               onClick={() => onToggle(b.id)}
-              title={showDot ? `${b.label} — ${perkChoices} perk choice${perkChoices > 1 ? 's' : ''} available!` : b.label}
+              title={showDot ? `${b.label} — ${dotCount} ${dotNoun}${dotCount > 1 ? 's' : ''} available!` : b.label}
               style={showDot ? { position: 'relative' } : undefined}
             >
               {b.img ? <img className="btn-ico" src={b.img} alt={b.emoji} /> : b.emoji}
@@ -92,7 +97,7 @@ export function Hud({
                     border: '2px solid #fff3d8', boxSizing: 'border-box',
                   }}
                 >
-                  {perkChoices}
+                  {dotCount}
                 </span>
               )}
             </button>
