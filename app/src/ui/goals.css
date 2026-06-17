@@ -94,6 +94,15 @@
   transform: rotate(-90deg);
 }
 
+/* North-star completion meter line, above the checklist. */
+.goals-master {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink, #4a3526);
+  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.35);
+}
+
 .goals-list {
   list-style: none;
   margin: 6px 0 0;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGameState } from './useGameState';
+import { masterGardenerPct } from '../game/collection';
 import type { UiState } from '../game/types';
 import './goals.css';
 
@@ -40,6 +41,17 @@ export function GoalsHud() {
   const completed = statuses.filter(Boolean).length;
   const allDone = completed === GOALS.length;
 
+  // North-star completion meter — the rolled-up long-term goal (see Almanac for
+  // the full breakdown). Derived live from the discovery/upgrade/achievement
+  // state already in the snapshot.
+  const masterPct = masterGardenerPct({
+    discoveredPlants: state.progress.discoveredPlants,
+    discoveredMutations: state.progress.discoveredMutations,
+    level: state.progress.level,
+    upgrades: state.progress.upgrades,
+    achievements: state.progress.achievements,
+  });
+
   return (
     <div className={`goals-hud${collapsed ? ' is-collapsed' : ''}`}>
       <div className="goals-inner">
@@ -58,6 +70,7 @@ export function GoalsHud() {
 
         {!collapsed && (
           <>
+            <div className="goals-master">🌱 Master Gardener: {masterPct}%</div>
             <ul className="goals-list">
               {GOALS.map((g, i) => (
                 <li key={g.label} className={`goals-item${statuses[i] ? ' is-done' : ''}`}>

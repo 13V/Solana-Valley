@@ -47,6 +47,7 @@ import {
   type UpgradeId,
   type Upgrades,
 } from '../progression';
+import { collectionBonus } from '../collection';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
   HOME,
@@ -1627,7 +1628,8 @@ export class FarmScene extends Phaser.Scene {
       cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
-        this.mods().cropValueMult,
+        this.mods().cropValueMult *
+        this.collectionMult(),
     );
     delete this.harvestInv[key];
     this.coins += value;
@@ -1639,11 +1641,23 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
-  // Suffix for sell toasts that surfaces the Market Stall bonus when it's active,
-  // so players actually feel the (otherwise invisible) sale-price upgrade pay off.
+  // Permanent Collection Bonus multiplier, derived live from cumulative
+  // discoveries (distinct plants + mutations + completed tiers). Keeps Commons
+  // relevant since every new find lifts ALL crop sale value forever.
+  private collectionMult(): number {
+    return collectionBonus(this.discoveredPlants, this.discoveredMutations).mult;
+  }
+
+  // Suffix for sell toasts that surfaces the Market Stall + Collection bonuses
+  // when active, so players actually feel these (otherwise invisible) sale-price
+  // boosts pay off.
   private marketBonusTag(): string {
-    const pct = Math.round((marketBonus(this.upgrades.market) - 1) * 100);
-    return pct > 0 ? ` · +${pct}% Market Stall` : '';
+    const market = Math.round((marketBonus(this.upgrades.market) - 1) * 100);
+    const coll = collectionBonus(this.discoveredPlants, this.discoveredMutations).pct;
+    let tag = '';
+    if (market > 0) tag += ` · +${market}% Market Stall`;
+    if (coll > 0) tag += ` · +${coll}% Collection`;
+    return tag;
   }
 
   private sellAll() {
@@ -1653,7 +1667,7 @@ export class FarmScene extends Phaser.Scene {
       const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
       total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
     }
-    total = Math.round(total * marketBonus(this.upgrades.market) * this.mods().cropValueMult);
+    total = Math.round(total * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult());
     if (total <= 0) {
       this.toast('Nothing to sell');
       return;

@@ -589,6 +589,32 @@ body {
   padding: 3px 9px;
 }
 
+/* Collection Bonus block + per-tier completion readout */
+.alm-collection {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a3140;
+}
+
+.alm-tier-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.alm-tier {
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 8px;
+  opacity: 0.65;
+}
+
+.alm-tier.done {
+  opacity: 1;
+}
+
 /* Toasts */
 .toasts {
   position: absolute;
