@@ -47,6 +47,7 @@ export function MultiplayerSync() {
 
     let cancelled = false;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let onVisible: (() => void) | null = null;
 
     (async () => {
       // Reuse the shared, cached signature (single prompt across features).
@@ -57,71 +58,80 @@ export function MultiplayerSync() {
       // island if it has room (server falls back when full / on bad input).
       const islandParam = new URLSearchParams(location.search).get('island');
       const preferIsland = islandParam !== null ? Number(islandParam) : NaN;
-      const requestBody: Record<string, unknown> = { ...auth };
-      if (Number.isInteger(preferIsland) && preferIsland >= 0) {
-        requestBody.preferIsland = preferIsland;
-      }
-      // Pass our chosen display name (server sanitizes + falls back to the short
-      // wallet if empty/missing).
-      if (username) requestBody.name = username;
 
-      let assignment: JoinResponse | null = null;
-      try {
-        const resp = await fetch('/api/join', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-        if (!resp.ok) return; // best-effort: disable multiplayer silently
-        const json = (await resp.json()) as Partial<JoinResponse>;
-        if (
-          typeof json.island !== 'number' ||
-          typeof json.plot !== 'number' ||
-          typeof json.name !== 'string'
-        ) {
-          return;
+      const buildBody = (prefer?: number): Record<string, unknown> => {
+        const body: Record<string, unknown> = { ...auth };
+        if (prefer !== undefined && Number.isInteger(prefer) && prefer >= 0) body.preferIsland = prefer;
+        // Re-send the name each time so a mid-session rename propagates via the
+        // server's existing-wallet path.
+        if (username) body.name = username;
+        return body;
+      };
+
+      const postJoin = async (prefer?: number): Promise<JoinResponse | null> => {
+        try {
+          const resp = await fetch('/api/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildBody(prefer)),
+          });
+          if (!resp.ok) return null;
+          const json = (await resp.json()) as Partial<JoinResponse>;
+          if (typeof json.island !== 'number' || typeof json.plot !== 'number' || typeof json.name !== 'string') {
+            return null;
+          }
+          return { island: json.island, plot: json.plot, name: json.name };
+        } catch {
+          return null;
         }
-        assignment = { island: json.island, plot: json.plot, name: json.name };
-      } catch {
-        return; // network error -> stay single-player
-      }
+      };
 
-      if (cancelled || !assignment) return;
+      // Our current seat. The server is authoritative: if a heartbeat comes back
+      // with a DIFFERENT seat, our old plot was reclaimed (we went stale) and
+      // we've been re-seated — so we re-point the game + presence to the new one.
+      let seat: JoinResponse | null = null;
+      const applySeat = (next: JoinResponse) => {
+        if (cancelled) return;
+        const first = seat === null;
+        const moved = !first && (seat!.island !== next.island || seat!.plot !== next.plot);
+        seat = next;
+        if (!first && !moved) return; // unchanged seat (normal heartbeat) -> no-op
 
-      // Tell the game which seat it owns (and our own id, so it can exclude us
-      // from the presence roster when spawning remote avatars).
-      bus.emit('mp:assigned', { id: auth.wallet, island: assignment.island, plot: assignment.plot });
+        bus.emit('mp:assigned', { id: auth.wallet, island: next.island, plot: next.plot });
+        const status = `Joined island ${next.island} · plot ${next.plot}`;
+        bus.emit('mp:status', status);
+        bus.emit(
+          'toast',
+          moved
+            ? `Your old plot was claimed — moved to island ${next.island} · plot ${next.plot}`
+            : status,
+        );
+        // (Re)connect to the island's realtime channel; re-tracks presence with
+        // the current plot so peers see us on the right one.
+        joinIsland(next.island, { id: auth.wallet, name: next.name, plot: next.plot });
+      };
 
-      const status = `Joined island ${assignment.island} · plot ${assignment.plot}`;
-      bus.emit('mp:status', status);
-      bus.emit('toast', status);
+      const initial = await postJoin(Number.isInteger(preferIsland) && preferIsland >= 0 ? preferIsland : undefined);
+      if (cancelled || !initial) return; // best-effort: stay single-player
+      applySeat(initial);
 
-      // Connect to the island's realtime channel (presence + position relay).
-      joinIsland(assignment.island, {
-        id: auth.wallet,
-        name: assignment.name,
-        plot: assignment.plot,
-      });
-
-      // Keep our seat alive: re-POST /api/join (same cached auth, preferIsland =
-      // our island) so the server refreshes our row's `updated_at`. The
-      // existing-wallet path returns the SAME seat and never reassigns, so this
-      // is purely a heartbeat. Best-effort: a failed beat just retries next tick.
-      const assignedIsland = assignment.island;
-      if (cancelled) return; // torn down mid-join -> don't start a stray interval
-      heartbeat = setInterval(() => {
-        // Re-send the name on each beat too, so a name changed mid-session
-        // propagates via the server's existing-wallet (rename) path.
-        const beatBody: Record<string, unknown> = { ...auth, preferIsland: assignedIsland };
-        if (username) beatBody.name = username;
-        void fetch('/api/join', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(beatBody),
-        }).catch(() => {
-          // network blip -> ignore; the next interval tick re-tries
+      // Heartbeat: re-POST /api/join (preferring our current island) so the
+      // server refreshes our `updated_at`. We now READ the response and re-point
+      // if it reassigned us (the bug fix: this used to be fire-and-forget).
+      const beat = () => {
+        void postJoin(seat?.island).then((next) => {
+          if (next) applySeat(next);
         });
-      }, HEARTBEAT_MS);
+      };
+      if (cancelled) return; // torn down mid-join -> don't start a stray interval
+      heartbeat = setInterval(beat, HEARTBEAT_MS);
+      // Mobile browsers throttle background timers, so a tab that's been away can
+      // miss beats and get its plot reclaimed. Beat immediately on refocus to
+      // re-confirm (and pick up any reassignment) as soon as we're visible again.
+      onVisible = () => {
+        if (document.visibilityState === 'visible') beat();
+      };
+      document.addEventListener('visibilitychange', onVisible);
     })();
 
     return () => {
@@ -129,6 +139,10 @@ export function MultiplayerSync() {
       if (heartbeat !== null) {
         clearInterval(heartbeat);
         heartbeat = null;
+      }
+      if (onVisible) {
+        document.removeEventListener('visibilitychange', onVisible);
+        onVisible = null;
       }
       leaveIsland();
     };
