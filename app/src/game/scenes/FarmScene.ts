@@ -1199,7 +1199,9 @@ export class FarmScene extends Phaser.Scene {
   // growing from the front (gate side) back toward the top. (Base bed is 10 rows
   // tall; this free level-unlock is unchanged.)
   private unlockedFarmRows(): number {
-    return Math.min(this.myFarmRect().ph, 2 + levelInfo(this.xp).level);
+    // New players get more tillable rows up front (3 + level) so the early
+    // farming loop has enough throughput; fully opens by level 7.
+    return Math.min(this.myFarmRect().ph, 3 + levelInfo(this.xp).level);
   }
 
   // A tile is tillable when it sits inside the farmable bed (base + purchased
@@ -1211,17 +1213,21 @@ export class FarmScene extends Phaser.Scene {
     return ty >= f.py + f.ph - this.unlockedFarmRows();
   }
 
-  // Player's crop bed: the grass is left at its natural colour so the plot blends
-  // seamlessly with the surrounding world (no checkerboard tint or locked-row
-  // dimming). Which rows are tillable is gated in `till()` via unlockedFarmRows(),
-  // so the unlock-by-level behaviour is unchanged — it just isn't shown as a tint.
+  // Player's crop bed: tint the grass so the cultivated plot reads clearly against
+  // the wild grass. Tillable (level-unlocked) rows get a warm "ready soil" tint;
+  // still-locked rows are dimmer so you can see the whole plot and what's left to
+  // unlock. The tint only shows on untilled tiles (the dirt overlay covers tilled
+  // ones). Re-run whenever the plot, expansion, or level changes.
   private markPlayerFarm() {
     const f = this.expandedFarmRect();
+    const unlockedFromY = f.py + f.ph - this.unlockedFarmRows();
     const x0 = f.px, x1 = f.px + f.pw - 1;
     const y0 = f.py, y1 = f.py + f.ph - 1;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        this.ground[y]?.[x]?.clearTint();
+        const tile = this.ground[y]?.[x];
+        if (!tile) continue;
+        tile.setTint(y >= unlockedFromY ? 0xd8e6a8 : 0xb3c2a0);
       }
     }
   }
@@ -1992,7 +1998,7 @@ export class FarmScene extends Phaser.Scene {
     if (after > before) {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
-      if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 2 + before)) {
+      if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 3 + before)) {
         this.markPlayerFarm(); // reveal the newly-unlocked crop row
         this.toast('🌱 New farm row unlocked!');
       }
