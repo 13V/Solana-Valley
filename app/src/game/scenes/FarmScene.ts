@@ -41,6 +41,7 @@ import {
   levelInfo,
   marketBonus,
   MAX_GROWTH_MULT,
+  seedDiscount,
   sprinklerIntervalMs,
   toolRadius,
   upgradeUnlocked,
@@ -52,6 +53,7 @@ import {
 } from '../progression';
 import { collectionBonus } from '../collection';
 import { GOALS, rewardLabel, type GoalStats } from '../goals';
+import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
   HOME,
@@ -304,6 +306,7 @@ export class FarmScene extends Phaser.Scene {
   private shopEpoch = 0;
   private shopPool: Record<string, number> = {};
   private shopBought: Record<string, number> = {};
+  private shopSyncMs = 0; // accumulator for the periodic authoritative DB reconcile
 
   // progression
   private xp = 0;
@@ -1715,19 +1718,47 @@ export class FarmScene extends Phaser.Scene {
       this.toast('Out of stock');
       return;
     }
-    if (this.coins < plant.seedCost) {
+    // Shop Supply upgrade + its fork give a modest personal seed discount.
+    const supplyFork = this.fork('supply');
+    let discount = seedDiscount(this.upgrades.supply ?? 0) + (supplyFork.seedDiscount ?? 0);
+    if (rarityRank(plant.rarity) >= 3) discount += supplyFork.rareSeedDiscount ?? 0; // Legendary+
+    const cost = Math.max(1, Math.round(plant.seedCost * (1 - Math.min(0.6, discount))));
+    if (this.coins < cost) {
       this.toast('Not enough coins');
       return;
     }
-    this.coins -= plant.seedCost;
+
+    // Optimistically grant the seed + drain the shared pool, then confirm against
+    // the authoritative DB when on a real island. This keeps buying instant while
+    // staying correct: if we lost a race for the last unit, we roll back.
+    const cap = this.shopPool[plantId] ?? 0;
+    this.coins -= cost;
     this.shopBought[plantId] = (this.shopBought[plantId] ?? 0) + 1;
-    bus.emit('mp:shopBuy', { plantId }); // drain the shared pool for island peers
     this.seeds[plantId] = (this.seeds[plantId] ?? 0) + 1;
     this.selectedSeed = plantId;
     this.selected = 'seed';
     sfx.play('buy');
     this.toast(`Bought ${plant.name} seed`);
+    bus.emit('mp:shopBuy', { plantId }); // live nudge to island peers
     this.emitState();
+
+    if (this.shopShared) {
+      void buySeedRemote(this.island, this.shopEpoch, plantId, cap).then((result) => {
+        if (result === null) return; // DB unavailable -> keep optimistic result
+        if (result === -1) {
+          // Sold out — we lost the race. Refund and undo.
+          this.coins += cost;
+          this.seeds[plantId] = Math.max(0, (this.seeds[plantId] ?? 0) - 1);
+          this.shopBought[plantId] = cap; // it's truly empty this window
+          this.toast(`${plant.name} just sold out!`);
+          this.emitState();
+          return;
+        }
+        // Adopt the authoritative count (includes our buy + any concurrent ones).
+        this.shopBought[plantId] = Math.max(this.shopBought[plantId] ?? 0, result);
+        this.emitState();
+      });
+    }
   }
 
   private selectSeed(plantId: string) {
@@ -1918,10 +1949,33 @@ export class FarmScene extends Phaser.Scene {
   }
 
   // Start a fresh restock window: reset purchases and re-roll the shared pool.
+  // When on a real island, pull the authoritative bought-counts for the new
+  // window from the DB (so the pool is exact, not just broadcast-derived).
   private rollShopWindow(epoch: number) {
     this.shopEpoch = epoch;
     this.shopBought = {};
     this.refreshShopPool();
+    if (this.shopShared) this.syncShopFromDb();
+  }
+
+  // True once we're seated on a real multiplayer island (vs. offline solo play).
+  private get shopShared(): boolean {
+    return !!this.myMpId;
+  }
+
+  // Pull the authoritative bought-counts for the current window from Supabase and
+  // adopt them, so late joiners / missed broadcasts can't desync the shared pool.
+  // Best-effort: a null result (DB not configured / offline) leaves local state.
+  private syncShopFromDb() {
+    if (!this.shopShared) return;
+    const island = this.island;
+    const epoch = this.shopEpoch;
+    void fetchShopBought(island, epoch).then((bought) => {
+      if (!bought) return; // DB unavailable -> keep local/broadcast state
+      if (this.shopEpoch !== epoch || this.island !== island) return; // stale
+      this.shopBought = bought;
+      this.emitState();
+    });
   }
 
   // A peer on the island bought a seed — drain the shared pool locally too.
@@ -3689,6 +3743,15 @@ export class FarmScene extends Phaser.Scene {
       this.rollShopWindow(epoch);
       this.toast('🛒 The seed shop restocked!');
       this.emitState();
+    }
+    // Periodically reconcile the shared pool against the authoritative DB so a
+    // missed buy-broadcast can't leave us out of sync for long.
+    if (this.shopShared) {
+      this.shopSyncMs += delta;
+      if (this.shopSyncMs >= 30_000) {
+        this.shopSyncMs = 0;
+        this.syncShopFromDb();
+      }
     }
     const frac = (this.timeMs % DAY_LENGTH_MS) / DAY_LENGTH_MS;
     const { color, alpha } = this.ambientFor(frac);

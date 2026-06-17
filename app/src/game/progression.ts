@@ -47,8 +47,8 @@ export type ForkEffect = {
   topMutationLuckMult?: number; // extra luck applied ONLY to the top mutations (Gold/Rainbow)
   saleFlatBonus?: number; // flat extra coins per crop sold
   rareSaleMult?: number; // extra sale multiplier for higher-rarity crops (Legendary+)
-  restockReductionMs?: number; // extra shop-restock speedup (ms)
-  rareSeedLuckMult?: number; // better odds of rarer seeds appearing on a restock
+  seedDiscount?: number; // fraction off ALL seed prices (0.08 = 8% cheaper)
+  rareSeedDiscount?: number; // additional fraction off Legendary+ seed prices
 };
 
 export type Fork = { id: string; name: string; desc: string; eff: ForkEffect };
@@ -86,10 +86,13 @@ export const UPGRADES: UpgradeDef[] = [
       a: { id: 'clover', name: 'Lucky Clover', desc: '+40% mutation luck across the board', eff: { mutationLuckMult: 0.40 } },
       b: { id: 'jackpot', name: 'Jackpot', desc: '×2 odds of the top mutations (Gold/Rainbow)', eff: { topMutationLuckMult: 1 } },
     } },
-  { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster`,
+  // Shop is shared per island now (deterministic + wall-clock restock), so the
+  // old per-player restock/luck effects don't apply. Repurposed as a modest
+  // personal SEED DISCOUNT (seeds are cheap vs crop value, so this stays minor).
+  { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `${l * 4}% off seed prices`,
     fork: {
-      a: { id: 'stockpile', name: 'Stockpile', desc: 'restock another 15s faster', eff: { restockReductionMs: 15_000 } },
-      b: { id: 'eye', name: "Connoisseur's Eye", desc: '+60% odds of rare seeds on restock', eff: { rareSeedLuckMult: 1.6 } },
+      a: { id: 'stockpile', name: 'Bulk Buyer', desc: '−8% off all seed prices', eff: { seedDiscount: 0.08 } },
+      b: { id: 'eye', name: "Connoisseur's Eye", desc: '−20% off Legendary+ seed prices', eff: { rareSeedDiscount: 0.20 } },
     } },
   { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`), req: 6,
     fork: {
@@ -116,7 +119,7 @@ export const EMPTY_UPGRADES: Upgrades = { water: 0, hoe: 0, growth: 0, fortune: 
 export const toolRadius = (lvl: number) => lvl; // 0=1 tile, 1=3x3, 2=5x5, 3=7x7
 export const growthFactor = (lvl: number) => 1 + 0.15 * lvl;
 export const fortuneLuck = (lvl: number) => 1 + 0.3 * lvl;
-export const restockReductionMs = (lvl: number) => lvl * 20_000;
+export const seedDiscount = (lvl: number) => lvl * 0.04; // 4% off seeds per Shop Supply level (max 12%)
 export const marketBonus = (lvl: number) => 1 + 0.1 * lvl; // crop sale price multiplier
 export const sprinklerIntervalMs = (lvl: number) => (lvl > 0 ? 45_000 / lvl : Infinity);
 
@@ -145,8 +148,8 @@ export const EMPTY_FORK_EFFECT: Required<ForkEffect> = {
   topMutationLuckMult: 0,
   saleFlatBonus: 0,
   rareSaleMult: 0,
-  restockReductionMs: 0,
-  rareSeedLuckMult: 0,
+  seedDiscount: 0,
+  rareSeedDiscount: 0,
 };
 
 // A fork is only choosable once its upgrade is at MAX level.
