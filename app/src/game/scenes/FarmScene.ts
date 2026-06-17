@@ -315,6 +315,8 @@ export class FarmScene extends Phaser.Scene {
   // roster to show whose plot each one is.
   private plotLabels = new Map<number, Phaser.GameObjects.Text>();
   private lastReverifyAt = 0; // throttle for the same-plot conflict re-verify
+  private minimap!: Phaser.GameObjects.Graphics; // fixed-to-camera island minimap
+  private minimapCoarse = false; // touch device -> draw on the right (clear of joystick)
 
   // progression
   private xp = 0;
@@ -508,6 +510,11 @@ export class FarmScene extends Phaser.Scene {
     });
 
     this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(100000);
+
+    // Minimap: fixed to the camera, drawn each frame in drawMinimap(). On touch
+    // devices it sits bottom-right to clear the bottom-left joystick.
+    this.minimapCoarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    this.minimap = this.add.graphics().setScrollFactor(0).setDepth(99000);
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
@@ -3236,6 +3243,52 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // Redraw the island minimap (fixed to the camera): a faint plot grid with a dot
+  // for every player — others in amber, you in green — so you can see who's where.
+  private drawMinimap() {
+    const g = this.minimap;
+    if (!g) return;
+    g.clear();
+    const pad = 4;
+    const scale = Math.min(168 / WORLD_WIDTH, 120 / WORLD_HEIGHT);
+    const mapW = WORLD_WIDTH * scale;
+    const mapH = WORLD_HEIGHT * scale;
+    const sw = this.scale.width;
+    const sh = this.scale.height;
+    const margin = 12;
+    const ox = this.minimapCoarse ? sw - mapW - pad * 2 - margin : margin;
+    const oy = sh - mapH - pad * 2 - margin;
+    const bx = ox + pad;
+    const by = oy + pad;
+    const wx = (x: number) => bx + x * scale;
+    const wy = (y: number) => by + y * scale;
+
+    // Panel.
+    g.fillStyle(0x12241b, 0.62);
+    g.fillRoundedRect(ox, oy, mapW + pad * 2, mapH + pad * 2, 6);
+    g.lineStyle(2, 0x6e4a2b, 0.85);
+    g.strokeRoundedRect(ox, oy, mapW + pad * 2, mapH + pad * 2, 6);
+
+    // Plot blocks for orientation.
+    g.fillStyle(0x9ccb6a, 0.45);
+    for (const h of HOMESTEADS) {
+      const it = h.interior;
+      g.fillRect(wx(it.x0 * TILE), wy(it.y0 * TILE), (it.x1 - it.x0 + 1) * TILE * scale, (it.y1 - it.y0 + 1) * TILE * scale);
+    }
+
+    // Other players (amber dots).
+    g.fillStyle(0xffc23d, 1);
+    this.remotePlayers.forEach((rp) => g.fillCircle(wx(rp.sprite.x), wy(rp.sprite.y), 2.4));
+
+    // You (green dot with a white ring).
+    if (this.player) {
+      g.fillStyle(0x57e08a, 1);
+      g.fillCircle(wx(this.player.x), wy(this.player.y), 3.2);
+      g.lineStyle(1.2, 0xffffff, 0.9);
+      g.strokeCircle(wx(this.player.x), wy(this.player.y), 3.2);
+    }
+  }
+
   // Tint another player's base crop bed (uniform "cultivated" green) so their plot
   // reads like a farm. We don't know their expansion width or unlocked rows, so we
   // mark just the base bed evenly.
@@ -3784,6 +3837,8 @@ export class FarmScene extends Phaser.Scene {
         this.tweens.add({ targets: this.gate, scaleX: 2, duration: 220, ease: 'Quad.easeIn' });
       }
     }
+
+    this.drawMinimap();
 
     this.updateAnimals(time);
 
