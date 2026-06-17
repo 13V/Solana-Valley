@@ -86,7 +86,7 @@ import {
 } from '../skills';
 import { catchFish, fishXp } from '../fishing';
 import { pickForage, forageXp, type Forage } from '../forage';
-import { bus } from '../EventBus';
+import { bus, type GameEvents } from '../EventBus';
 import { sfx } from '../audio';
 import { virtualMove, getKeyBinds, onKeyBindsChange, type MoveAction } from '../input';
 
@@ -123,6 +123,25 @@ type RemotePlayer = {
   targetY: number;
   facing: Dir;
   name: string;
+};
+
+// A single remote crop drawn in another player's plot. Visual only — it reuses
+// the same 'cropsheet' texture/frames + mutation glow/sparkle as a local crop,
+// but never touches this.crops / this.tiles. `key` is its plot-relative "dx,dy".
+type RemoteCropSprite = {
+  sprite: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+  sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Last-rendered visual signature, so a snapshot that didn't change a given
+  // crop is a cheap no-op (no destroy/recreate of glow/sparkle).
+  sig: string;
+};
+
+// One remote player's whole farm: which plot they're on + their crop sprites,
+// keyed by plot-relative "dx,dy" so snapshots can be diffed in place.
+type RemoteFarm = {
+  plot: number;
+  sprites: Map<string, RemoteCropSprite>;
 };
 
 // The player's two animal pens + orchard in *pixel* coords (derived from HOME).
@@ -307,6 +326,17 @@ export class FarmScene extends Phaser.Scene {
   private myPlotIndex = 0;
   // id -> remote avatar. Visual only (no collision); upserted on `mp:move`.
   private remotePlayers = new Map<string, RemotePlayer>();
+  // id -> remote player's farm (their crops, drawn in their own plot). Visual
+  // only; upserted on `mp:remoteFarm`, diffed in place, cleaned up on leave.
+  private remoteFarms = new Map<string, RemoteFarm>();
+  // True once the server has assigned us a plot (we're in a live session). Gates
+  // the local-crop snapshot broadcast so single-player never emits.
+  private mpConnected = false;
+  // Throttle for the periodic local-crop snapshot heartbeat (see update()).
+  private lastFarmEmit = 0;
+  // Set when a change (plant/harvest) wants the next heartbeat to fire ASAP, so
+  // edits feel responsive without rebuilding the snapshot every frame.
+  private farmDirty = false;
   // Last pose we broadcast, so `mp:self` only fires on change + throttled.
   private lastSelfPose = { x: 0, y: 0, facing: 'down' as Dir };
   private lastSelfEmit = 0;
@@ -485,11 +515,14 @@ export class FarmScene extends Phaser.Scene {
       bus.on('mp:roster', (players) => this.onRoster(players)),
       bus.on('mp:move', (m) => this.onRemoteMove(m)),
       bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
+      bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
     );
-    // Tear down every remote avatar + the ground guide on scene shutdown.
+    // Tear down every remote avatar + remote farm + the ground guide on shutdown.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
       this.remotePlayers.clear();
+      this.remoteFarms.forEach((_, id) => this.removeRemoteFarm(id));
+      this.remoteFarms.clear();
       this.clearGuide();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -1338,6 +1371,7 @@ export class FarmScene extends Phaser.Scene {
     }, 6);
     sfx.play('plant');
     bus.emit('action', 'plant');
+    this.farmDirty = true; // push an updated crop snapshot to peers ASAP
     this.emitState();
   }
 
@@ -1551,6 +1585,7 @@ export class FarmScene extends Phaser.Scene {
     if (!regrew && mods.autoReplant && Math.random() < 0.15 && this.isInMyFarm(tx, ty)) {
       this.autoReplant(tx, ty, plant);
     }
+    this.farmDirty = true; // a crop changed -> peers should see it ASAP
     this.emitState();
   }
 
@@ -2865,6 +2900,8 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private removeRemote(id: string) {
+    // Drop the avatar AND any crops they were showing (a leaver vanishes whole).
+    this.removeRemoteFarm(id);
     const rp = this.remotePlayers.get(id);
     if (!rp) return;
     rp.sprite.destroy();
@@ -2925,6 +2962,174 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // ---- multiplayer: remote crops ------------------------------------------
+
+  // Build the local crop snapshot (relative to our plot origin) and ask the net
+  // layer to broadcast it. Mirrors broadcastSelf: cheap, no-op in single-player
+  // (nobody subscribes to 'mp:farm'). Capped to bound the payload size.
+  private broadcastFarm() {
+    const origin = this.myFarmRect();
+    const ox = origin.px, oy = origin.py;
+    const crops: GameEvents['mp:farm']['crops'] = [];
+    const MAX_CROPS = 150;
+    for (const c of this.crops.values()) {
+      if (crops.length >= MAX_CROPS) break;
+      crops.push([
+        c.tx - ox,
+        c.ty - oy,
+        c.plant.id,
+        c.stage,
+        c.mature ? 1 : 0,
+        c.mutation?.id ?? '',
+      ]);
+    }
+    bus.emit('mp:farm', { crops });
+  }
+
+  // A remote player's crop snapshot arrived. Reconcile their visual-only crop
+  // sprites against the new snapshot (add/update/remove). Defensive throughout —
+  // a malformed tuple is skipped, never thrown.
+  private onRemoteFarm({ id, plot, crops }: GameEvents['mp:remoteFarm']) {
+    if (typeof id !== 'string' || !Array.isArray(crops)) return;
+    // Never draw over our own farm (our own crops are authoritative locally).
+    if (plot === this.myPlotIndex) {
+      this.removeRemoteFarm(id);
+      return;
+    }
+    const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : -1;
+    if (next < 0) return;
+
+    let farm = this.remoteFarms.get(id);
+    // If the player moved plots, wipe their old sprites and start fresh.
+    if (farm && farm.plot !== next) {
+      this.removeRemoteFarm(id);
+      farm = undefined;
+    }
+    if (!farm) {
+      farm = { plot: next, sprites: new Map() };
+      this.remoteFarms.set(id, farm);
+    }
+
+    const origin = homesteadPlot(next);
+    const seen = new Set<string>();
+    for (const t of crops) {
+      if (!Array.isArray(t) || t.length < 6) continue;
+      const [dx, dy, plantId, stage, mature, mutId] = t;
+      if (typeof dx !== 'number' || typeof dy !== 'number' || typeof plantId !== 'string') continue;
+      const plant = PLANT_BY_ID[plantId];
+      if (!plant) continue; // unknown crop id -> skip
+      const key = `${dx},${dy}`;
+      seen.add(key);
+      this.upsertRemoteCrop(farm, key, origin.px + dx, origin.py + dy, plant, stage, mature === 1, mutId);
+    }
+
+    // DIFF: destroy sprites for crops no longer present (harvested/removed).
+    for (const [key, rc] of [...farm.sprites]) {
+      if (!seen.has(key)) {
+        this.destroyRemoteCrop(rc);
+        farm.sprites.delete(key);
+      }
+    }
+  }
+
+  // Create or update a single remote crop sprite at world tile (tx, ty). Reuses
+  // the local crop texture/frame logic and (when mutated) a simple glow/sparkle.
+  private upsertRemoteCrop(
+    farm: RemoteFarm,
+    key: string,
+    tx: number,
+    ty: number,
+    plant: Plant,
+    stage: number,
+    mature: boolean,
+    mutId: string,
+  ) {
+    const mut = mutId && MUTATION_BY_ID[mutId] ? MUTATION_BY_ID[mutId] : null;
+    // The frame: same as a local crop (cropRow * 5 + stage). Ripe crops show the
+    // final stage; otherwise clamp the streamed stage into range defensively.
+    const safeStage = mature
+      ? STAGES - 1
+      : Math.max(0, Math.min(STAGES - 1, Number.isFinite(stage) ? Math.floor(stage) : 0));
+    const frame = plant.cropRow * 5 + safeStage;
+    // A signature of everything that affects the visuals; unchanged -> no work.
+    const sig = `${frame}|${mut?.id ?? ''}`;
+
+    const cx = tx * TILE + TILE / 2;
+    const cy = ty * TILE + TILE / 2;
+
+    let rc = farm.sprites.get(key);
+    if (rc && rc.sig === sig) return; // identical -> cheap no-op
+
+    if (!rc) {
+      const sprite = this.add
+        .image(cx, cy, 'cropsheet', frame)
+        .setScale(2)
+        .setDepth(this.cropDepth(ty) - 1);
+      rc = { sprite, sig: '' };
+      farm.sprites.set(key, rc);
+    }
+
+    // Update the base sprite (texture frame + tint).
+    rc.sprite.setFrame(frame);
+    // Tear down any prior mutation visuals before reapplying (mutation may have
+    // changed or cleared between snapshots).
+    rc.glow?.destroy(); rc.glow = undefined;
+    rc.sparkle?.destroy(); rc.sparkle = undefined;
+
+    if (mut?.rainbow) {
+      rc.sprite.setTint(0xffffff);
+    } else if (mut?.tint != null) {
+      rc.sprite.setTint(mut.tint);
+    } else {
+      rc.sprite.setTint(plant.cropTint ?? 0xffffff);
+    }
+
+    // Add glow + sparkle for special (non-normal mutation OR high-rarity) ripe
+    // crops, mirroring applyMatureVisuals but kept simpler for remote views.
+    const rank = rarityRank(plant.rarity);
+    const special = mature && (!!mut && mut.id !== 'normal' || rank >= 3);
+    if (special) {
+      const tint = mut?.rainbow ? 0xffffff : (mut?.tint ?? RARITY[plant.rarity].glow);
+      rc.glow = this.add
+        .image(cx, cy - 4, 'glow')
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(tint)
+        .setDepth(this.cropDepth(ty) - 2)
+        .setScale(0.7)
+        .setAlpha(0.6);
+      rc.sparkle = this.add
+        .particles(cx, cy - 6, 'p_star', {
+          lifespan: 900,
+          frequency: 260,
+          scale: { start: 0.8, end: 0 },
+          alpha: { start: 0.9, end: 0 },
+          tint: mut?.rainbow ? 0xffffff : (mut?.tint ?? RARITY[plant.rarity].color),
+          speedY: { min: -14, max: -3 },
+          x: { min: -7, max: 7 },
+          y: { min: -12, max: 2 },
+        })
+        .setDepth(this.cropDepth(ty) + 1);
+    }
+
+    rc.sig = sig;
+  }
+
+  // Destroy one remote crop sprite and its mutation visuals.
+  private destroyRemoteCrop(rc: RemoteCropSprite) {
+    rc.sprite.destroy();
+    rc.glow?.destroy();
+    rc.sparkle?.destroy();
+  }
+
+  // Remove a remote player's entire farm (all crop sprites). Safe if absent.
+  private removeRemoteFarm(id: string) {
+    const farm = this.remoteFarms.get(id);
+    if (!farm) return;
+    for (const rc of farm.sprites.values()) this.destroyRemoteCrop(rc);
+    farm.sprites.clear();
+    this.remoteFarms.delete(id);
+  }
+
   // ---- multiplayer: broadcast self ----------------------------------------
 
   // Throttle (~10/sec) and only when the pose actually changed, tell the net
@@ -2941,12 +3146,30 @@ export class FarmScene extends Phaser.Scene {
     bus.emit('mp:self', { x, y, facing: this.facing });
   }
 
+  // Periodic crop-snapshot heartbeat (~3.5s) so growth-stage changes and newly
+  // joined peers always converge to current state, plus an immediate push when a
+  // crop just changed (farmDirty). Only fires once we've been assigned a plot, so
+  // single-player never broadcasts. The net layer further throttles the send.
+  private broadcastFarmHeartbeat(time: number) {
+    if (!this.mpConnected) return;
+    const HEARTBEAT_MS = 3500;
+    if (!this.farmDirty && time - this.lastFarmEmit < HEARTBEAT_MS) return;
+    this.lastFarmEmit = time;
+    this.farmDirty = false;
+    this.broadcastFarm();
+  }
+
   // ---- multiplayer: dynamic owned plot + spawn + guide --------------------
 
   // The server assigned us a plot. Re-point ownership (clear the old farm tint,
   // set up the new crop bed + overlays + gate), drop the player at the plaza
   // centre, and draw a ground guide leading to the new plot's gate.
   private onAssigned(plot: number) {
+    // We've been assigned a plot -> we're in a live multiplayer session. Gate the
+    // crop-snapshot heartbeat on this so single-player never broadcasts, and push
+    // an immediate snapshot so peers see our crops right away.
+    this.mpConnected = true;
+    this.farmDirty = true;
     const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : 0;
     if (next !== this.myPlotIndex) {
       this.clearFarmTint(this.myPlotIndex); // un-tint the previously-owned bed
@@ -3135,6 +3358,7 @@ export class FarmScene extends Phaser.Scene {
     // avatars, and advance the spawn→gate ground guide. All no-ops when nobody
     // else is connected (no remotes, no guide, no `mp:self` subscribers).
     this.broadcastSelf(time);
+    this.broadcastFarmHeartbeat(time);
     this.updateRemotes(delta);
     this.updateGuide();
 

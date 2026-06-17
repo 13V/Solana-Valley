@@ -21,22 +21,39 @@ type PresenceMeta = { id: string; name: string; plot: number };
 // Broadcast 'pos' payload (a moved player).
 type PosPayload = { id: string; x: number; y: number; facing: string };
 
+// A single crop in a farm snapshot, RELATIVE to the sender's plot origin:
+// [dx, dy, plantId, stage, mature(0|1), mutId('' = none)].
+type CropTuple = [number, number, string, number, 0 | 1, string];
+
+// Broadcast 'farm' payload (a player's full crop snapshot).
+type FarmPayload = { id: string; plot: number; crops: CropTuple[] };
+
 // Throttle local position broadcasts to ~10/sec.
 const POS_INTERVAL_MS = 100;
+
+// Throttle local FARM snapshots much slower than position — crops change rarely
+// and the payload is larger. Trailing-flush so the latest snapshot always lands.
+const FARM_INTERVAL_MS = 1800;
 
 // Module-level singletons for the single active island connection. We only ever
 // occupy one island at a time (the one /api/join assigned us).
 let channel: RealtimeChannel | null = null;
 let current: Self | null = null;
 
-// Unsubscribe handle for the bus 'mp:self' listener.
+// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' listeners.
 let offSelf: (() => void) | null = null;
+let offFarm: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
 let lastSent: PosPayload | null = null;
 let pending: PosPayload | null = null;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Throttle state for outgoing FARM (crop snapshot) broadcasts.
+let lastFarmSentAt = 0;
+let pendingFarm: FarmPayload | null = null;
+let farmFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
 // The set of remote ids we last reported as present, so on each presence sync we
 // can diff and emit 'mp:leave' for anyone who dropped.
@@ -90,6 +107,49 @@ function onSelfPose(pose: { x: number; y: number; facing: string }): void {
   }
 }
 
+// Send a farm snapshot over broadcast, guarded (mirrors sendPos).
+function sendFarm(p: FarmPayload): void {
+  if (!channel) return;
+  lastFarmSentAt = Date.now();
+  pendingFarm = null;
+  try {
+    // Ignore the ack so a slow/failed send can't reject into the game loop.
+    void channel.send({ type: 'broadcast', event: 'farm', payload: p });
+  } catch {
+    // ignore — best effort
+  }
+}
+
+// Handle a local-player crop snapshot from the game, throttled to
+// FARM_INTERVAL_MS with a trailing flush so the latest snapshot always lands.
+// The game emits { crops } with no id/plot; we stamp current.id/plot here
+// (mirroring how onSelfPose stamps the id on a pose).
+function onSelfFarm(snapshot: { crops: CropTuple[] }): void {
+  if (!channel || !current) return;
+  const payload: FarmPayload = {
+    id: current.id,
+    plot: current.plot,
+    crops: Array.isArray(snapshot.crops) ? snapshot.crops : [],
+  };
+
+  const now = Date.now();
+  const elapsed = now - lastFarmSentAt;
+  if (elapsed >= FARM_INTERVAL_MS) {
+    sendFarm(payload);
+    return;
+  }
+
+  // Within the throttle window: coalesce to the latest snapshot and schedule a
+  // trailing flush so the final state always lands.
+  pendingFarm = payload;
+  if (!farmFlushTimer) {
+    farmFlushTimer = setTimeout(() => {
+      farmFlushTimer = null;
+      if (pendingFarm) sendFarm(pendingFarm);
+    }, FARM_INTERVAL_MS - elapsed);
+  }
+}
+
 // Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
 // remote peer that disappeared since the last sync.
 function handlePresenceSync(): void {
@@ -136,6 +196,8 @@ export function joinIsland(island: number, self: Self): void {
     lastSent = null;
     pending = null;
     lastSentAt = 0;
+    lastFarmSentAt = 0;
+    pendingFarm = null;
 
     const ch = supabase.channel(`island:${island}`, {
       config: {
@@ -168,6 +230,24 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:move', p);
     });
 
+    // Remote crop snapshots -> tell the game. Validate defensively: a malformed
+    // payload (or our own echo) is ignored rather than emitted.
+    ch.on('broadcast', { event: 'farm' }, (msg) => {
+      const f = (msg as { payload?: unknown }).payload as FarmPayload | undefined;
+      if (
+        !f ||
+        typeof f.id !== 'string' ||
+        typeof f.plot !== 'number' ||
+        !Array.isArray(f.crops)
+      ) {
+        return;
+      }
+      // Ignore any stray echo of ourselves (broadcast self:false should prevent
+      // this, but guard anyway).
+      if (current && f.id === current.id) return;
+      bus.emit('mp:remoteFarm', f);
+    });
+
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         // Announce our presence once the channel is live.
@@ -175,8 +255,9 @@ export function joinIsland(island: number, self: Self): void {
       }
     });
 
-    // Forward throttled local poses to the channel.
+    // Forward throttled local poses + crop snapshots to the channel.
     offSelf = bus.on('mp:self', onSelfPose);
+    offFarm = bus.on('mp:farm', onSelfFarm);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -195,9 +276,23 @@ export function leaveIsland(): void {
     offSelf = null;
   }
 
+  if (offFarm) {
+    try {
+      offFarm();
+    } catch {
+      // ignore
+    }
+    offFarm = null;
+  }
+
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = null;
+  }
+
+  if (farmFlushTimer) {
+    clearTimeout(farmFlushTimer);
+    farmFlushTimer = null;
   }
 
   const ch = channel;
@@ -207,6 +302,8 @@ export function leaveIsland(): void {
   lastSent = null;
   pending = null;
   lastSentAt = 0;
+  lastFarmSentAt = 0;
+  pendingFarm = null;
 
   if (ch) {
     try {
