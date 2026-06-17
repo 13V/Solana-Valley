@@ -25,9 +25,15 @@ const GOALS: Goal[] = [
 // A compact, collapsible "What next?" checklist pinned to the left edge.
 export function GoalsHud() {
   const state = useGameState();
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSED_KEY) === '1',
-  );
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem(COLLAPSED_KEY);
+    if (saved !== null) return saved === '1';
+    // First run (no saved preference): start collapsed on small screens so the
+    // checklist is a compact pill instead of a tall panel hogging the limited
+    // mobile real estate. Desktop starts expanded.
+    return typeof window !== 'undefined'
+      && window.matchMedia?.('(max-width: 640px)').matches;
+  });
 
   const toggle = () => {
     setCollapsed((c) => {

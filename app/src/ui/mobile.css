@@ -59,9 +59,11 @@
     gap: 2px;
   }
 
-  /* --- Top-left day/night + stats stack ----------------------------- */
+  /* --- Top-left day/night + stats stack -----------------------------
+     Smaller decorative weather widget (93x100 art) so the day/night → coins →
+     level → goals column doesn't crowd down the left edge. */
   .daynight {
-    width: 124px;
+    width: 110px;
   }
 
   /* --- Top-right wallet / island cluster ----------------------------
@@ -87,10 +89,10 @@
   }
 
   /* --- Goals checklist ----------------------------------------------
-     Narrower and nudged up beneath the smaller stat stack. Stays
-     collapsible via its header. */
+     Narrower and tucked just beneath the (now smaller) stat stack. Starts
+     collapsed on first run on mobile (see GoalsHud) so it's a compact pill. */
   .goals-hud {
-    top: 196px;
+    top: 176px;
     width: 148px;
     font-size: 11px;
   }
@@ -106,5 +108,15 @@
   }
   .slot {
     width: clamp(74px, calc((100vw - 28px) / 3 - 6px), 104px);
+  }
+}
+
+/* On touch devices the bottom-left thumb joystick (≈120px tall, bottom:80) and
+   the bottom-center onboarding coach card overlapped. Lift the card well above
+   the joystick zone so the first-run tutorial never sits on top of the stick. */
+@media (pointer: coarse) {
+  .tut-card {
+    bottom: 224px;
+    width: 300px;
   }
 }
