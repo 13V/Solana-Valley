@@ -39,9 +39,10 @@ export const COLORS = {
   waterDark: 0x2c66a0,
 };
 
-export type Tool = { id: 'hoe' | 'can' | 'seed'; label: string };
+export type Tool = { id: 'hoe' | 'can' | 'seed' | 'rod'; label: string };
 export const TOOLS: Tool[] = [
   { id: 'hoe', label: 'Hoe' },
   { id: 'can', label: 'Watering Can' },
   { id: 'seed', label: 'Seeds' },
+  { id: 'rod', label: 'Fishing Rod' },
 ];

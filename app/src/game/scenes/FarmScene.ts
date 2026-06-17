@@ -523,8 +523,8 @@ export class FarmScene extends Phaser.Scene {
     this.buildMoveKeys();
     const unsubBinds = onKeyBindsChange(() => this.buildMoveKeys());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubBinds);
-    ['ONE', 'TWO', 'THREE'].forEach((key, i) => {
-      kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
+    ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, i) => {
+      kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed', 'rod'] as const)[i]));
     });
 
     // While a DOM text field is focused (e.g. the username prompt), hand the
