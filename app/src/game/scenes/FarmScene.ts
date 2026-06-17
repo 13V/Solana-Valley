@@ -310,6 +310,9 @@ export class FarmScene extends Phaser.Scene {
   // Plots (other players') we've tinted as cultivated, so we can un-tint them when
   // that player leaves. Our own plot is handled separately by markPlayerFarm.
   private remotePlotTints = new Set<number>();
+  // Floating holographic nameplate per plot (plot index -> text), updated from the
+  // roster to show whose plot each one is.
+  private plotLabels = new Map<number, Phaser.GameObjects.Text>();
 
   // progression
   private xp = 0;
@@ -1104,13 +1107,13 @@ export class FarmScene extends Phaser.Scene {
   // pen. #0 is the player's (farmable, real animals); the rest are decorative
   // neighbours so the neighbourhood reads as alive.
   private buildPlots() {
-    for (const h of HOMESTEADS) this.buildHomestead(h);
+    HOMESTEADS.forEach((h, i) => this.buildHomestead(h, i));
   }
 
   // One self-contained homestead: an outer fence (with a front gate gap), a 7×7
   // crop farm on the left, and two separate animal areas on the right — a chicken
   // pen (with coop) and a cow pasture — plus an orchard.
-  private buildHomestead(h: Homestead) {
+  private buildHomestead(h: Homestead, plot: number) {
     const it = h.interior;
     const gateCx = Math.floor((it.x0 + it.x1) / 2);
     const south = h.openSide === 'S';
@@ -1125,19 +1128,15 @@ export class FarmScene extends Phaser.Scene {
     fence();
     this.buildChickenPen(h);
     this.buildCowPen(h);
-    this.addSignpost(gateCx, gateY);
     this.addGateStairs(gateCx, gateY, south);
+    // Floating holographic nameplate over the plot (replaces the wooden signs).
+    // Text is filled in from the roster (whose plot it is); "Available" until then.
+    this.addPlotHologram(plot, h.signCx, backY, plot === this.myPlotIndex ? 'Your Plot' : 'Available');
 
-    if (!h.mine) {
-      // A furnished but unclaimed plot — same design, empty crop bed, "Available".
-      this.addPlotSign(h.signCx, backY, 'Available', false);
-      return;
-    }
+    if (!h.mine) return; // a furnished but unclaimed neighbour plot — no interactive farm
 
-    // The player's interactive farm: an untinted crop bed (blends with the
-    // surrounding grass) that unlocks row-by-row as you level up.
+    // The player's interactive farm: a tinted crop bed that unlocks row-by-row.
     this.markPlayerFarm();
-    this.addPlotSign(h.signCx, backY, '★ Your Homestead', true);
 
     // Working front gate that swings open on approach.
     const gx = gateCx * TILE + TILE / 2;
@@ -1235,21 +1234,26 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  private addSignpost(tx: number, ty: number) {
-    this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + 40);
-  }
-
-  private addPlotSign(cxTile: number, topTile: number, label: string, mine: boolean) {
-    this.add
-      .text(cxTile * TILE, (topTile - 1) * TILE + 8, label, {
+  // A floating holographic nameplate over a plot, showing whose plot it is.
+  // Cyan glow + gentle bob/flicker so it reads as a hologram. The text is updated
+  // from the roster (see onRoster); starts as "Available"/"Your Plot".
+  private addPlotHologram(plot: number, cxTile: number, topTile: number, text: string) {
+    const x = cxTile * TILE;
+    const baseY = (topTile - 1) * TILE + 6;
+    const label = this.add
+      .text(x, baseY, text, {
         fontFamily: 'Pixelify Sans, monospace',
-        fontSize: mine ? '16px' : '13px',
-        color: mine ? '#fff0a8' : '#ffffff',
-        stroke: '#39271a',
-        strokeThickness: 4,
+        fontSize: '15px',
+        color: '#caf4ff',
       })
       .setOrigin(0.5, 1)
-      .setDepth(60000);
+      .setDepth(60000)
+      .setAlpha(0.85);
+    label.setShadow(0, 0, '#4fd6ff', 12, true, true); // cyan glow → holographic
+    // Gentle hover + flicker so it feels projected, not painted on.
+    this.tweens.add({ targets: label, y: baseY - 5, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: label, alpha: 0.55, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.plotLabels.set(plot, label);
   }
 
   // ---- helpers ------------------------------------------------------------
@@ -3151,6 +3155,17 @@ export class FarmScene extends Phaser.Scene {
       this.onlineCount = count;
       this.refreshShopPool();
       this.emitState();
+    }
+
+    // Update each plot's holographic nameplate to whoever is on it (Available if
+    // empty). Our own plot shows our name.
+    const nameByPlot = new Map<number, string>();
+    for (const p of players) {
+      if (!Number.isInteger(p.plot)) continue;
+      nameByPlot.set(p.plot, p.id === this.myMpId ? (p.name || 'You') : (p.name || p.id.slice(0, 4)));
+    }
+    for (const [plot, label] of this.plotLabels) {
+      label.setText(nameByPlot.get(plot) ?? 'Available');
     }
 
     // Tint every OTHER occupied plot's crop bed too, so a friend's farmland reads
