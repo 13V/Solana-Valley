@@ -22,7 +22,7 @@ import {
   pickMutation,
   cropValue,
   stackKey,
-  rollShop,
+  rollShopAt,
   rollQuality,
   QUALITY,
   MUTATION_BY_ID,
@@ -41,7 +41,6 @@ import {
   levelInfo,
   marketBonus,
   MAX_GROWTH_MULT,
-  restockReductionMs,
   sprinklerIntervalMs,
   toolRadius,
   upgradeUnlocked,
@@ -227,9 +226,9 @@ type SaveData = {
   selectedSeed: string | null;
   seeds: Record<string, number>;
   harvest: Record<string, number>;
-  shopStock: Record<string, number>;
+  // shopStock/restockMs removed in v16+: the shop is now a shared, deterministic
+  // per-(island, wall-clock window) roll, so there's nothing per-player to save.
   timeMs: number;
-  restockMs: number;
   tiles: Array<[number, number, number]>; // x, y, wetRemainingMs (tilled implied)
   // q/ma/wth/rg are optional so old v11 saves (without crop-depth fields) still
   // load. rg = regrow-cycle growth duration (ms) when the crop is mid-regrow.
@@ -295,7 +294,16 @@ export class FarmScene extends Phaser.Scene {
   private selectedSeed: string | null = 'carrot';
   private seeds: Record<string, number> = { carrot: 5 };
   private harvestInv: Record<string, number> = {};
-  private shopStock: Record<string, number> = {};
+  // ---- shared island seed shop -------------------------------------------
+  // The stock is shared by everyone on the island: a deterministic per-(island,
+  // window) roll (identical for all peers) scaled by the online player count,
+  // drained by everyone's purchases. `shopBought` tracks units taken this window
+  // (local + peers via mp:shopBought); remaining = pool − bought.
+  private island = 0;
+  private onlineCount = 1;
+  private shopEpoch = 0;
+  private shopPool: Record<string, number> = {};
+  private shopBought: Record<string, number> = {};
 
   // progression
   private xp = 0;
@@ -336,7 +344,6 @@ export class FarmScene extends Phaser.Scene {
   private forageNodes: ForageNode[] = [];
 
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
-  private restockMs = RESTOCK_MS;
   private growthMult = 1;
   private forcedMutation: Mutation | null = null;
   private persist = true;
@@ -517,7 +524,7 @@ export class FarmScene extends Phaser.Scene {
     this.input.on('pointermove', () => (this.pointerInside = true));
     this.input.on('gameout', () => (this.pointerInside = false));
 
-    this.shopStock = rollShop();
+    this.rollShopWindow(this.currentEpoch());
     if (this.persist) this.loadSave();
 
     // Scatter forage nodes across the open world (after any save load so they
@@ -537,11 +544,12 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
-      bus.on('mp:assigned', ({ id, plot }) => { this.myMpId = id; this.onAssigned(plot); }),
+      bus.on('mp:assigned', ({ id, island, plot }) => { this.myMpId = id; this.island = island; this.onAssigned(plot); this.rollShopWindow(this.currentEpoch()); }),
       bus.on('mp:roster', (players) => this.onRoster(players)),
       bus.on('mp:move', (m) => this.onRemoteMove(m)),
       bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
       bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
+      bus.on('mp:shopBought', ({ plantId }) => this.onRemoteShopBuy(plantId)),
     );
     // Tear down every remote avatar + remote farm + the ground guide on shutdown.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -1701,8 +1709,9 @@ export class FarmScene extends Phaser.Scene {
     const plant = PLANT_BY_ID[plantId];
     if (!plant) return;
     // No level gate: any seed in stock is buyable if you can afford it (price is
-    // the gate now). Rare seeds simply rarely appear and cost a lot.
-    if ((this.shopStock[plantId] ?? 0) <= 0) {
+    // the gate now). Rare seeds simply rarely appear and cost a lot. Stock is the
+    // shared island pool — buying drains it for everyone on the island.
+    if (this.remainingStock(plantId) <= 0) {
       this.toast('Out of stock');
       return;
     }
@@ -1711,7 +1720,8 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
     this.coins -= plant.seedCost;
-    this.shopStock[plantId] -= 1;
+    this.shopBought[plantId] = (this.shopBought[plantId] ?? 0) + 1;
+    bus.emit('mp:shopBuy', { plantId }); // drain the shared pool for island peers
     this.seeds[plantId] = (this.seeds[plantId] ?? 0) + 1;
     this.selectedSeed = plantId;
     this.selected = 'seed';
@@ -1887,19 +1897,38 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
-  private restock() {
-    this.shopStock = this.rollShopForPlayer();
-    // Shop Supply "Stockpile" fork shaves additional time off the restock timer.
-    const reduction = restockReductionMs(this.upgrades.supply) + (this.fork('supply').restockReductionMs ?? 0);
-    this.restockMs = Math.max(20_000, RESTOCK_MS - reduction);
-    this.toast('🛒 The seed shop restocked!');
-    this.emitState();
+  // ---- shared island seed shop -------------------------------------------
+  // The current restock window: a wall-clock epoch so every island peer flips
+  // windows at the same instant (shared pool needs a shared boundary).
+  private currentEpoch(): number {
+    return Math.floor(Date.now() / RESTOCK_MS);
   }
 
-  // Roll the shop at the player's current level, applying the Shop Supply
-  // "Connoisseur's Eye" fork's rare-seed luck when chosen.
-  private rollShopForPlayer(): Record<string, number> {
-    return rollShop(this.fork('supply').rareSeedLuckMult ?? 1);
+  // Units of a seed still buyable this window: shared pool minus what's been
+  // bought (by anyone on the island), floored at 0.
+  private remainingStock(id: string): number {
+    return Math.max(0, (this.shopPool[id] ?? 0) - (this.shopBought[id] ?? 0));
+  }
+
+  // (Re)roll the shared pool for the current island/window/online-count, keeping
+  // this window's purchases. Called on join, on roster change (count changes the
+  // ×players multiplier), and at the start of each window.
+  private refreshShopPool() {
+    this.shopPool = rollShopAt(this.island, this.shopEpoch, this.onlineCount);
+  }
+
+  // Start a fresh restock window: reset purchases and re-roll the shared pool.
+  private rollShopWindow(epoch: number) {
+    this.shopEpoch = epoch;
+    this.shopBought = {};
+    this.refreshShopPool();
+  }
+
+  // A peer on the island bought a seed — drain the shared pool locally too.
+  private onRemoteShopBuy(plantId: string) {
+    if (!PLANT_BY_ID[plantId]) return;
+    this.shopBought[plantId] = (this.shopBought[plantId] ?? 0) + 1;
+    this.emitState();
   }
 
   private gainXp(amount: number) {
@@ -1909,7 +1938,6 @@ export class FarmScene extends Phaser.Scene {
     if (after > before) {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
-      this.shopStock = this.rollShopForPlayer(); // reveal newly-unlocked tiers right away
       if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 2 + before)) {
         this.markPlayerFarm(); // reveal the newly-unlocked crop row
         this.toast('🌱 New farm row unlocked!');
@@ -2632,9 +2660,7 @@ export class FarmScene extends Phaser.Scene {
       selectedSeed: this.selectedSeed,
       seeds: this.seeds,
       harvest: this.harvestInv,
-      shopStock: this.shopStock,
       timeMs: this.timeMs,
-      restockMs: this.restockMs,
       tiles,
       crops,
       xp: this.xp,
@@ -2696,9 +2722,9 @@ export class FarmScene extends Phaser.Scene {
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
     this.harvestInv = data.harvest ?? {};
-    this.shopStock = data.shopStock ?? this.shopStock;
+    // Shop is the shared deterministic pool now — no per-player stock to restore;
+    // it was already rolled for the current window in create().
     this.timeMs = data.timeMs ?? this.timeMs;
-    this.restockMs = data.restockMs ?? RESTOCK_MS;
     this.selected = data.selected ?? 'hoe';
     this.selectedSeed = data.selectedSeed ?? null;
 
@@ -2844,7 +2870,7 @@ export class FarmScene extends Phaser.Scene {
       selectedSeed: this.selectedSeed,
       seeds: { ...this.seeds },
       harvest: { ...this.harvestInv },
-      shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.shopStock[p.id] ?? 0 })),
+      shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.remainingStock(p.id) })),
       animalCounts: { ...this.animalCounts },
       progress: {
         level: info.level,
@@ -2879,7 +2905,8 @@ export class FarmScene extends Phaser.Scene {
       day: Math.floor(this.timeMs / DAY_LENGTH_MS) + 1,
       clock,
       phase,
-      restockIn: Math.ceil(this.restockMs / 1000),
+      // Time to the next shared restock window (wall-clock aligned for everyone).
+      restockIn: Math.ceil((RESTOCK_MS - (Date.now() % RESTOCK_MS)) / 1000),
     });
   }
 
@@ -3052,6 +3079,15 @@ export class FarmScene extends Phaser.Scene {
         rp.name = p.name;
         rp.label.setText(p.name);
       }
+    }
+
+    // The shared shop pool scales with how many players are on the island, so
+    // re-roll (keeping this window's purchases) whenever the headcount changes.
+    const count = Math.max(1, players.length);
+    if (count !== this.onlineCount) {
+      this.onlineCount = count;
+      this.refreshShopPool();
+      this.emitState();
     }
   }
 
@@ -3646,8 +3682,14 @@ export class FarmScene extends Phaser.Scene {
 
     // clock + restock + ambient
     this.timeMs += delta;
-    this.restockMs -= delta;
-    if (this.restockMs <= 0) this.restock();
+    // Shared shop restocks on the wall-clock window boundary, in sync for the
+    // whole island.
+    const epoch = this.currentEpoch();
+    if (epoch !== this.shopEpoch) {
+      this.rollShopWindow(epoch);
+      this.toast('🛒 The seed shop restocked!');
+      this.emitState();
+    }
     const frac = (this.timeMs % DAY_LENGTH_MS) / DAY_LENGTH_MS;
     const { color, alpha } = this.ambientFor(frac);
     this.ambient.setFillStyle(color);

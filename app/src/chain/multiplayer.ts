@@ -44,9 +44,10 @@ const FARM_INTERVAL_MS = 1800;
 let channel: RealtimeChannel | null = null;
 let current: Self | null = null;
 
-// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' listeners.
+// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' / 'mp:shopBuy' listeners.
 let offSelf: (() => void) | null = null;
 let offFarm: (() => void) | null = null;
+let offShop: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -155,6 +156,17 @@ function onSelfFarm(snapshot: { crops: CropTuple[]; tilled: TilledTuple[] }): vo
   }
 }
 
+// Broadcast a local seed-shop purchase so every peer drains the shared island
+// pool. Buys are infrequent, so no throttle — just fire-and-forget (best effort).
+function onSelfShopBuy({ plantId }: { plantId: string }): void {
+  if (!channel || !current || typeof plantId !== 'string') return;
+  try {
+    void channel.send({ type: 'broadcast', event: 'shop', payload: { id: current.id, plantId } });
+  } catch {
+    // ignore — best effort
+  }
+}
+
 // Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
 // remote peer that disappeared since the last sync.
 function handlePresenceSync(): void {
@@ -256,6 +268,14 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:remoteFarm', f);
     });
 
+    // Remote seed-shop purchases -> drain the shared pool in the game.
+    ch.on('broadcast', { event: 'shop' }, (msg) => {
+      const s = (msg as { payload?: unknown }).payload as { id?: unknown; plantId?: unknown } | undefined;
+      if (!s || typeof s.id !== 'string' || typeof s.plantId !== 'string') return;
+      if (current && s.id === current.id) return; // ignore our own echo
+      bus.emit('mp:shopBought', { id: s.id, plantId: s.plantId });
+    });
+
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         // Announce our presence once the channel is live.
@@ -263,9 +283,10 @@ export function joinIsland(island: number, self: Self): void {
       }
     });
 
-    // Forward throttled local poses + crop snapshots to the channel.
+    // Forward throttled local poses + crop snapshots + shop buys to the channel.
     offSelf = bus.on('mp:self', onSelfPose);
     offFarm = bus.on('mp:farm', onSelfFarm);
+    offShop = bus.on('mp:shopBuy', onSelfShopBuy);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -291,6 +312,15 @@ export function leaveIsland(): void {
       // ignore
     }
     offFarm = null;
+  }
+
+  if (offShop) {
+    try {
+      offShop();
+    } catch {
+      // ignore
+    }
+    offShop = null;
   }
 
   if (flushTimer) {

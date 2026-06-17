@@ -37,6 +37,11 @@ export interface GameEvents {
   // peer's dirt beds render under their crops (older clients omit `tilled`).
   'mp:farm': { crops: Array<[number, number, string, number, number, 0 | 1, string]>; tilled: Array<[number, number]> }; // FarmScene -> network (no id/plot; net stamps the sender's current.id/plot, like mp:self)
   'mp:remoteFarm': { id: string; plot: number; crops: Array<[number, number, string, number, number, 0 | 1, string]>; tilled: Array<[number, number]> }; // network -> FarmScene: a remote player's farm snapshot
+  // Shared island seed shop: the stock pool is shared by everyone on the island,
+  // so a purchase must drain it for all peers. FarmScene broadcasts each local
+  // buy; the network echoes remote buys back so every client decrements the pool.
+  'mp:shopBuy': { plantId: string }; // FarmScene -> network: we bought one of this seed
+  'mp:shopBought': { id: string; plantId: string }; // network -> FarmScene: a peer bought one (id = buyer)
 }
 
 type Handler<T> = (payload: T) => void;

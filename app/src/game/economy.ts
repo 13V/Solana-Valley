@@ -213,24 +213,37 @@ export function cropValue(
   );
 }
 
-function randInt(min: number, max: number): number {
-  return Math.floor(min + Math.random() * (max - min + 1));
+
+// A tiny deterministic PRNG (mulberry32). Seeded so every client computes the
+// SAME shop for a given island + restock window — that's what makes the shop
+// shared per island without a server.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-// Roll a fresh shop stock map (plantId -> count). Stock is purely RARITY-based
-// (GAG-style): commons are always present in bulk, and each rarer tier appears
-// with steeply lower odds and tiny stock (1-2), down to the occasional lone
-// Celestial. There is NO level gating — every tier can show up from day one;
-// the seed PRICE is the gate (a new player simply can't afford the rare seeds
-// yet, which makes spotting one a goal to chase). `rareLuck` (>1, the Shop
-// Supply "Connoisseur's Eye" fork) lifts the appearance odds of the rarer
-// (Rare+) tiers, clamped to 1.
-export function rollShop(rareLuck = 1): Record<string, number> {
+// Roll the SHARED island seed-shop stock for a given (island, restock window).
+// Deterministic (seeded PRNG, not Math.random) so every player on the island
+// sees identical stock, and each tier's quantity is multiplied by the number of
+// players online — the shared pool (10 players ⇒ 10× stock, drained by everyone
+// on the island). Purely RARITY-based with NO level gating: commons in bulk down
+// to the occasional lone Celestial; the seed PRICE is the only gate.
+export function rollShopAt(island: number, window: number, players = 1): Record<string, number> {
+  const count = Math.max(1, Math.floor(players));
+  const rand = mulberry32(((island | 0) * 0x9e3779b1) ^ ((window | 0) * 0x85ebca77));
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
     const r = RARITY[p.rarity];
-    const present = rareLuck > 1 && rarityRank(p.rarity) >= 2 ? Math.min(1, r.present * rareLuck) : r.present;
-    stock[p.id] = Math.random() < present ? randInt(r.qty[0], r.qty[1]) : 0;
+    // Draw present-roll then qty-roll for EVERY plant in order so the stream
+    // stays aligned across clients regardless of outcomes.
+    const present = rand() < r.present;
+    const qty = r.qty[0] + Math.floor(rand() * (r.qty[1] - r.qty[0] + 1));
+    stock[p.id] = present ? qty * count : 0;
   }
   return stock;
 }
