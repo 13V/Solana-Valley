@@ -313,6 +313,7 @@ export class FarmScene extends Phaser.Scene {
   // Floating holographic nameplate per plot (plot index -> text), updated from the
   // roster to show whose plot each one is.
   private plotLabels = new Map<number, Phaser.GameObjects.Text>();
+  private lastReverifyAt = 0; // throttle for the same-plot conflict re-verify
 
   // progression
   private xp = 0;
@@ -3202,6 +3203,16 @@ export class FarmScene extends Phaser.Scene {
     }
     for (const [plot, label] of this.plotLabels) {
       label.setText(nameByPlot.get(plot) ?? 'Available');
+    }
+
+    // Stacking guard: if another player claims OUR plot, the seat assignment has
+    // desynced (their join reclaimed it while we were still present, or vice
+    // versa). Ask the client to re-verify our seat with the authoritative server
+    // right away so whoever actually lost the plot gets re-pointed. Throttled.
+    const conflict = players.some((p) => p.id !== this.myMpId && p.plot === this.myPlotIndex);
+    if (conflict && this.time.now - this.lastReverifyAt > 5000) {
+      this.lastReverifyAt = this.time.now;
+      bus.emit('mp:reverify', undefined);
     }
 
     // Tint every OTHER occupied plot's crop bed too, so a friend's farmland reads

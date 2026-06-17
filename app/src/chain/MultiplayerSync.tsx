@@ -48,6 +48,7 @@ export function MultiplayerSync() {
     let cancelled = false;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let onVisible: (() => void) | null = null;
+    let offReverify: (() => void) | null = null;
 
     (async () => {
       // Reuse the shared, cached signature (single prompt across features).
@@ -132,6 +133,9 @@ export function MultiplayerSync() {
         if (document.visibilityState === 'visible') beat();
       };
       document.addEventListener('visibilitychange', onVisible);
+      // The game asks us to re-verify when another player shows up on our plot;
+      // an immediate beat lets the server re-point whoever actually lost the seat.
+      offReverify = bus.on('mp:reverify', beat);
     })();
 
     return () => {
@@ -143,6 +147,10 @@ export function MultiplayerSync() {
       if (onVisible) {
         document.removeEventListener('visibilitychange', onVisible);
         onVisible = null;
+      }
+      if (offReverify) {
+        offReverify();
+        offReverify = null;
       }
       leaveIsland();
     };

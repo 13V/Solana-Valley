@@ -42,6 +42,7 @@ export interface GameEvents {
   // buy; the network echoes remote buys back so every client decrements the pool.
   'mp:shopBuy': { plantId: string }; // FarmScene -> network: we bought one of this seed
   'mp:shopBought': { id: string; plantId: string }; // network -> FarmScene: a peer bought one (id = buyer)
+  'mp:reverify': void; // FarmScene -> network: another player shares our plot; re-check our seat with the server NOW
 }
 
 type Handler<T> = (payload: T) => void;
