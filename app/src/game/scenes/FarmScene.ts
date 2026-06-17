@@ -1928,7 +1928,7 @@ export class FarmScene extends Phaser.Scene {
     const after = skillLevel(this.skills[id]);
     if (after > before) {
       sfx.play('levelup');
-      this.toast(`${def.icon} ${def.name} reached Lv ${after}!`);
+      this.toast(`⭐ ${def.name} reached Lv ${after}!`);
       this.burst(this.player.x, this.player.y - 16, 'p_star', {
         speed: { min: 40, max: 110 },
         lifespan: 850,
@@ -1964,7 +1964,7 @@ export class FarmScene extends Phaser.Scene {
     this.recomputeMods();
     const chosen = perk === ms.a.id ? ms.a : ms.b;
     sfx.play('upgrade');
-    this.toast(`${def.icon} ${chosen.name} — ${chosen.desc}`);
+    this.toast(`✨ ${chosen.name} — ${chosen.desc}`);
     this.emitState();
     this.saveState();
   }
@@ -2030,7 +2030,7 @@ export class FarmScene extends Phaser.Scene {
     this.coins -= cost;
     this.upgrades[def.id] = lvl + 1;
     sfx.play('upgrade');
-    let msg = `${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`;
+    let msg = `⬆️ ${def.name} upgraded to Lv ${lvl + 1}!`;
     // Reaching MAX on a fork-able upgrade unlocks its 1-of-2 specialization.
     if (def.fork && this.upgrades[def.id] >= def.max) {
       msg += ' MAX — choose a specialization in Upgrades!';
@@ -2076,7 +2076,7 @@ export class FarmScene extends Phaser.Scene {
     this.upgradeForks[id] = fork;
     const chosen = fork === def.fork.a.id ? def.fork.a : def.fork.b;
     sfx.play('upgrade');
-    this.toast(`${def.icon} ${chosen.name} — ${chosen.desc}`);
+    this.toast(`✨ ${chosen.name} — ${chosen.desc}`);
     this.emitState();
     this.saveState();
   }
