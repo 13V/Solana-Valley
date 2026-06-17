@@ -2,7 +2,7 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel help">
       <div className="panel-head">
-        <h3>🌱 Welcome to Solana Valley</h3>
+        <h3>🌱 Welcome to Sprout Valley</h3>
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="help-body">
@@ -29,8 +29,11 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
         </ul>
         <p className="muted">
           Your farm autosaves locally. Connect a Solana wallet (devnet) to see your address &amp; balance —
-          on-chain land/items and the $VALLEY token are on the roadmap.
+          on-chain land/items and the $SPROUT token are on the roadmap.
         </p>
+        <a className="docs-link" href="docs/" target="_blank" rel="noopener noreferrer">
+          📖 Read the full docs &amp; tokenomics →
+        </a>
       </div>
     </div>
   );
