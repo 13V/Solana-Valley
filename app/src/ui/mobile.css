@@ -34,10 +34,18 @@
     display: inline;
   }
 
-  /* Tighter screen-edge padding to reclaim width for the HUD rows. */
+  /* Tighter screen-edge padding to reclaim width for the HUD rows. The toolbar
+     is a full-width centered row on phones, so the left (stats) and right
+     (wallet) clusters are pushed BELOW it (margin-top) instead of sharing its
+     band — otherwise they slide underneath and overlap. */
   .hud {
     padding: 4px;
     gap: 4px;
+    align-items: flex-start;
+  }
+  .hud-left,
+  .hud-right {
+    margin-top: 58px; /* clear the absolutely-positioned toolbar row above */
   }
 
   /* --- Top toolbar: all 10 icon buttons must stay on one row ---------
@@ -49,8 +57,8 @@
     gap: 2px;
   }
   .iconbtn {
-    width: clamp(26px, calc((100vw - 48px) / 10), 44px);
-    height: clamp(26px, calc((100vw - 48px) / 10), 44px);
+    width: clamp(26px, calc((100vw - 48px) / 10), 40px);
+    height: clamp(26px, calc((100vw - 48px) / 10), 40px);
     font-size: 15px;
   }
   /* Icon scales with its (now fluid) button instead of a fixed 24px. */
@@ -58,9 +66,10 @@
     width: 64%;
     height: 64%;
   }
-  /* Thin the wooden tray's border/padding so it doesn't eat the row. */
+  /* Thin the wooden tray's border/padding so it doesn't eat the row, and keep
+     its overall height predictable (≤~54px) so the clusters below clear it. */
   .ui-skin .hud-buttons {
-    border-width: 6px;
+    border-width: 5px;
     padding: 2px;
     gap: 2px;
   }
@@ -102,11 +111,12 @@
   }
 
   /* --- Goals checklist ----------------------------------------------
-     With the day/night widget gone the left stack is just the day pill + coins
-     + level, so the goals board tucks up right beneath it. Starts collapsed on
-     first run on mobile (see GoalsHud) so it's a compact, tappable pill. */
+     Sits below the left cluster (day pill + coins/level), which itself starts
+     ~58px down to clear the toolbar — so anchor goals just beneath that stack.
+     Starts collapsed on first run on mobile (see GoalsHud) so it's a compact,
+     tappable pill. */
   .goals-hud {
-    top: 78px;
+    top: 118px;
     width: 148px;
     font-size: 11px;
   }
