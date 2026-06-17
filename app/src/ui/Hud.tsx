@@ -143,7 +143,14 @@ export function Hud({
             style={{ fontFamily: 'var(--pixel-font)', opacity: 0.85 }}
             title="Multiplayer needs a connected devnet wallet — every player must connect AND approve the signature to see each other"
           >
-            {addr ? '🌐 Connecting…' : '🌐 Connect wallet for multiplayer'}
+            {addr ? (
+              '🌐 Connecting…'
+            ) : (
+              <>
+                🌐 <span className="only-wide">Connect wallet for multiplayer</span>
+                <span className="only-narrow">Connect wallet</span>
+              </>
+            )}
           </span>
         )}
         {mpConnected && (

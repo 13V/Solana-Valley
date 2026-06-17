@@ -13,7 +13,21 @@
    base ones and rely on load order to break ties.
    ===================================================================== */
 
+/* Responsive text helpers: swap a long label for a short one on phones.
+   Default (wide / desktop) shows the full text; the mobile block below flips
+   them. Used by the wallet-connect hint, which otherwise overflows top-right. */
+.only-narrow {
+  display: none;
+}
+
 @media (max-width: 640px) {
+  .only-wide {
+    display: none;
+  }
+  .only-narrow {
+    display: inline;
+  }
+
   /* Tighter screen-edge padding to reclaim width for the HUD rows. */
   .hud {
     padding: 4px;
