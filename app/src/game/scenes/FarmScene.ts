@@ -69,7 +69,16 @@ import {
   type Modifiers,
   SKILL_BY_ID,
 } from '../skills';
-import { catchFish, fishXp } from '../fishing';
+import {
+  catchFish,
+  fishXp,
+  fishColor,
+  fishCss,
+  FISH_SHEET,
+  TREASURE_FRAMES,
+  type WaterKind,
+} from '../fishing';
+import { FishingCast, type CastPhase } from '../fishingCast';
 import { pickForage, forageXp, type Forage } from '../forage';
 import { bus } from '../EventBus';
 import { sfx } from '../audio';
@@ -211,6 +220,7 @@ export class FarmScene extends Phaser.Scene {
   private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
   private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
   private casting = false; // only one cast at a time
+  private fishingCast!: FishingCast; // rod/line/bobber cast choreography
   // foraging
   private forageNodes: ForageNode[] = [];
 
@@ -348,9 +358,17 @@ export class FarmScene extends Phaser.Scene {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
 
+    this.fishingCast = new FishingCast(this);
+
     // Browsers suspend audio until a user gesture; resume on first input.
     this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      // While a cast is live, every click is a fishing input (hook the bite or
+      // reel in early) — it must never fall through to a tool/plant action.
+      if (this.casting) {
+        this.fishingCast.onPointer();
+        return;
+      }
       // Gathering interactions take priority over the held tool so clicking the
       // pond fishes (never tills/plants) and clicking a node forages.
       if (this.tryCollectAnimal(p.worldX, p.worldY)) return;
@@ -385,6 +403,7 @@ export class FarmScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
       this.unsubs = [];
+      this.fishingCast.destroy();
     });
 
     if (this.persist) {
@@ -540,6 +559,61 @@ export class FarmScene extends Phaser.Scene {
         }
       }
     }
+
+    // Fishing cast animations from the Ocean Pack character sheets (the same cat
+    // as pchar). left/right share the side sheet (right = flipX). Frame rows:
+    // cast 32–38, wait 64–80, reel 96–106, hook 128–135, catch (front) 160–191.
+    const fishSheet: Record<Dir, string> = {
+      down: 'pfish_front', up: 'pfish_back', left: 'pfish_side', right: 'pfish_side',
+    };
+    for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+      const sheet = fishSheet[dir];
+      if (!this.textures.exists(sheet)) continue;
+      const mk = (name: string, start: number, end: number, frameRate: number, repeat: number) => {
+        const key = `pfish-${name}-${dir}`;
+        if (!this.anims.exists(key)) {
+          this.anims.create({ key, frames: this.anims.generateFrameNumbers(sheet, { start, end }), frameRate, repeat });
+        }
+      };
+      mk('cast', 32, 38, 16, 0);
+      mk('wait', 64, 80, 8, -1);
+      mk('reel', 96, 106, 14, 0);
+      mk('hook', 128, 135, 14, 0);
+    }
+    if (this.textures.exists('pfish_front') && !this.anims.exists('pfish-catch')) {
+      this.anims.create({
+        key: 'pfish-catch',
+        frames: this.anims.generateFrameNumbers('pfish_front', { start: 160, end: 191 }),
+        frameRate: 14, repeat: 0,
+      });
+    }
+
+    // Bobber + water-splash (Ocean Pack `fishing_splash`, 48px) and the underwater
+    // shadow-fish tell (`fish_shadow_md`, 16px) used by the cast minigame.
+    if (this.textures.exists('fishing_splash')) {
+      if (!this.anims.exists('bobber_idle')) {
+        this.anims.create({ key: 'bobber_idle', frames: [{ key: 'fishing_splash', frame: 0 }] });
+      }
+      if (!this.anims.exists('bobber_dunk')) {
+        this.anims.create({
+          key: 'bobber_dunk', frameRate: 18, repeat: 0,
+          frames: this.anims.generateFrameNumbers('fishing_splash', { frames: [2, 4, 5, 6, 8] }),
+        });
+      }
+      if (!this.anims.exists('splash_burst')) {
+        this.anims.create({
+          key: 'splash_burst', frameRate: 20, repeat: 0,
+          frames: this.anims.generateFrameNumbers('fishing_splash', { frames: [16, 17, 18, 19] }),
+        });
+      }
+    }
+    if (this.textures.exists('fish_shadow_md') && !this.anims.exists('shadow_swim')) {
+      this.anims.create({
+        key: 'shadow_swim', frameRate: 10, repeat: -1,
+        frames: this.anims.generateFrameNumbers('fish_shadow_md', { start: 0, end: 14 }),
+      });
+    }
+
     if (!this.anims.exists('water-anim')) {
       this.anims.create({
         key: 'water-anim',
@@ -1894,76 +1968,128 @@ export class FarmScene extends Phaser.Scene {
     return true;
   }
 
-  // The open sea has bigger, more valuable catches than the little pond.
+  // Kick off a cast: the FishingCast controller runs the rod/line/bobber
+  // choreography (cast → bubbles → the bob you click); we resolve the catch
+  // when it reports a successful hook. The open sea pulls a richer pool.
   private startCast(tx: number, ty: number, ocean = false) {
-    const oceanLuck = ocean ? 1.25 : 1;
-    const oceanValue = ocean ? 1.3 : 1;
+    if (this.casting) return;
     this.casting = true;
     const cx = tx * TILE + TILE / 2;
     const cy = ty * TILE + TILE / 2;
-    sfx.play('water');
-    // A bobber on the water + expanding ripple while we wait for a bite.
-    const bobber = this.add.image(cx, cy - 2, 'p_droplet').setScale(2.4).setDepth(99980).setTint(0xff4d4d);
-    this.tweens.add({ targets: bobber, y: cy + 2, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const ripple = this.add.image(cx, cy, 'glow').setScale(0.4).setAlpha(0.5).setDepth(99979).setTint(0x9fd4ff);
-    this.tweens.add({ targets: ripple, scale: 1.1, alpha: 0, duration: 1200, repeat: -1 });
+    // Face the water for the cast.
+    this.facing =
+      Math.abs(cx - this.player.x) > Math.abs(cy - this.player.y)
+        ? cx < this.player.x ? 'left' : 'right'
+        : cy < this.player.y ? 'up' : 'down';
 
-    this.time.delayedCall(1200, () => {
-      bobber.destroy();
-      ripple.destroy();
-      const m = this.mods();
-
-      // Treasure Hunter: a chance to reel a treasure chest instead of a fish.
-      if (Math.random() < m.treasureChance) {
-        const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
-        this.coins += coins;
-        this.earned += coins;
-        this.addSkillXp('fishing', 12); // still grants fishing XP
-        sfx.play('achievement');
-        const chest = this.add.image(cx, cy - 6, 'p_star').setScale(3).setDepth(99990).setTint(0xffd21a);
-        this.tweens.add({
-          targets: chest, y: cy - 42, scale: 3.6, duration: 700, ease: 'Back.out',
-          onComplete: () => this.tweens.add({ targets: chest, alpha: 0, y: cy - 58, duration: 500, onComplete: () => chest.destroy() }),
-        });
-        this.burst(cx, cy - 4, 'p_star', { speed: { min: 40, max: 120 }, lifespan: 800, scale: { start: 1.4, end: 0 }, tint: [0xffe066, 0xffd21a, 0xffffff] }, 16);
-        this.floatText(cx, cy - 50, '💰 Treasure!', '#ffd21a');
-        this.toast(`💰 Treasure! +${coins}🪙`);
+    // Rod-tip offset per facing — the player visibly holds the rod, so the line
+    // emanates from roughly the rod tip rather than dead-centre. Tunable.
+    const tip: Record<Dir, { x: number; y: number }> = {
+      down: { x: 6, y: -2 }, up: { x: -6, y: -18 }, left: { x: -14, y: -10 }, right: { x: 14, y: -10 },
+    };
+    this.fishingCast.begin({
+      origin: () => ({ x: this.player.x + tip[this.facing].x, y: this.player.y + tip[this.facing].y }),
+      target: { x: cx, y: cy },
+      onPhase: (phase) => this.playCastAnim(phase),
+      onResolve: (o) => {
+        if (o.hooked) {
+          this.landCatch(o.at.x, o.at.y, ocean);
+        } else if (o.reason === 'early') {
+          this.toast('🎣 Reeled in early — nothing was biting yet.');
+        } else {
+          this.toast('🎣 It got away! Click the moment it bites.');
+        }
         this.casting = false;
-        this.checkAchievements();
+        // Return the player from the cast pose to the normal idle on their skin.
+        this.player.setFlipX(false);
+        this.player.setTexture(this.playerSheet(), 0);
+        this.player.anims.play(`${this.playerSheet()}-idle-${this.facing}`, true);
         this.emitState();
-        return;
-      }
+      },
+    });
+  }
 
-      const f = catchFish(m.fishLuckMult * oceanLuck);
-      // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
-      const legendary = m.legendaryFish && Math.random() < 0.03;
-      const baseValue = legendary ? f.value * 12 : f.value;
-      const coins = Math.round(baseValue * m.fishValueMult * oceanValue);
+  // Map a FishingCast phase to the player's casting animation. The cast sheets
+  // are a separate (non-recoloured) base cat; on a non-default coat the cast
+  // briefly shows the cream coat — acceptable for the scaffold. left/right share
+  // the side sheet via flipX.
+  private playCastAnim(phase: CastPhase) {
+    const dir = this.facing;
+    const flip = dir === 'right';
+    const play = (key: string) => {
+      if (this.anims.exists(key)) {
+        this.player.setFlipX(flip);
+        this.player.anims.play(key, true);
+      }
+    };
+    switch (phase) {
+      case 'casting': play(`pfish-cast-${dir}`); break;
+      case 'waiting':
+      case 'ready': play(`pfish-wait-${dir}`); break;
+      case 'reeling': play(`pfish-reel-${dir}`); break;
+      // 'bite' keeps the waiting hold — the bobber dunk + "!" is the cue.
+    }
+  }
+
+  // Roll what's actually on the line and present it. Treasure Hunter can swap
+  // the fish for a treasure; the Legendary Angler capstone can land a huge haul.
+  private landCatch(cx: number, cy: number, ocean: boolean) {
+    const m = this.mods();
+    const oceanValue = ocean ? 1.3 : 1;
+    const oceanLuck = ocean ? 1.25 : 1;
+
+    if (Math.random() < m.treasureChance) {
+      const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
       this.coins += coins;
       this.earned += coins;
-      this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
-      sfx.play(legendary ? 'achievement' : 'sell');
-      // A brief fish popup that arcs up out of the water, tinted to the catch.
-      const fish = this.add.image(cx, cy - 6, 'p_fish').setScale(legendary ? 3 : 2.4).setDepth(99990).setTint(legendary ? 0xffd21a : f.tint);
-      this.tweens.add({
-        targets: fish, y: cy - 40, scale: legendary ? 3.8 : 3, duration: 700, ease: 'Back.out',
-        onComplete: () => this.tweens.add({ targets: fish, alpha: 0, y: cy - 56, duration: 500, onComplete: () => fish.destroy() }),
-      });
-      this.burst(cx, cy - 4, legendary ? 'p_star' : 'p_droplet', {
-        speed: { min: 40, max: 110 }, angle: { min: 220, max: 320 }, lifespan: 600,
-        scale: { start: 1.4, end: 0 }, gravityY: legendary ? 0 : 240,
-        tint: legendary ? [0xffe066, 0xffd21a, 0xffffff] : undefined,
-      }, legendary ? 16 : 10);
-      if (legendary) {
-        this.floatText(cx, cy - 50, '🌟 LEGENDARY!', '#ffd21a');
-        this.toast(`🌟 LEGENDARY ${f.name}! +${coins}🪙`);
-      } else {
-        this.toast(`🎣 Caught a ${f.name}! +${coins}🪙`);
-      }
-      this.casting = false;
+      this.addSkillXp('fishing', 12);
+      sfx.play('achievement');
+      const frame = TREASURE_FRAMES[Math.floor(Math.random() * TREASURE_FRAMES.length)];
+      this.popCatch(cx, cy, frame, 0xffd21a, true);
+      this.floatText(cx, cy - 50, '💰 Treasure!', '#ffd21a');
+      this.toast(`💰 Treasure! +${coins}🪙`);
       this.checkAchievements();
-      this.emitState();
+      return;
+    }
+
+    const water: WaterKind = ocean ? 'salt' : 'fresh';
+    const f = catchFish(m.fishLuckMult * oceanLuck, water);
+    // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
+    const legendary = m.legendaryFish && Math.random() < 0.03;
+    const baseValue = legendary ? f.value * 12 : f.value;
+    const coins = Math.round(baseValue * m.fishValueMult * oceanValue);
+    this.coins += coins;
+    this.earned += coins;
+    this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
+    sfx.play(legendary ? 'achievement' : 'sell');
+    this.popCatch(cx, cy, f.frame, fishColor(f), legendary);
+    if (legendary) {
+      this.floatText(cx, cy - 50, '🌟 LEGENDARY!', '#ffd21a');
+      this.toast(`🌟 LEGENDARY ${f.name}! +${coins}🪙`);
+    } else {
+      this.floatText(cx, cy - 46, f.rarity, fishCss(f));
+      this.toast(`🎣 Caught a ${f.name} (${f.rarity})! +${coins}🪙`);
+    }
+    this.checkAchievements();
+  }
+
+  // The catch popup: the real Fish-Sheet sprite arcs up out of the water with a
+  // rarity-tinted sparkle.
+  private popCatch(cx: number, cy: number, frame: number, glow: number, special: boolean) {
+    const sprite = this.add
+      .image(cx, cy - 6, FISH_SHEET, frame)
+      .setDepth(99990)
+      .setScale(special ? 2.2 : 1.8);
+    this.tweens.add({
+      targets: sprite, y: cy - 40, scale: special ? 2.8 : 2.2, duration: 700, ease: 'Back.out',
+      onComplete: () =>
+        this.tweens.add({ targets: sprite, alpha: 0, y: cy - 56, duration: 500, onComplete: () => sprite.destroy() }),
     });
+    this.burst(cx, cy - 4, special ? 'p_star' : 'p_droplet', {
+      speed: { min: 40, max: 110 }, angle: { min: 220, max: 320 }, lifespan: 600,
+      scale: { start: 1.4, end: 0 }, gravityY: special ? 0 : 240,
+      tint: special ? [0xffe066, 0xffd21a, 0xffffff] : [glow, 0xffffff],
+    }, special ? 16 : 10);
   }
 
   // ---- foraging -----------------------------------------------------------
@@ -2335,16 +2461,24 @@ export class FarmScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    // movement
+    // Keep the rod + line tracking the player and the bobber (no-op when idle).
+    this.fishingCast.update();
+
+    // movement — locked while a cast is in progress so the line stays anchored.
     let vx = 0;
     let vy = 0;
-    if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -1;
-    else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = 1;
-    if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -1;
-    else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = 1;
+    if (!this.casting) {
+      if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -1;
+      else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = 1;
+      if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -1;
+      else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = 1;
+    }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
-    if (vx !== 0 || vy !== 0) {
+    if (this.casting) {
+      // The cast animation is driven by the FishingCast phase callback; don't
+      // let walk/idle override it while a cast is in progress.
+    } else if (vx !== 0 || vy !== 0) {
       this.actingUntil = 0; // moving cancels the tool pose
       if (vx < 0) this.facing = 'left';
       else if (vx > 0) this.facing = 'right';

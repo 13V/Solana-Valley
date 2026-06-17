@@ -11,6 +11,10 @@
   **Sprout Lands UI Pack — Premium** — https://cupnooble.itch.io/sprout-lands-ui-pack
 - Crops, produce/seed item icons (and additional content):
   **Sprout Lands Sprites — Premium pack** — https://cupnooble.itch.io/sprout-lands-asset-pack
+- Fishing — player rod-cast animations, bobber + water-splash, and fish/shadow
+  sprites: **Sprout Lands "Sorry Pack" — Ocean Pack** (Cup Nooble). Files:
+  `fishing_{front,back,side}.png`, `fishing_splash.png`, `fish_shadow_*.png`, `fish.png`.
+  Commercial use confirmed permitted by Cup Nooble (no redistribution of the pack itself; no NFTs).
 
 These assets are included in this repository under the terms below. They live in
 `app/public/assets/sprout/` (base) and `app/public/assets/sprout-ui/` (premium UI).
