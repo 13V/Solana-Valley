@@ -24,7 +24,7 @@ export const RESTOCK_MS = 120_000; // seed shop restock interval
 // Global multiplier on every crop's grow time — a single economy-pacing knob.
 // >1 slows the whole farming loop down (income is gated by how fast crops ripen).
 // Applied wherever a crop's grow duration is computed (cropGrowMs + liveStats).
-export const GROWTH_TIME_SCALE = 1.8;
+export const GROWTH_TIME_SCALE = 2.6;
 
 export const COLORS = {
   grass: 0x5fa64d,
