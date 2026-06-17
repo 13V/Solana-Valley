@@ -518,6 +518,38 @@ export class FarmScene extends Phaser.Scene {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
 
+    // While a DOM text field is focused (e.g. the username prompt), hand the
+    // keyboard to the browser: disable the game's key handling AND release its key
+    // captures, so WASD / arrows / space type into the field instead of moving the
+    // character. Restored on blur.
+    const isEditable = (el: EventTarget | null): boolean => {
+      const n = el as HTMLElement | null;
+      if (!n || !n.tagName) return false;
+      return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable;
+    };
+    let savedCaptures: number[] = [];
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isEditable(e.target)) return;
+      savedCaptures = kb.getCaptures();
+      kb.clearCaptures();
+      kb.resetKeys(); // drop any keys held when focus moved into the field
+      kb.enabled = false;
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (!isEditable(e.target)) return;
+      kb.enabled = true;
+      if (savedCaptures.length) {
+        kb.addCapture(savedCaptures);
+        savedCaptures = [];
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    });
+
     // Browsers suspend audio until a user gesture; resume on first input.
     this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
