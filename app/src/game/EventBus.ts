@@ -18,6 +18,7 @@ export interface GameEvents {
   'ui:buyUpgrade': string; // upgrade id
   'ui:buyAnimal': string; // animal id
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
+  'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones
 
   // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
   'mp:self': { x: number; y: number; facing: string }; // FarmScene -> network (throttled): local player pose

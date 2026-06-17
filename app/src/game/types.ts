@@ -29,6 +29,7 @@ export type UiState = {
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
   perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
+  respecs: number; // how many perk respecs have been done (drives next respec cost)
 };
 
 // Lightweight time/restock state, emitted about once per second.

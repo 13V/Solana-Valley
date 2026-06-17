@@ -45,13 +45,20 @@ export type UpgradeDef = {
 const areaDesc = (lvl: number) => ['1 tile', '3×3 tiles', '5×5 tiles', '7×7 tiles'][lvl] ?? 'huge';
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'water', name: 'Watering Can', icon: 'assets/sprout-ui/tool_can.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
-  { id: 'hoe', name: 'Hoe', icon: 'assets/sprout-ui/tool_hoe.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
+  // Tool reach: the bigger areas (5×5, 7×7) used to scale quadratically and sat
+  // as dead end-game buys. Flattened to a gentler linear curve so each tier is
+  // attainable mid-game and worth grabbing.
+  { id: 'water', name: 'Watering Can', icon: 'assets/sprout-ui/tool_can.png', max: 3, cost: (l) => 200 + 350 * l, desc: areaDesc },
+  { id: 'hoe', name: 'Hoe', icon: 'assets/sprout-ui/tool_hoe.png', max: 3, cost: (l) => 200 + 350 * l, desc: areaDesc },
   { id: 'growth', name: 'Fertilizer', icon: 'assets/sprout-ui/tool_seed.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
-  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck`, req: 4 },
+  // Fortune: was the priciest upgrade yet the weakest payoff. Cheaper curve +
+  // a stronger per-level effect (+30% luck/level) so its ROI matches the rest.
+  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 30}% mutation luck`, req: 4 },
   { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
   { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`), req: 6 },
-  { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 350 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
+  // Market Stall: the best ROI of the lot, so nudged a touch pricier. Its bonus
+  // is now surfaced in the sell toast (FarmScene) so players feel it land.
+  { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 450 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
 ];
 
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
@@ -64,10 +71,17 @@ export const EMPTY_UPGRADES: Upgrades = { water: 0, hoe: 0, growth: 0, fortune: 
 // Effects
 export const toolRadius = (lvl: number) => lvl; // 0=1 tile, 1=3x3, 2=5x5, 3=7x7
 export const growthFactor = (lvl: number) => 1 + 0.15 * lvl;
-export const fortuneLuck = (lvl: number) => 1 + 0.2 * lvl;
+export const fortuneLuck = (lvl: number) => 1 + 0.3 * lvl;
 export const restockReductionMs = (lvl: number) => lvl * 20_000;
 export const marketBonus = (lvl: number) => 1 + 0.1 * lvl; // crop sale price multiplier
 export const sprinklerIntervalMs = (lvl: number) => (lvl > 0 ? 45_000 / lvl : Infinity);
+
+// Ceiling on the *combined* crop growth-speed multiplier (Fertilizer + Farming
+// skill + the wet ×2). Without it, maxed Fertilizer stacked with skill perks and
+// a wet tile trivializes growth into near-instant; this keeps watering and the
+// bonuses meaningful while leaving a sane floor on grow time. Applied in
+// FarmScene where the final growth rate is assembled.
+export const MAX_GROWTH_MULT = 5;
 
 // An upgrade is buyable only once the player's global level meets its `req`.
 export const upgradeUnlocked = (def: UpgradeDef, level: number) => !def.req || level >= def.req;

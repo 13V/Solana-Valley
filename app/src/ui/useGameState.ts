@@ -25,6 +25,7 @@ const initialState: UiState = {
   },
   skills: { ...EMPTY_SKILLS },
   perks: {},
+  respecs: 0,
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };

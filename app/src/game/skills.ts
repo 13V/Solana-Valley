@@ -16,6 +16,15 @@ export const EMPTY_SKILLS: Skills = { farming: 0, ranching: 0, breeding: 0, fish
 export type ChosenPerks = Record<string, string>;
 export const EMPTY_PERKS: ChosenPerks = {};
 
+// Coin cost of the *next* perk respec, given how many have already been done.
+// First respec is free, then escalates: 0, 5k, 15k, 35k, 75k … (each step is
+// roughly double the previous gap) so it stays a meaningful coin sink without
+// ever becoming a pay-to-win timer/gacha — just a plain "change your mind" tax.
+export function respecCost(respecsDone: number): number {
+  if (respecsDone <= 0) return 0;
+  return 5000 * (Math.pow(2, respecsDone) - 1);
+}
+
 // ---- level curve --------------------------------------------------------
 export function skillXpForLevel(level: number): number {
   const l = Math.min(level, MAX_SKILL_LEVEL);

@@ -39,6 +39,7 @@ import {
   harvestXp,
   levelInfo,
   marketBonus,
+  MAX_GROWTH_MULT,
   restockReductionMs,
   sprinklerIntervalMs,
   toolRadius,
@@ -69,6 +70,7 @@ import {
   activeModifiers,
   PERK_LEVELS,
   MAX_SKILL_LEVEL,
+  respecCost,
   type SkillId,
   type Skills,
   type ChosenPerks,
@@ -156,7 +158,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 11; // bumped: Cozy Homestead plot layout relocated the farm
+const SAVE_VERSION = 12; // bumped: added perk-respec counter (defaults to 0 on older saves)
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -205,6 +207,7 @@ type SaveData = {
   animals: Record<string, number>;
   skills: Skills;
   perks: ChosenPerks;
+  respecs?: number; // v12+: perk respecs done. Optional so older saves still load.
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -263,6 +266,7 @@ export class FarmScene extends Phaser.Scene {
   // skill progression (xp per skill) + chosen milestone perks
   private skills: Skills = { ...EMPTY_SKILLS };
   private perks: ChosenPerks = { ...EMPTY_PERKS };
+  private respecs = 0; // number of perk respecs done (drives the escalating respec cost)
   // Aggregated multipliers/flags from skills + perks; recomputed on any change.
   private modCache: Modifiers = activeModifiers(this.skills, this.perks);
 
@@ -457,6 +461,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
+      bus.on('ui:respecPerks', () => this.respecPerks()),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
       bus.on('mp:assigned', ({ plot }) => this.onAssigned(plot)),
       bus.on('mp:roster', (players) => this.onRoster(players)),
@@ -1630,8 +1635,15 @@ export class FarmScene extends Phaser.Scene {
     sfx.play('sell');
     bus.emit('action', 'sell');
     this.checkAchievements();
-    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)`);
+    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}`);
     this.emitState();
+  }
+
+  // Suffix for sell toasts that surfaces the Market Stall bonus when it's active,
+  // so players actually feel the (otherwise invisible) sale-price upgrade pay off.
+  private marketBonusTag(): string {
+    const pct = Math.round((marketBonus(this.upgrades.market) - 1) * 100);
+    return pct > 0 ? ` · +${pct}% Market Stall` : '';
   }
 
   private sellAll() {
@@ -1652,7 +1664,7 @@ export class FarmScene extends Phaser.Scene {
     sfx.play('sell');
     bus.emit('action', 'sell');
     this.checkAchievements();
-    this.toast(`Sold everything (+${total}🪙)`);
+    this.toast(`Sold everything (+${total}🪙)${this.marketBonusTag()}`);
     this.emitState();
   }
 
@@ -1810,6 +1822,25 @@ export class FarmScene extends Phaser.Scene {
     const chosen = perk === ms.a.id ? ms.a : ms.b;
     sfx.play('upgrade');
     this.toast(`${def.icon} ${chosen.name} — ${chosen.desc}`);
+    this.emitState();
+    this.saveState();
+  }
+
+  // Wipe all chosen milestone perks for an escalating coin cost (first is free),
+  // so every unlocked milestone becomes a pending choice again. Skill XP/levels
+  // are untouched — only the perk picks reset. A plain coin sink, no dark pattern.
+  private respecPerks() {
+    const cost = respecCost(this.respecs);
+    if (this.coins < cost) {
+      this.toast(`Need ${cost.toLocaleString()}🪙 to respec perks`);
+      return;
+    }
+    this.coins -= cost;
+    this.respecs += 1;
+    this.perks = { ...EMPTY_PERKS };
+    this.recomputeMods(); // dropping perks changes the modifier bag immediately
+    sfx.play('upgrade');
+    this.toast('Perks reset — choose again!');
     this.emitState();
     this.saveState();
   }
@@ -2382,6 +2413,7 @@ export class FarmScene extends Phaser.Scene {
       animals: this.animalCounts,
       skills: this.skills,
       perks: this.perks,
+      respecs: this.respecs,
     };
     try {
       const json = JSON.stringify(data);
@@ -2401,7 +2433,10 @@ export class FarmScene extends Phaser.Scene {
     } catch {
       return false;
     }
-    if (!data || data.v !== SAVE_VERSION) return false;
+    // Accept the current version and v11. v11→v12 only added the additive
+    // `respecs` field (every other field is read defensively with `?? default`),
+    // so an older save migrates cleanly with respecs defaulting to 0 below.
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 11)) return false;
 
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
@@ -2422,6 +2457,7 @@ export class FarmScene extends Phaser.Scene {
     this.achievements = new Set(data.achievements ?? []);
     this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
+    this.respecs = data.respecs ?? 0; // additive v12 field; v11 saves default to 0
     this.recomputeMods(); // restored skills/perks change the modifier bag
     this.animalCounts = data.animals ?? {};
     for (const [type, count] of Object.entries(this.animalCounts)) {
@@ -2531,6 +2567,7 @@ export class FarmScene extends Phaser.Scene {
       },
       skills: { ...this.skills },
       perks: { ...this.perks },
+      respecs: this.respecs,
     });
   }
 
@@ -2977,7 +3014,12 @@ export class FarmScene extends Phaser.Scene {
         continue;
       }
       const wet = this.isWet(crop.tx, crop.ty);
-      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth) * this.mods().cropGrowthMult;
+      // Combined growth-speed multiplier: wet ×2 · Fertilizer upgrade · Farming
+      // skill. Clamped at MAX_GROWTH_MULT so stacked bonuses can't trivialize
+      // growth (keeps wet/Fertilizer meaningful with a sane floor on grow time).
+      // growthMult is a debug/dev knob and stays outside the clamp.
+      const speed = Math.min(MAX_GROWTH_MULT, (wet ? 2 : 1) * growthFactor(this.upgrades.growth) * this.mods().cropGrowthMult);
+      crop.grownMs += delta * this.growthMult * speed;
       const total = this.cropGrowMs(crop);
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
