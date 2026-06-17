@@ -9,6 +9,7 @@ import { BagPanel } from './BagPanel';
 import { AnimalsPanel } from './AnimalsPanel';
 import { UpgradesPanel } from './UpgradesPanel';
 import { SkillsPanel } from './SkillsPanel';
+import { FishTreePanel } from './FishTreePanel';
 import { AlmanacPanel } from './AlmanacPanel';
 import { HelpPanel } from './HelpPanel';
 import { SettingsPanel } from './SettingsPanel';
@@ -75,6 +76,7 @@ export function App() {
           {panel === 'animals' && <AnimalsPanel onClose={close} />}
           {panel === 'upgrades' && <UpgradesPanel onClose={close} />}
           {panel === 'skills' && <SkillsPanel onClose={close} />}
+          {panel === 'fishtree' && <FishTreePanel onClose={close} />}
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           {panel === 'settings' && <SettingsPanel onClose={close} />}

@@ -21,6 +21,7 @@ export interface GameEvents {
   'ui:buyAnimal': string; // animal id
   'ui:buyExpansion': void; // buy the next crop-bed expansion column
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
+  'ui:unlockFishNode': string; // Angler's Tree node id -> spend points to unlock
   'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones
 
   // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
