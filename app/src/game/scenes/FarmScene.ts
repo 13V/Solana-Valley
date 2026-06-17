@@ -56,7 +56,6 @@ import { GOALS, rewardLabel, type GoalStats } from '../goals';
 import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
-  HOME,
   HOMESTEADS,
   SHORE,
   BEACH,
@@ -158,13 +157,14 @@ type RemoteFarm = {
   tilled: Map<string, Phaser.GameObjects.Image>;
 };
 
-// The player's two animal pens + orchard in *pixel* coords (derived from HOME).
-// These drive where bought/bred animals spawn and how far they may wander.
-// Chickens roam the chicken pen, cows the cow pasture, fruit trees the orchard.
+// Convert an inclusive tile Rect to pixel bounds. Animal pens/orchard are derived
+// from the player's CURRENT homestead at spawn time (see producerArea) so animals
+// appear on the plot you actually own — not a fixed one.
 const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
-const CHICKEN_PEN = px(HOME.chickenPen);
-const COW_PEN = px(HOME.cowPen);
-const ORCHARD = px(HOME.orchard);
+
+// Hard cap on how many of each producer (chickens / cows / each tree type) a
+// player may own, via buying or breeding.
+const MAX_PRODUCERS = 50;
 
 // Translate a stored bind (a raw keyboard event.key, e.g. 'W', 'ArrowUp', ' ')
 // into a name Phaser's keyboard.addKey() understands. Single letters/digits and
@@ -2267,8 +2267,10 @@ export class FarmScene extends Phaser.Scene {
   // chickens (and any other small animal) in the chicken pen. Used both to spawn
   // a new producer and to clamp its wandering.
   private producerArea(def: AnimalDef) {
-    if (def.category === 'tree') return ORCHARD;
-    return def.id === 'cow' ? COW_PEN : CHICKEN_PEN;
+    // Use the pens of the plot we currently own, so animals spawn where we are.
+    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
+    if (def.category === 'tree') return px(h.orchard);
+    return def.id === 'cow' ? px(h.cowPen) : px(h.chickenPen);
   }
 
   // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
@@ -2338,6 +2340,10 @@ export class FarmScene extends Phaser.Scene {
     if (!def) return;
     if (levelInfo(this.xp).level < def.unlockLevel) {
       this.toast(`${def.name}s unlock at level ${def.unlockLevel}`);
+      return;
+    }
+    if ((this.animalCounts[id] ?? 0) >= MAX_PRODUCERS) {
+      this.toast(`You can have at most ${MAX_PRODUCERS} ${def.name}s`);
       return;
     }
     if (this.coins < def.cost) {
