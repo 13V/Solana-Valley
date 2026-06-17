@@ -47,6 +47,10 @@ export interface GameEvents {
   // fish flying into our avatar (cosmetic only — no coins/XP awarded on receive).
   'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
   'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
+  // Cast state so peers can render a remote player actually casting (rod-hold
+  // animation + a bobber on the water), not just the final catch.
+  'mp:fish': { casting: boolean; x: number; y: number; facing: string }; // FarmScene -> network: started/ended a cast (net stamps our id)
+  'mp:remoteFish': { id: string; casting: boolean; x: number; y: number; facing: string }; // network -> FarmScene: a peer started/ended a cast
 }
 
 type Handler<T> = (payload: T) => void;

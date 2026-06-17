@@ -49,6 +49,7 @@ let offSelf: (() => void) | null = null;
 let offFarm: (() => void) | null = null;
 let offShop: (() => void) | null = null;
 let offCatch: (() => void) | null = null;
+let offFish: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -174,6 +175,17 @@ function onSelfCatch({ fishId, rarity, x, y }: { fishId: string; rarity: number;
   if (!channel || !current || typeof fishId !== 'string') return;
   try {
     void channel.send({ type: 'broadcast', event: 'catch', payload: { id: current.id, fishId, rarity, x, y } });
+  } catch {
+    // ignore — best effort
+  }
+}
+
+// Broadcast that we started/ended a cast so peers can show us holding the rod
+// over the water (the catch event covers only the landed fish). Best-effort.
+function onSelfFish({ casting, x, y, facing }: { casting: boolean; x: number; y: number; facing: string }): void {
+  if (!channel || !current) return;
+  try {
+    void channel.send({ type: 'broadcast', event: 'fish', payload: { id: current.id, casting, x, y, facing } });
   } catch {
     // ignore — best effort
   }
@@ -308,6 +320,22 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:remoteCatch', { id: c.id, fishId: c.fishId, rarity: c.rarity, x: c.x, y: c.y });
     });
 
+    // Remote cast state -> render the peer holding the rod over the water.
+    ch.on('broadcast', { event: 'fish' }, (msg) => {
+      const c = (msg as { payload?: unknown }).payload as
+        | { id?: unknown; casting?: unknown; x?: unknown; y?: unknown; facing?: unknown }
+        | undefined;
+      if (!c || typeof c.id !== 'string' || typeof c.casting !== 'boolean') return;
+      if (current && c.id === current.id) return; // ignore our own echo
+      bus.emit('mp:remoteFish', {
+        id: c.id,
+        casting: c.casting,
+        x: typeof c.x === 'number' ? c.x : 0,
+        y: typeof c.y === 'number' ? c.y : 0,
+        facing: typeof c.facing === 'string' ? c.facing : 'down',
+      });
+    });
+
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         // Announce our presence once the channel is live.
@@ -320,6 +348,7 @@ export function joinIsland(island: number, self: Self): void {
     offFarm = bus.on('mp:farm', onSelfFarm);
     offShop = bus.on('mp:shopBuy', onSelfShopBuy);
     offCatch = bus.on('mp:catch', onSelfCatch);
+    offFish = bus.on('mp:fish', onSelfFish);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -363,6 +392,15 @@ export function leaveIsland(): void {
       // ignore
     }
     offCatch = null;
+  }
+
+  if (offFish) {
+    try {
+      offFish();
+    } catch {
+      // ignore
+    }
+    offFish = null;
   }
 
   if (flushTimer) {

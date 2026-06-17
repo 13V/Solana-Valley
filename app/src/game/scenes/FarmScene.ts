@@ -135,6 +135,9 @@ type RemotePlayer = {
   targetY: number;
   facing: Dir;
   name: string;
+  // Present while this peer is casting: their bobber on the water + the line we
+  // draw to it. The avatar plays the rod-hold (`pfish-wait`) anim meanwhile.
+  casting?: { tx: number; ty: number; bobber: Phaser.GameObjects.Sprite; line: Phaser.GameObjects.Graphics } | null;
 };
 
 // A single remote crop drawn in another player's plot. Visual only — it reuses
@@ -624,10 +627,11 @@ export class FarmScene extends Phaser.Scene {
       bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
       bus.on('mp:shopBought', ({ plantId }) => this.onRemoteShopBuy(plantId)),
       bus.on('mp:remoteCatch', (c) => this.onRemoteCatch(c)),
+      bus.on('mp:remoteFish', (m) => this.onRemoteFish(m)),
     );
     // Tear down every remote avatar + remote farm + the ground guide on shutdown.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
+      this.remotePlayers.forEach((rp) => { this.endRemoteFishFx(rp); rp.sprite.destroy(); rp.label.destroy(); });
       this.remotePlayers.clear();
       this.remoteFarms.forEach((_, id) => this.removeRemoteFarm(id));
       this.remoteFarms.clear();
@@ -2693,6 +2697,9 @@ export class FarmScene extends Phaser.Scene {
         ? cx < this.player.x ? 'left' : 'right'
         : cy < this.player.y ? 'up' : 'down';
 
+    // Tell island peers we've started a cast so they render us holding the rod.
+    bus.emit('mp:fish', { casting: true, x: cx, y: cy, facing: this.facing });
+
     // Rod-tip offset per facing — the player visibly holds the rod, so the line
     // emanates from roughly the rod tip rather than dead-centre. Tunable.
     const tip: Record<Dir, { x: number; y: number }> = {
@@ -2711,6 +2718,7 @@ export class FarmScene extends Phaser.Scene {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
         this.casting = false;
+        bus.emit('mp:fish', { casting: false, x: cx, y: cy, facing: this.facing });
         // Return the player from the cast pose to the normal idle.
         this.player.setFlipX(false);
         this.player.setTexture('pchar', 0);
@@ -3394,9 +3402,41 @@ export class FarmScene extends Phaser.Scene {
     this.removeRemoteFarm(id);
     const rp = this.remotePlayers.get(id);
     if (!rp) return;
+    this.endRemoteFishFx(rp);
     rp.sprite.destroy();
     rp.label.destroy();
     this.remotePlayers.delete(id);
+  }
+
+  // A remote player started/ended a cast (broadcast over the island channel).
+  // Cosmetic only: show them holding the rod over the water with a bobber + line.
+  private onRemoteFish({ id, casting, x, y, facing }: GameEvents['mp:remoteFish']) {
+    let rp = this.remotePlayers.get(id);
+    if (casting) {
+      if (!rp) rp = this.createRemote(id, id.slice(0, 4), x, y, this.toDir(facing));
+      rp.facing = this.toDir(facing);
+      this.endRemoteFishFx(rp); // clear any stale bobber/line first
+      const bobber = this.anims.exists('bobber_idle')
+        ? this.add.sprite(x, y, 'fishing_splash').setScale(1.4).play('bobber_idle')
+        : this.add.sprite(x, y, 'p_droplet').setScale(2);
+      bobber.setOrigin(0.5, 0.5).setDepth(99985);
+      const line = this.add.graphics().setDepth(99975);
+      rp.casting = { tx: x, ty: y, bobber, line };
+      rp.sprite.setFlipX(rp.facing === 'right'); // right reuses the side sheet flipped
+      if (this.anims.exists(`pfish-wait-${rp.facing}`)) rp.sprite.play(`pfish-wait-${rp.facing}`, true);
+    } else if (rp) {
+      this.endRemoteFishFx(rp);
+      rp.sprite.setFlipX(false);
+      rp.sprite.play(`idle-${rp.facing}`, true);
+    }
+  }
+
+  // Destroy a remote caster's bobber + line (if any) and clear the flag.
+  private endRemoteFishFx(rp: RemotePlayer) {
+    if (!rp.casting) return;
+    rp.casting.bobber.destroy();
+    rp.casting.line.destroy();
+    rp.casting = null;
   }
 
   // Presence sync: the roster is the full list of who's on the island. SPAWN an
@@ -3556,6 +3596,23 @@ export class FarmScene extends Phaser.Scene {
     // Frame-rate-independent smoothing factor.
     const t = 1 - Math.pow(0.001, delta / 1000);
     for (const rp of this.remotePlayers.values()) {
+      // A casting peer holds the rod-wait pose; pin them in place, draw their
+      // line to the gently-bobbing bobber, and skip walk/idle so it isn't
+      // overridden. (Casters don't move — local movement is locked mid-cast.)
+      if (rp.casting) {
+        rp.sprite.x = rp.targetX;
+        rp.sprite.y = rp.targetY;
+        const c = rp.casting;
+        c.bobber.y = c.ty + Math.sin(this.time.now / 300) * 2;
+        c.line.clear();
+        c.line.lineStyle(1, 0xf2efe6, 0.8);
+        c.line.beginPath();
+        c.line.moveTo(rp.sprite.x, rp.sprite.y - 16);
+        c.line.lineTo(c.bobber.x, c.bobber.y);
+        c.line.strokePath();
+        this.depthSortRemote(rp);
+        continue;
+      }
       const dx = rp.targetX - rp.sprite.x;
       const dy = rp.targetY - rp.sprite.y;
       const dist = Math.hypot(dx, dy);
