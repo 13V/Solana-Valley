@@ -1271,20 +1271,25 @@ export class FarmScene extends Phaser.Scene {
   // from the roster (see onRoster); starts as "Available"/"Your Plot".
   private addPlotHologram(plot: number, cxTile: number, topTile: number, text: string) {
     const x = cxTile * TILE;
-    const baseY = (topTile - 1) * TILE + 6;
+    const baseY = (topTile - 1) * TILE + 2;
     const label = this.add
       .text(x, baseY, text, {
         fontFamily: 'Pixelify Sans, monospace',
-        fontSize: '15px',
-        color: '#caf4ff',
+        fontSize: '16px',
+        color: '#9af2ff',
+        stroke: '#06303f',
+        strokeThickness: 4,
+        // Dark translucent backing so the cyan reads against bright grass.
+        backgroundColor: 'rgba(8,38,52,0.5)',
+        padding: { x: 7, y: 3 },
       })
       .setOrigin(0.5, 1)
       .setDepth(60000)
-      .setAlpha(0.85);
-    label.setShadow(0, 0, '#4fd6ff', 12, true, true); // cyan glow → holographic
-    // Gentle hover + flicker so it feels projected, not painted on.
+      .setAlpha(0.95);
+    label.setShadow(0, 0, '#3fd2ff', 10, true, true); // cyan glow → holographic
+    // Gentle hover + flicker so it feels projected, not painted on (kept readable).
     this.tweens.add({ targets: label, y: baseY - 5, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.tweens.add({ targets: label, alpha: 0.55, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: label, alpha: 0.72, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.plotLabels.set(plot, label);
   }
 
