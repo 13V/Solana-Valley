@@ -53,6 +53,7 @@ import {
   type UpgradeForks,
 } from '../progression';
 import { collectionBonus } from '../collection';
+import { GOALS, rewardLabel, type GoalStats } from '../goals';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
   HOME,
@@ -197,7 +198,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 15; // bumped: added px/py player position + plotIndex (owned homestead) so refresh restores where you were; defaults preserve older saves
+const SAVE_VERSION = 16; // bumped: added claimedGoals (rewarded goal-ladder); defaults preserve older saves (legacy saves retro-claim satisfied goals without payout)
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -244,6 +245,7 @@ type SaveData = {
   discPlants: string[];
   discMutations: string[];
   achievements: string[];
+  claimedGoals?: string[]; // v16+: rewarded goal-ladder ids already paid out. Optional so older saves migrate.
   animals: Record<string, number>;
   skills: Skills;
   perks: ChosenPerks;
@@ -307,6 +309,8 @@ export class FarmScene extends Phaser.Scene {
   private discoveredPlants = new Set<string>();
   private discoveredMutations = new Set<string>();
   private achievements = new Set<string>();
+  // Rewarded goal-ladder ids already paid out (see game/goals.ts). One-time.
+  private claimedGoals = new Set<string>();
   private animals: Animal[] = [];
   private gate?: Phaser.GameObjects.Sprite;
   private gateOpen = false;
@@ -2007,6 +2011,45 @@ export class FarmScene extends Phaser.Scene {
         this.toast(`🏆 ${a.name}!  +${a.reward}🪙 · +${a.xp} XP`);
       }
     }
+    this.checkGoals(); // the rewarded goal ladder rides the same action hooks
+  }
+
+  // Snapshot the few stats the goal ladder predicates read (see game/goals.ts).
+  private goalStats(): GoalStats {
+    return {
+      seedsOwned: Object.values(this.seeds).reduce((a, b) => a + b, 0),
+      harvested: this.harvested,
+      earned: this.earned,
+      level: levelInfo(this.xp).level,
+      upgradesBought: Object.values(this.upgrades).filter((lvl) => lvl > 0).length,
+      animalsOwned: Object.values(this.animalCounts).reduce((a, b) => a + b, 0),
+      plantsDiscovered: this.discoveredPlants.size,
+      mutationsFound: this.mutationsFound,
+    };
+  }
+
+  // Auto-claim any newly-satisfied goals exactly once, paying out coins/XP/seeds.
+  // Coins are added directly (NOT via `earned`, so payouts can't snowball the
+  // coin-earned goals). Loops until stable so a reward that pushes the player
+  // over the next rung (e.g. XP triggers a level-up) is caught in the same tick.
+  private checkGoals() {
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      const stats = this.goalStats();
+      for (const g of GOALS) {
+        if (this.claimedGoals.has(g.id) || !g.test(stats)) continue;
+        this.claimedGoals.add(g.id);
+        this.coins += g.reward.coins;
+        if (g.reward.seed && PLANTS.some((p) => p.id === g.reward.seed!.id)) {
+          this.seeds[g.reward.seed.id] = (this.seeds[g.reward.seed.id] ?? 0) + g.reward.seed.count;
+        }
+        sfx.play('achievement');
+        this.toast(`🎯 Goal complete: ${g.label}!  ${rewardLabel(g.reward)}`);
+        if (g.reward.xp) this.gainXp(g.reward.xp); // may level up → loop re-checks
+        progressed = true;
+      }
+    }
   }
 
   private buyUpgrade(id: string) {
@@ -2606,6 +2649,7 @@ export class FarmScene extends Phaser.Scene {
       discPlants: [...this.discoveredPlants],
       discMutations: [...this.discoveredMutations],
       achievements: [...this.achievements],
+      claimedGoals: [...this.claimedGoals],
       animals: this.animalCounts,
       skills: this.skills,
       perks: this.perks,
@@ -2641,7 +2685,7 @@ export class FarmScene extends Phaser.Scene {
     // other field is read defensively with `?? default`, so older saves migrate
     // cleanly — respecs defaults to 0, upgradeForks defaults to {}, plotExpansion
     // defaults to 0, and the v15 position/plot fields default below.
-    if (!data || (data.v !== SAVE_VERSION && data.v !== 14 && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 15 && data.v !== 14 && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
 
     // Re-point the owned plot BEFORE any tiles/crops are placed: tile/crop coords
     // are stored relative to the owned-plot origin (myFarmRect), so the index must
@@ -2683,6 +2727,14 @@ export class FarmScene extends Phaser.Scene {
     this.markPlayerFarm();
     this.recomputeMods(); // restored skills/perks change the modifier bag
     this.animalCounts = data.animals ?? {};
+    // Rewarded goal ladder (v16+). For legacy saves (no claimedGoals field),
+    // retro-mark every goal the player ALREADY satisfies as claimed WITHOUT
+    // paying out — so existing players don't get a flood of back-rewards; only
+    // brand-new completions earn from here on. (Runs after every stat the
+    // predicates read, incl. animalCounts above, is loaded.)
+    this.claimedGoals = data.claimedGoals
+      ? new Set(data.claimedGoals)
+      : new Set(GOALS.filter((g) => g.test(this.goalStats())).map((g) => g.id));
     for (const [type, count] of Object.entries(this.animalCounts)) {
       const adef = ANIMAL_BY_ID[type];
       if (!adef) continue;
@@ -2817,6 +2869,7 @@ export class FarmScene extends Phaser.Scene {
       perks: { ...this.perks },
       respecs: this.respecs,
       upgradeForks: { ...this.upgradeForks },
+      goalsClaimed: [...this.claimedGoals],
     });
   }
 

@@ -109,13 +109,40 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  /* The ladder is long (18 rungs); cap its height and scroll so it never runs
+     off the screen. */
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .goals-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
+}
+
+/* Label + reward stacked so the reward never widens the narrow panel. */
+.goals-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* The carrot: what this rung pays out, shown until it's done. */
+.goals-reward {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b9821f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-skin .goals-reward {
+  color: #8a5a1e;
 }
 
 /* Icon slot keeps a fixed width so labels line up. */

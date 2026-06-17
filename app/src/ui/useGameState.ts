@@ -30,6 +30,7 @@ const initialState: UiState = {
   perks: {},
   respecs: 0,
   upgradeForks: {},
+  goalsClaimed: [],
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };
