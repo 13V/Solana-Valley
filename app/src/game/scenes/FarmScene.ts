@@ -307,6 +307,9 @@ export class FarmScene extends Phaser.Scene {
   private shopPool: Record<string, number> = {};
   private shopBought: Record<string, number> = {};
   private shopSyncMs = 0; // accumulator for the periodic authoritative DB reconcile
+  // Plots (other players') we've tinted as cultivated, so we can un-tint them when
+  // that player leaves. Our own plot is handled separately by markPlayerFarm.
+  private remotePlotTints = new Set<number>();
 
   // progression
   private xp = 0;
@@ -3148,6 +3151,36 @@ export class FarmScene extends Phaser.Scene {
       this.onlineCount = count;
       this.refreshShopPool();
       this.emitState();
+    }
+
+    // Tint every OTHER occupied plot's crop bed too, so a friend's farmland reads
+    // as cultivated grass just like ours (uniform — we don't know their unlocked
+    // rows). Un-tint plots whose owner has left.
+    const occupied = new Set<number>();
+    for (const p of players) {
+      if (p.id !== this.myMpId && Number.isInteger(p.plot)) occupied.add(p.plot);
+    }
+    for (const plot of occupied) {
+      if (plot === this.myPlotIndex || this.remotePlotTints.has(plot)) continue;
+      this.markRemotePlot(plot);
+      this.remotePlotTints.add(plot);
+    }
+    for (const plot of [...this.remotePlotTints]) {
+      if (occupied.has(plot)) continue;
+      if (plot !== this.myPlotIndex) this.clearFarmTint(plot);
+      this.remotePlotTints.delete(plot);
+    }
+  }
+
+  // Tint another player's base crop bed (uniform "cultivated" green) so their plot
+  // reads like a farm. We don't know their expansion width or unlocked rows, so we
+  // mark just the base bed evenly.
+  private markRemotePlot(plot: number) {
+    const f = homesteadPlot(plot);
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw; x++) {
+        this.ground[y]?.[x]?.setTint(0xd8e6a8);
+      }
     }
   }
 
