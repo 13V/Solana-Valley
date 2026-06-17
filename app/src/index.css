@@ -48,6 +48,147 @@ body {
   pointer-events: none;
 }
 
+/* Island chat (bottom-left, above the minimap). */
+.chat-toggle {
+  position: absolute;
+  left: 10px;
+  bottom: 152px;
+  z-index: 8;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(12, 20, 14, 0.82);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-toggle:hover {
+  border-color: var(--accent);
+}
+.chat-unread {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #e6433a;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-weight: 700;
+  border: 2px solid #fff3d8;
+  box-sizing: border-box;
+}
+.chat-panel {
+  position: absolute;
+  left: 10px;
+  bottom: 152px;
+  z-index: 8;
+  width: 300px;
+  max-width: 80vw;
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(12, 20, 14, 0.9);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--panel-border);
+}
+.chat-x {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.7;
+}
+.chat-x:hover {
+  opacity: 1;
+}
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.chat-empty {
+  opacity: 0.6;
+  font-size: 12px;
+  text-align: center;
+  margin: auto 0;
+}
+.chat-msg {
+  word-break: break-word;
+}
+.chat-name {
+  font-weight: 700;
+  color: var(--accent);
+}
+.chat-msg.is-self .chat-name {
+  color: var(--gold);
+}
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+}
+.chat-input:focus {
+  border-color: var(--accent);
+}
+.chat-send {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.chat-send:hover {
+  border-color: var(--accent);
+}
+/* On touch the bottom-left is the joystick — lift chat above it. */
+@media (pointer: coarse) {
+  .chat-toggle,
+  .chat-panel {
+    bottom: 214px;
+  }
+}
+
 /* Contract-address pill, pinned bottom-right (copy on click). */
 .ca-pill {
   position: absolute;

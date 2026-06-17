@@ -43,6 +43,8 @@ export interface GameEvents {
   'mp:shopBuy': { plantId: string }; // FarmScene -> network: we bought one of this seed
   'mp:shopBought': { id: string; plantId: string }; // network -> FarmScene: a peer bought one (id = buyer)
   'mp:reverify': void; // FarmScene -> network: another player shares our plot; re-check our seat with the server NOW
+  'mp:chatSend': { text: string }; // UI -> network: send a chat line to the island
+  'mp:chat': { id: string; name: string; text: string }; // network -> UI: a chat line arrived from a peer
 }
 
 type Handler<T> = (payload: T) => void;

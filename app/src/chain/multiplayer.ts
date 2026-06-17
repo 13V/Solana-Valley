@@ -44,10 +44,11 @@ const FARM_INTERVAL_MS = 1800;
 let channel: RealtimeChannel | null = null;
 let current: Self | null = null;
 
-// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' / 'mp:shopBuy' listeners.
+// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' / 'mp:shopBuy' / 'mp:chatSend' listeners.
 let offSelf: (() => void) | null = null;
 let offFarm: (() => void) | null = null;
 let offShop: (() => void) | null = null;
+let offChat: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -167,6 +168,19 @@ function onSelfShopBuy({ plantId }: { plantId: string }): void {
   }
 }
 
+// Broadcast a local chat line to the island (stamped with our id + name, like
+// pos/farm). Trimmed + length-capped; best effort.
+function onSelfChat({ text }: { text: string }): void {
+  if (!channel || !current || typeof text !== 'string') return;
+  const t = text.trim().slice(0, 200);
+  if (!t) return;
+  try {
+    void channel.send({ type: 'broadcast', event: 'chat', payload: { id: current.id, name: current.name, text: t } });
+  } catch {
+    // ignore — best effort
+  }
+}
+
 // Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
 // remote peer that disappeared since the last sync.
 function handlePresenceSync(): void {
@@ -268,6 +282,14 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:remoteFarm', f);
     });
 
+    // Remote chat lines -> show in the UI. Ignore our own echo / malformed.
+    ch.on('broadcast', { event: 'chat' }, (msg) => {
+      const c = (msg as { payload?: unknown }).payload as { id?: unknown; name?: unknown; text?: unknown } | undefined;
+      if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.text !== 'string') return;
+      if (current && c.id === current.id) return;
+      bus.emit('mp:chat', { id: c.id, name: c.name, text: c.text.slice(0, 200) });
+    });
+
     // Remote seed-shop purchases -> drain the shared pool in the game.
     ch.on('broadcast', { event: 'shop' }, (msg) => {
       const s = (msg as { payload?: unknown }).payload as { id?: unknown; plantId?: unknown } | undefined;
@@ -287,6 +309,7 @@ export function joinIsland(island: number, self: Self): void {
     offSelf = bus.on('mp:self', onSelfPose);
     offFarm = bus.on('mp:farm', onSelfFarm);
     offShop = bus.on('mp:shopBuy', onSelfShopBuy);
+    offChat = bus.on('mp:chatSend', onSelfChat);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -321,6 +344,15 @@ export function leaveIsland(): void {
       // ignore
     }
     offShop = null;
+  }
+
+  if (offChat) {
+    try {
+      offChat();
+    } catch {
+      // ignore
+    }
+    offChat = null;
   }
 
   if (flushTimer) {
