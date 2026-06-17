@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
+import { buildSkinTextures } from '../skins';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -75,6 +76,7 @@ export class BootScene extends Phaser.Scene {
     this.makeUtilTextures();
     this.makeFxTextures();
     this.defineAssetFrames();
+    buildSkinTextures(this); // recolour the farmer into selectable outfit skins
     this.scene.start('Farm');
   }
 

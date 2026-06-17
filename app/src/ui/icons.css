@@ -88,6 +88,16 @@
   height: 24px;
 }
 
+/* Wardrobe outfit swatch (gradient chip: highlight → base → shadow). */
+.skin-swatch {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  border: 2px solid rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
 /* Skill / upgrade row icons — real pack sprites (was emoji). */
 .upg-icon-img {
   width: 26px;

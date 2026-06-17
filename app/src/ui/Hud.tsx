@@ -15,7 +15,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'wardrobe' | 'help' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
@@ -30,6 +30,7 @@ const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; la
   { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
   { id: 'skills', emoji: '🎯', img: 'assets/sprout-ui/icon_star.png', label: 'Skills' },
   { id: 'almanac', emoji: '📖', img: 'assets/sprout-ui/icon_almanac.png', label: 'Almanac' },
+  { id: 'wardrobe', emoji: '👕', label: 'Wardrobe' },
   { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 

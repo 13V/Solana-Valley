@@ -43,6 +43,7 @@ import {
   type Upgrades,
 } from '../progression';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
+import { SKINS, SKIN_BY_ID, DEFAULT_SKIN, skinTextureKey } from '../skins';
 import {
   HOME,
   MY_PLOT,
@@ -144,6 +145,8 @@ type SaveData = {
   animals: Record<string, number>;
   skills: Skills;
   perks: ChosenPerks;
+  skin: string; // worn outfit id
+  ownedSkins: string[]; // unlocked outfit ids
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -156,6 +159,8 @@ export class FarmScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
   private player!: Phaser.Physics.Arcade.Sprite;
+  private skin = DEFAULT_SKIN; // active outfit skin id
+  private ownedSkins = new Set<string>([DEFAULT_SKIN]); // unlocked outfits
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private highlight!: Phaser.GameObjects.Image;
@@ -374,7 +379,9 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
+      bus.on('ui:selectSkin', (id) => this.selectSkin(id)),
     );
+    this.applySkin(this.skin); // wear the saved outfit (or classic) now the player exists
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
       this.unsubs = [];
@@ -491,26 +498,46 @@ export class FarmScene extends Phaser.Scene {
   };
 
   private createAnims() {
-    for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
-      const walk = `walk-${dir}`;
-      if (!this.anims.exists(walk)) {
-        const start = FarmScene.WALK_ROW[dir];
-        this.anims.create({
-          key: walk,
-          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
-          frameRate: 12,
-          repeat: -1,
-        });
+    // Player locomotion + tool swings — one namespaced set per outfit skin, so a
+    // recoloured sheet animates exactly like the base (mirrors the animal swaps).
+    for (const skin of SKINS) {
+      const sheet = skinTextureKey(skin.id);
+      if (!this.textures.exists(sheet)) continue; // skip skins whose texture failed to build
+      for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+        const walk = `${sheet}-walk-${dir}`;
+        if (!this.anims.exists(walk)) {
+          const start = FarmScene.WALK_ROW[dir];
+          this.anims.create({
+            key: walk,
+            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
+            frameRate: 12,
+            repeat: -1,
+          });
+        }
+        const idle = `${sheet}-idle-${dir}`;
+        if (!this.anims.exists(idle)) {
+          const start = FarmScene.IDLE_ROW[dir];
+          this.anims.create({
+            key: idle,
+            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
+            frameRate: 6,
+            repeat: -1,
+          });
+        }
       }
-      const idle = `idle-${dir}`;
-      if (!this.anims.exists(idle)) {
-        const start = FarmScene.IDLE_ROW[dir];
-        this.anims.create({
-          key: idle,
-          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
-          frameRate: 6,
-          repeat: -1,
-        });
+      // Directional tool swings from the premium sheet (rows 12–23, 8 frames each).
+      for (const tool of ['hoe', 'water'] as const) {
+        for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+          const key = `${sheet}-act-${tool}-${dir}`;
+          if (this.anims.exists(key)) continue;
+          const start = FarmScene.TOOL_ROW[tool][dir];
+          this.anims.create({
+            key,
+            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
+            frameRate: 18,
+            repeat: 0,
+          });
+        }
       }
     }
     if (!this.anims.exists('water-anim')) {
@@ -520,20 +547,6 @@ export class FarmScene extends Phaser.Scene {
         frameRate: 6,
         repeat: -1,
       });
-    }
-    // Directional tool swings from the premium sheet (rows 12–23, 8 frames each).
-    for (const tool of ['hoe', 'water'] as const) {
-      for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
-        const key = `act-${tool}-${dir}`;
-        if (this.anims.exists(key)) continue;
-        const start = FarmScene.TOOL_ROW[tool][dir];
-        this.anims.create({
-          key,
-          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
-          frameRate: 18,
-          repeat: 0,
-        });
-      }
     }
     // Animations are keyed by sheet so every palette swap gets its own pair.
     for (const a of ANIMALS) {
@@ -559,9 +572,44 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // The texture key for the player's current outfit (falls back to the base
+  // sheet if the active skin's texture is somehow missing).
+  private playerSheet(): string {
+    const key = skinTextureKey(this.skin);
+    return this.textures.exists(key) ? key : skinTextureKey(DEFAULT_SKIN);
+  }
+
+  // Wear an (already-owned) outfit: swap the sprite texture and replay the
+  // current idle so the change shows instantly.
+  private applySkin(id: string) {
+    this.skin = SKIN_BY_ID[id] ? id : DEFAULT_SKIN;
+    const sheet = this.playerSheet();
+    this.player.setTexture(sheet, 0);
+    this.player.anims.play(`${sheet}-idle-${this.facing}`, true);
+  }
+
+  // UI intent: buy (if needed & affordable) and wear an outfit.
+  private selectSkin(id: string) {
+    const skin = SKIN_BY_ID[id];
+    if (!skin) return;
+    if (!this.ownedSkins.has(id)) {
+      if (this.coins < skin.cost) {
+        bus.emit('toast', `Need ${skin.cost.toLocaleString()}🪙 for the ${skin.name} outfit`);
+        return;
+      }
+      this.coins -= skin.cost;
+      this.ownedSkins.add(id);
+      sfx.play('buy');
+      bus.emit('toast', `Unlocked the ${skin.name} outfit!`);
+    }
+    this.applySkin(id);
+    this.saveState();
+    this.emitState();
+  }
+
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
-    this.player.anims.play(`act-${tool}-${this.facing}`, true);
+    this.player.anims.play(`${this.playerSheet()}-act-${tool}-${this.facing}`, true);
   }
 
   private grassFrame(x: number, y: number): number {
@@ -2062,6 +2110,8 @@ export class FarmScene extends Phaser.Scene {
       animals: this.animalCounts,
       skills: this.skills,
       perks: this.perks,
+      skin: this.skin,
+      ownedSkins: [...this.ownedSkins],
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -2100,6 +2150,8 @@ export class FarmScene extends Phaser.Scene {
     this.achievements = new Set(data.achievements ?? []);
     this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
+    this.ownedSkins = new Set([DEFAULT_SKIN, ...(data.ownedSkins ?? [])]);
+    this.skin = this.ownedSkins.has(data.skin) ? data.skin : DEFAULT_SKIN;
     this.recomputeMods(); // restored skills/perks change the modifier bag
     this.animalCounts = data.animals ?? {};
     for (const [type, count] of Object.entries(this.animalCounts)) {
@@ -2188,6 +2240,8 @@ export class FarmScene extends Phaser.Scene {
       },
       skills: { ...this.skills },
       perks: { ...this.perks },
+      skin: this.skin,
+      ownedSkins: [...this.ownedSkins],
     });
   }
 
@@ -2295,11 +2349,11 @@ export class FarmScene extends Phaser.Scene {
       if (vx < 0) this.facing = 'left';
       else if (vx > 0) this.facing = 'right';
       else this.facing = vy < 0 ? 'up' : 'down';
-      this.player.anims.play(`walk-${this.facing}`, true);
+      this.player.anims.play(`${this.playerSheet()}-walk-${this.facing}`, true);
     } else if (time < this.actingUntil) {
       // let the tool-use animation play out
     } else {
-      this.player.anims.play(`idle-${this.facing}`, true);
+      this.player.anims.play(`${this.playerSheet()}-idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
 

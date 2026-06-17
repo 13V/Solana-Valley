@@ -29,6 +29,8 @@ export type UiState = {
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
   perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
+  skin: string; // worn outfit id
+  ownedSkins: string[]; // unlocked outfit ids
 };
 
 // Lightweight time/restock state, emitted about once per second.

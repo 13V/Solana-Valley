@@ -16,6 +16,7 @@ export interface GameEvents {
   'ui:buyUpgrade': string; // upgrade id
   'ui:buyAnimal': string; // animal id
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
+  'ui:selectSkin': string; // outfit skin id -> buy (if needed) then wear
 }
 
 type Handler<T> = (payload: T) => void;

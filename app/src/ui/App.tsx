@@ -10,6 +10,7 @@ import { AnimalsPanel } from './AnimalsPanel';
 import { UpgradesPanel } from './UpgradesPanel';
 import { SkillsPanel } from './SkillsPanel';
 import { AlmanacPanel } from './AlmanacPanel';
+import { WardrobePanel } from './WardrobePanel';
 import { HelpPanel } from './HelpPanel';
 import { Toasts } from './Toasts';
 
@@ -60,6 +61,7 @@ export function App() {
           {panel === 'upgrades' && <UpgradesPanel onClose={close} />}
           {panel === 'skills' && <SkillsPanel onClose={close} />}
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
+          {panel === 'wardrobe' && <WardrobePanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           <Hotbar />
           <Toasts />
