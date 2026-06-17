@@ -333,7 +333,11 @@ export class FarmScene extends Phaser.Scene {
   // Which homestead the local player owns/farms. Defaults to #0 (single-player);
   // a `mp:assigned` event re-points it to the server-assigned plot.
   private myPlotIndex = 0;
-  // id -> remote avatar. Visual only (no collision); upserted on `mp:move`.
+  // Our own wallet id once assigned, so the presence roster can exclude us when
+  // spawning remote avatars (the roster includes ourselves).
+  private myMpId: string | null = null;
+  // id -> remote avatar. Visual only (no collision); spawned from the presence
+  // roster and updated on `mp:move`.
   private remotePlayers = new Map<string, RemotePlayer>();
   // id -> remote player's farm (their crops, drawn in their own plot). Visual
   // only; upserted on `mp:remoteFarm`, diffed in place, cleaned up on leave.
@@ -520,7 +524,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
-      bus.on('mp:assigned', ({ plot }) => this.onAssigned(plot)),
+      bus.on('mp:assigned', ({ id, plot }) => { this.myMpId = id; this.onAssigned(plot); }),
       bus.on('mp:roster', (players) => this.onRoster(players)),
       bus.on('mp:move', (m) => this.onRemoteMove(m)),
       bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
@@ -2918,18 +2922,31 @@ export class FarmScene extends Phaser.Scene {
     this.remotePlayers.delete(id);
   }
 
-  // Presence sync: the roster is the full list of who's on the island. Remove any
-  // avatar no longer present, and refresh names for those that are. (We don't
-  // pre-spawn avatars here — positions arrive via mp:move — but we DO drop stale
-  // ones so leavers vanish even if a mp:leave was missed.)
+  // Presence sync: the roster is the full list of who's on the island. SPAWN an
+  // avatar for every online peer right away (at their plot's gate as a placeholder
+  // until a real position streams in via mp:move) so idle or just-joined players
+  // are visible immediately — not only once they move. Also drop avatars for
+  // anyone no longer present, and refresh names.
   private onRoster(players: Array<{ id: string; name: string; plot: number }>) {
     const present = new Set(players.map((p) => p.id));
     for (const id of [...this.remotePlayers.keys()]) {
       if (!present.has(id)) this.removeRemote(id);
     }
     for (const p of players) {
-      const rp = this.remotePlayers.get(p.id);
-      if (rp && p.name && rp.name !== p.name) {
+      if (p.id === this.myMpId) continue; // never spawn an avatar for ourselves
+      let rp = this.remotePlayers.get(p.id);
+      if (!rp) {
+        // Place them at their own plot's gate until their first pose arrives.
+        const gate = homesteadGateTile(p.plot);
+        rp = this.createRemote(
+          p.id,
+          p.name || p.id.slice(0, 4),
+          gate.tx * TILE + TILE / 2,
+          gate.ty * TILE + TILE / 2,
+          'down',
+        );
+      }
+      if (p.name && rp.name !== p.name) {
         rp.name = p.name;
         rp.label.setText(p.name);
       }

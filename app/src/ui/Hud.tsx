@@ -137,6 +137,15 @@ export function Hud({
         </button>
       </div>
       <div className="hud-right">
+        {!mpConnected && (
+          <span
+            className="badge"
+            style={{ fontFamily: 'var(--pixel-font)', opacity: 0.85 }}
+            title="Multiplayer needs a connected devnet wallet — every player must connect AND approve the signature to see each other"
+          >
+            {addr ? '🌐 Connecting…' : '🌐 Connect wallet for multiplayer'}
+          </span>
+        )}
         {mpConnected && (
           <span className="island-group">
             <span

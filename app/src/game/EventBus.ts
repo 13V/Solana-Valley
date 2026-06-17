@@ -25,7 +25,7 @@ export interface GameEvents {
 
   // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
   'mp:self': { x: number; y: number; facing: string }; // FarmScene -> network (throttled): local player pose
-  'mp:assigned': { island: number; plot: number }; // network -> FarmScene, after /api/join assigns a stable plot
+  'mp:assigned': { id: string; island: number; plot: number }; // network -> FarmScene, after /api/join assigns a stable plot (id = our own wallet, so we can exclude ourselves from the roster)
   'mp:roster': Array<{ id: string; name: string; plot: number }>; // network -> FarmScene: who's online (presence sync)
   'mp:move': { id: string; x: number; y: number; facing: string }; // network -> FarmScene: a remote player moved
   'mp:leave': { id: string }; // network -> FarmScene: a remote player left

@@ -80,8 +80,9 @@ export function MultiplayerSync() {
 
       if (cancelled || !assignment) return;
 
-      // Tell the game which seat it owns.
-      bus.emit('mp:assigned', { island: assignment.island, plot: assignment.plot });
+      // Tell the game which seat it owns (and our own id, so it can exclude us
+      // from the presence roster when spawning remote avatars).
+      bus.emit('mp:assigned', { id: auth.wallet, island: assignment.island, plot: assignment.plot });
 
       const status = `Joined island ${assignment.island} · plot ${assignment.plot}`;
       bus.emit('mp:status', status);
