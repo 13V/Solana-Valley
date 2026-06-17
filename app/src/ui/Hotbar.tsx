@@ -12,6 +12,7 @@ export function Hotbar() {
     <div className="hotbar">
       {TOOLS.map((tool, i) => {
         const isSeed = tool.id === 'seed';
+        const isRod = tool.id === 'rod';
         const label = isSeed && seedPlant ? seedPlant.name : tool.label;
         const accent = isSeed && seedPlant ? RARITY[seedPlant.rarity].css : undefined;
         return (
@@ -23,8 +24,9 @@ export function Hotbar() {
             title={label}
           >
             <span className="slot-key">{i + 1}</span>
-            {tool.id === 'rod' ? (
-              <span className="tool-ico" style={{ fontSize: 20, lineHeight: '22px' }}>🎣</span>
+            {isRod ? (
+              // No rod art ships yet — use the fishing emoji as the icon.
+              <span className="tool-ico" role="img" aria-label="🎣" style={{ fontSize: 22, lineHeight: '1', textAlign: 'center' }}>🎣</span>
             ) : (
               <img
                 className="tool-ico"

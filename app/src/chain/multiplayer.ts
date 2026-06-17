@@ -44,11 +44,12 @@ const FARM_INTERVAL_MS = 1800;
 let channel: RealtimeChannel | null = null;
 let current: Self | null = null;
 
-// Unsubscribe handles for the bus 'mp:self' / 'mp:farm' / 'mp:shopBuy' / 'mp:chatSend' listeners.
+// Unsubscribe handles for the bus 'mp:self'/'mp:farm'/'mp:shopBuy'/'mp:chatSend'/'mp:catch' listeners.
 let offSelf: (() => void) | null = null;
 let offFarm: (() => void) | null = null;
 let offShop: (() => void) | null = null;
 let offChat: (() => void) | null = null;
+let offCatch: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -181,6 +182,17 @@ function onSelfChat({ text }: { text: string }): void {
   }
 }
 
+// Broadcast a local fishing catch so every peer can animate the fish flying into
+// our avatar. Cosmetic-only on the receiving side. Fire-and-forget (best effort).
+function onSelfCatch({ fishId, rarity, x, y }: { fishId: string; rarity: number; x: number; y: number }): void {
+  if (!channel || !current || typeof fishId !== 'string') return;
+  try {
+    void channel.send({ type: 'broadcast', event: 'catch', payload: { id: current.id, fishId, rarity, x, y } });
+  } catch {
+    // ignore — best effort
+  }
+}
+
 // Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
 // remote peer that disappeared since the last sync.
 function handlePresenceSync(): void {
@@ -298,6 +310,26 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:shopBought', { id: s.id, plantId: s.plantId });
     });
 
+    // Remote fishing catches -> animate the fish flying into that player's avatar
+    // (cosmetic only). Validate the payload defensively and drop our own echo.
+    ch.on('broadcast', { event: 'catch' }, (msg) => {
+      const c = (msg as { payload?: unknown }).payload as
+        | { id?: unknown; fishId?: unknown; rarity?: unknown; x?: unknown; y?: unknown }
+        | undefined;
+      if (
+        !c ||
+        typeof c.id !== 'string' ||
+        typeof c.fishId !== 'string' ||
+        typeof c.rarity !== 'number' ||
+        typeof c.x !== 'number' ||
+        typeof c.y !== 'number'
+      ) {
+        return;
+      }
+      if (current && c.id === current.id) return; // ignore our own echo
+      bus.emit('mp:remoteCatch', { id: c.id, fishId: c.fishId, rarity: c.rarity, x: c.x, y: c.y });
+    });
+
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         // Announce our presence once the channel is live.
@@ -305,11 +337,12 @@ export function joinIsland(island: number, self: Self): void {
       }
     });
 
-    // Forward throttled local poses + crop snapshots + shop buys to the channel.
+    // Forward throttled local poses + crop snapshots + shop buys + catches to the channel.
     offSelf = bus.on('mp:self', onSelfPose);
     offFarm = bus.on('mp:farm', onSelfFarm);
     offShop = bus.on('mp:shopBuy', onSelfShopBuy);
     offChat = bus.on('mp:chatSend', onSelfChat);
+    offCatch = bus.on('mp:catch', onSelfCatch);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -353,6 +386,15 @@ export function leaveIsland(): void {
       // ignore
     }
     offChat = null;
+  }
+
+  if (offCatch) {
+    try {
+      offCatch();
+    } catch {
+      // ignore
+    }
+    offCatch = null;
   }
 
   if (flushTimer) {
