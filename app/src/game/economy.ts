@@ -122,12 +122,14 @@ export type Mutation = {
   css: string;
 };
 
+// Dialled down (both odds + multipliers) to slow the economy — mutations now add
+// ~1.4x on average (was ~2.4x), and a mutation lands on ~15% of harvests (was ~22%).
 export const MUTATIONS: Mutation[] = [
   { id: 'normal', name: 'Normal', mult: 1, weight: 100, tint: null, css: '#cfd6dd' },
-  { id: 'shiny', name: 'Shiny', mult: 2, weight: 18, tint: 0xfff6c2, css: '#ffe98a' },
-  { id: 'frosted', name: 'Frosted', mult: 8, weight: 6, tint: 0xbdecff, css: '#bdecff' },
-  { id: 'gold', name: 'Gold', mult: 20, weight: 4, tint: 0xffd21a, css: '#ffd21a' },
-  { id: 'rainbow', name: 'Rainbow', mult: 50, weight: 1, tint: 0xffffff, rainbow: true, css: '#ff7ad0' },
+  { id: 'shiny', name: 'Shiny', mult: 1.5, weight: 12, tint: 0xfff6c2, css: '#ffe98a' },
+  { id: 'frosted', name: 'Frosted', mult: 4, weight: 4, tint: 0xbdecff, css: '#bdecff' },
+  { id: 'gold', name: 'Gold', mult: 10, weight: 2, tint: 0xffd21a, css: '#ffd21a' },
+  { id: 'rainbow', name: 'Rainbow', mult: 25, weight: 0.5, tint: 0xffffff, rainbow: true, css: '#ff7ad0' },
 ];
 
 export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
