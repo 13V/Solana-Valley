@@ -48,6 +48,22 @@ function shortWallet(wallet: string): string {
   return `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
 }
 
+// Server-side username sanitizer — DO NOT trust the client's copy. Strips ASCII
+// + C1 control characters, collapses whitespace, trims, and caps length (~16).
+// Returns '' when nothing usable remains (caller falls back to shortWallet).
+// Mirrors sanitizeUsername in app/src/chain/username.ts.
+function sanitizeName(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  let stripped = '';
+  for (const ch of raw) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isWhitespace = /\s/.test(ch);
+    if (!isWhitespace && (code <= 0x1f || (code >= 0x7f && code <= 0x9f))) continue;
+    stripped += ch;
+  }
+  return stripped.replace(/\s+/g, ' ').trim().slice(0, 16);
+}
+
 // Build common PostgREST headers carrying the service-role key. NEVER returned
 // to the client.
 function authHeaders(serviceKey: string, extra?: Record<string, string>): Record<string, string> {
@@ -143,20 +159,25 @@ async function findLowestFreeSlot(
 }
 
 // HEARTBEAT / keep-alive: refresh an existing wallet's `updated_at` to now() so
-// its plot stays fresh (non-stale). Best-effort — a failed refresh just means
-// the row ages slightly until the next heartbeat, so we swallow errors and never
-// block returning the (still-valid) seat. Idempotent.
+// its plot stays fresh (non-stale). When `name` is non-empty and differs from
+// the currently stored one, it's also applied so renames take effect mid-session
+// (the client re-POSTs on rename). Best-effort — a failed refresh just means the
+// row ages slightly / the rename retries next beat, so we swallow errors and
+// never block returning the (still-valid) seat. Idempotent.
 async function refreshExisting(
   baseUrl: string,
   serviceKey: string,
   wallet: string,
+  name?: string,
 ): Promise<void> {
   try {
+    const patch: Record<string, string> = { updated_at: new Date().toISOString() };
+    if (name) patch.name = name; // caller passes a sanitized name only when it differs
     const url = `${baseUrl}/rest/v1/plots` + `?wallet=eq.${encodeURIComponent(wallet)}`;
     const resp = await fetch(url, {
       method: 'PATCH',
       headers: authHeaders(serviceKey, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ updated_at: new Date().toISOString() }),
+      body: JSON.stringify(patch),
     });
     if (!resp.ok) {
       const detail = await resp.text().catch(() => '');
@@ -252,7 +273,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const baseUrl = getSupabaseUrl();
   const wallet = auth.wallet;
-  const name = shortWallet(wallet);
+  // Effective display name: a sanitized client-supplied name if usable, else the
+  // short-wallet fallback. Never trust the raw body — sanitizeName guards it.
+  const requestedName = sanitizeName(body.name);
+  const name = requestedName || shortWallet(wallet);
 
   // Optional island preference (e.g. an invite link): claim a seat on this
   // island if it has room. Coerce to a non-negative integer; ignore anything
@@ -270,8 +294,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // wallet owns a plot, so seats stay stable and a re-POST never reassigns.
     const existing = await fetchExisting(baseUrl, serviceKey, wallet);
     if (existing) {
-      await refreshExisting(baseUrl, serviceKey, wallet);
-      res.status(200).json({ island: existing.island, plot: existing.plot, name: existing.name });
+      // Apply a rename when a valid client name differs from the stored one;
+      // otherwise just heartbeat. Either way return the EFFECTIVE name so the
+      // client's label matches what peers will see.
+      const rename = requestedName && requestedName !== existing.name ? requestedName : undefined;
+      await refreshExisting(baseUrl, serviceKey, wallet, rename);
+      const effectiveName = rename ?? existing.name;
+      res.status(200).json({ island: existing.island, plot: existing.plot, name: effectiveName });
       return;
     }
 

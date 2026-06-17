@@ -3,6 +3,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { bus } from '../game/EventBus';
 import { getWalletAuth } from './walletAuth';
 import { joinIsland, leaveIsland } from './multiplayer';
+import { useUsername } from './username';
 
 // Mounted INSIDE <WalletProvider> (renders nothing). Bridges the connected
 // Solana wallet to real-time multiplayer:
@@ -32,6 +33,10 @@ type JoinResponse = { island: number; plot: number; name: string };
 
 export function MultiplayerSync() {
   const { publicKey, signMessage, connected } = useWallet();
+  // The player's chosen display name (see UsernamePrompt). When set we pass it
+  // to /api/join so it becomes our multiplayer presence name (the avatar label
+  // peers see). Changing it re-runs the effect → re-joins → re-tracks presence.
+  const username = useUsername(publicKey ? publicKey.toBase58() : null);
 
   useEffect(() => {
     // Not connected (or no signing support): make sure we're disconnected.
@@ -56,6 +61,9 @@ export function MultiplayerSync() {
       if (Number.isInteger(preferIsland) && preferIsland >= 0) {
         requestBody.preferIsland = preferIsland;
       }
+      // Pass our chosen display name (server sanitizes + falls back to the short
+      // wallet if empty/missing).
+      if (username) requestBody.name = username;
 
       let assignment: JoinResponse | null = null;
       try {
@@ -102,10 +110,14 @@ export function MultiplayerSync() {
       const assignedIsland = assignment.island;
       if (cancelled) return; // torn down mid-join -> don't start a stray interval
       heartbeat = setInterval(() => {
+        // Re-send the name on each beat too, so a name changed mid-session
+        // propagates via the server's existing-wallet (rename) path.
+        const beatBody: Record<string, unknown> = { ...auth, preferIsland: assignedIsland };
+        if (username) beatBody.name = username;
         void fetch('/api/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...auth, preferIsland: assignedIsland }),
+          body: JSON.stringify(beatBody),
         }).catch(() => {
           // network blip -> ignore; the next interval tick re-tries
         });
@@ -120,8 +132,9 @@ export function MultiplayerSync() {
       }
       leaveIsland();
     };
-    // publicKey identity changes when the wallet switches.
-  }, [connected, publicKey, signMessage]);
+    // publicKey identity changes when the wallet switches. `username` is included
+    // so choosing/changing the name re-runs join → re-tracks presence with it.
+  }, [connected, publicKey, signMessage, username]);
 
   return null;
 }
