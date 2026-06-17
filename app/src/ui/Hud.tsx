@@ -142,6 +142,16 @@ export function Hud({
         </button>
       </div>
       <div className="hud-right">
+        {/* Wallet cluster on top: SOL balance + the connect/address button. The
+            address lives only on the WalletMultiButton (no duplicate badge). */}
+        <span className="wallet-group">
+          {addr && sol !== null && (
+            <span className="badge sol" title="Your wallet's SOL balance">
+              ◎ {sol.toFixed(2)} SOL
+            </span>
+          )}
+          <WalletMultiButton />
+        </span>
         {!mpConnected && (
           <span
             className="badge"
@@ -158,6 +168,7 @@ export function Hud({
             )}
           </span>
         )}
+        {/* Island indicator + Invite tucked underneath the wallet button. */}
         {mpConnected && (
           <span className="island-group">
             <span
@@ -177,17 +188,6 @@ export function Hud({
             </button>
           </span>
         )}
-        {/* Wallet cluster: SOL balance + the connect/address button. The address
-            lives only on the WalletMultiButton now (it used to also be repeated in
-            a separate badge), so the bar reads cleanly. */}
-        <span className="wallet-group">
-          {addr && sol !== null && (
-            <span className="badge sol" title="Your wallet's SOL balance">
-              ◎ {sol.toFixed(2)} SOL
-            </span>
-          )}
-          <WalletMultiButton />
-        </span>
       </div>
     </div>
   );

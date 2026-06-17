@@ -60,7 +60,9 @@ body {
   right: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  /* Top-align the side clusters so the wallet/island sit at the very top-right
+     instead of being vertically centered against the tall day/night widget. */
+  align-items: flex-start;
   gap: 8px;
   padding: 8px;
 }
@@ -72,14 +74,13 @@ body {
   gap: 8px;
 }
 
-/* The top-right HUD: a tidy row of two clusters — the multiplayer island
-   indicator (+ Invite) and the wallet controls — each kept together with a
-   slightly tighter inner gap than the gap between the clusters. Wraps to a new
-   line on narrow screens instead of overflowing. */
+/* The top-right HUD: a vertical stack hugging the right edge — wallet controls
+   on top, then the multiplayer island indicator + Invite tucked underneath.
+   Right-aligned so every row hugs the screen edge. */
 .hud-right {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px 10px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 /* Multiplayer island indicator + Invite button cluster (in the right group). */
