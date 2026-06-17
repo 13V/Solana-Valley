@@ -128,13 +128,22 @@ type RemotePlayer = {
 // A single remote crop drawn in another player's plot. Visual only — it reuses
 // the same 'cropsheet' texture/frames + mutation glow/sparkle as a local crop,
 // but never touches this.crops / this.tiles. `key` is its plot-relative "dx,dy".
+//
+// Growth is SIMULATED locally for smoothness: each snapshot carries the crop's
+// authoritative grownMs/growMs, and between snapshots we advance grownMs at the
+// base rate (a safe LOWER bound — real growth is ≥1×, so we never overshoot)
+// and only re-render when the visual stage actually changes.
 type RemoteCropSprite = {
   sprite: Phaser.GameObjects.Image;
   glow?: Phaser.GameObjects.Image;
   sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
-  // Last-rendered visual signature, so a snapshot that didn't change a given
-  // crop is a cheap no-op (no destroy/recreate of glow/sparkle).
-  sig: string;
+  plant: Plant;
+  tx: number; ty: number; // world tile (drives glow/sparkle placement)
+  mutId: string;
+  grownMs: number; // simulated growth so far (corrected on each snapshot)
+  growMs: number; // total grow duration for the current cycle (0 = unknown)
+  mature: boolean;
+  stage: number; // last-rendered visual stage (0..STAGES-1)
 };
 
 // One remote player's whole farm: which plot they're on + their crop sprites,
@@ -2978,7 +2987,8 @@ export class FarmScene extends Phaser.Scene {
         c.tx - ox,
         c.ty - oy,
         c.plant.id,
-        c.stage,
+        Math.round(c.grownMs),       // growth so far (ms) — peers simulate from this
+        Math.round(this.cropGrowMs(c)), // total grow duration (ms) for this cycle
         c.mature ? 1 : 0,
         c.mutation?.id ?? '',
       ]);
@@ -3013,14 +3023,20 @@ export class FarmScene extends Phaser.Scene {
     const origin = homesteadPlot(next);
     const seen = new Set<string>();
     for (const t of crops) {
-      if (!Array.isArray(t) || t.length < 6) continue;
-      const [dx, dy, plantId, stage, mature, mutId] = t;
+      if (!Array.isArray(t) || t.length < 7) continue;
+      const [dx, dy, plantId, grownMs, growMs, mature, mutId] = t;
       if (typeof dx !== 'number' || typeof dy !== 'number' || typeof plantId !== 'string') continue;
       const plant = PLANT_BY_ID[plantId];
       if (!plant) continue; // unknown crop id -> skip
       const key = `${dx},${dy}`;
       seen.add(key);
-      this.upsertRemoteCrop(farm, key, origin.px + dx, origin.py + dy, plant, stage, mature === 1, mutId);
+      this.upsertRemoteCrop(
+        farm, key, origin.px + dx, origin.py + dy, plant,
+        typeof grownMs === 'number' ? grownMs : 0,
+        typeof growMs === 'number' ? growMs : 0,
+        mature === 1,
+        typeof mutId === 'string' ? mutId : '',
+      );
     }
 
     // DIFF: destroy sprites for crops no longer present (harvested/removed).
@@ -3032,47 +3048,82 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // Create or update a single remote crop sprite at world tile (tx, ty). Reuses
-  // the local crop texture/frame logic and (when mutated) a simple glow/sparkle.
+  // The visual stage for a given growth progress — same maths the local crops
+  // use (floor(progress * (STAGES-1)); ripe crops show the final stage).
+  private remoteStage(grownMs: number, growMs: number, mature: boolean): number {
+    if (mature) return STAGES - 1;
+    if (growMs <= 0) return 0;
+    return Math.max(0, Math.min(STAGES - 1, Math.floor((grownMs / growMs) * (STAGES - 1))));
+  }
+
+  // Create or update a remote crop from an authoritative snapshot: store its
+  // growth state (so update() can simulate it smoothly between snapshots) and
+  // render its current stage/mutation right away.
   private upsertRemoteCrop(
     farm: RemoteFarm,
     key: string,
     tx: number,
     ty: number,
     plant: Plant,
-    stage: number,
+    grownMs: number,
+    growMs: number,
     mature: boolean,
     mutId: string,
   ) {
-    const mut = mutId && MUTATION_BY_ID[mutId] ? MUTATION_BY_ID[mutId] : null;
-    // The frame: same as a local crop (cropRow * 5 + stage). Ripe crops show the
-    // final stage; otherwise clamp the streamed stage into range defensively.
-    const safeStage = mature
-      ? STAGES - 1
-      : Math.max(0, Math.min(STAGES - 1, Number.isFinite(stage) ? Math.floor(stage) : 0));
-    const frame = plant.cropRow * 5 + safeStage;
-    // A signature of everything that affects the visuals; unchanged -> no work.
-    const sig = `${frame}|${mut?.id ?? ''}`;
-
-    const cx = tx * TILE + TILE / 2;
-    const cy = ty * TILE + TILE / 2;
-
     let rc = farm.sprites.get(key);
-    if (rc && rc.sig === sig) return; // identical -> cheap no-op
-
     if (!rc) {
       const sprite = this.add
-        .image(cx, cy, 'cropsheet', frame)
+        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
         .setDepth(this.cropDepth(ty) - 1);
-      rc = { sprite, sig: '' };
+      rc = { sprite, plant, tx, ty, mutId, grownMs: 0, growMs: 0, mature: false, stage: -1 };
       farm.sprites.set(key, rc);
     }
+    rc.plant = plant;
+    rc.tx = tx; rc.ty = ty;
+    rc.mutId = mutId;
+    rc.grownMs = Number.isFinite(grownMs) ? Math.max(0, grownMs) : 0;
+    rc.growMs = Number.isFinite(growMs) && growMs > 0 ? growMs : 0;
+    rc.mature = mature;
+    rc.stage = this.remoteStage(rc.grownMs, rc.growMs, rc.mature);
+    // Always re-render on a snapshot: it may have changed mutation, stage, or the
+    // crop may have been replanted (same tile, new plant) since last time.
+    this.renderRemoteCrop(rc);
+  }
 
-    // Update the base sprite (texture frame + tint).
-    rc.sprite.setFrame(frame);
-    // Tear down any prior mutation visuals before reapplying (mutation may have
-    // changed or cleared between snapshots).
+  // Smoothly advance every remote crop's SIMULATED growth each frame, re-drawing
+  // only when its visual stage (or maturity) actually changes. Growth runs at the
+  // base 1× rate — a safe lower bound (real growth is ≥1×, boosted by wet/skills/
+  // Fertilizer the peer doesn't see), so we never overshoot; each incoming
+  // snapshot corrects grownMs upward to the truth.
+  private updateRemoteFarms(delta: number) {
+    if (!this.remoteFarms.size) return;
+    for (const farm of this.remoteFarms.values()) {
+      for (const rc of farm.sprites.values()) {
+        if (rc.mature || rc.growMs <= 0) continue; // ripe/unknown -> nothing to advance
+        rc.grownMs = Math.min(rc.growMs, rc.grownMs + delta);
+        const mature = rc.grownMs >= rc.growMs;
+        const stage = this.remoteStage(rc.grownMs, rc.growMs, mature);
+        if (mature !== rc.mature || stage !== rc.stage) {
+          rc.mature = mature;
+          rc.stage = stage;
+          this.renderRemoteCrop(rc);
+        }
+      }
+    }
+  }
+
+  // Draw a remote crop at its current stage: same texture frame + tint as a local
+  // crop, plus glow/sparkle for special (mutated / high-rarity) ripe crops.
+  private renderRemoteCrop(rc: RemoteCropSprite) {
+    const plant = rc.plant;
+    const mut = rc.mutId && MUTATION_BY_ID[rc.mutId] ? MUTATION_BY_ID[rc.mutId] : null;
+    const cx = rc.tx * TILE + TILE / 2;
+    const cy = rc.ty * TILE + TILE / 2;
+
+    rc.sprite.setFrame(plant.cropRow * 5 + (rc.mature ? STAGES - 1 : rc.stage));
+    // Tear down any prior mutation visuals before reapplying (stage/mutation may
+    // have changed between renders).
     rc.glow?.destroy(); rc.glow = undefined;
     rc.sparkle?.destroy(); rc.sparkle = undefined;
 
@@ -3087,14 +3138,14 @@ export class FarmScene extends Phaser.Scene {
     // Add glow + sparkle for special (non-normal mutation OR high-rarity) ripe
     // crops, mirroring applyMatureVisuals but kept simpler for remote views.
     const rank = rarityRank(plant.rarity);
-    const special = mature && (!!mut && mut.id !== 'normal' || rank >= 3);
+    const special = rc.mature && (!!mut && mut.id !== 'normal' || rank >= 3);
     if (special) {
       const tint = mut?.rainbow ? 0xffffff : (mut?.tint ?? RARITY[plant.rarity].glow);
       rc.glow = this.add
         .image(cx, cy - 4, 'glow')
         .setBlendMode(Phaser.BlendModes.ADD)
         .setTint(tint)
-        .setDepth(this.cropDepth(ty) - 2)
+        .setDepth(this.cropDepth(rc.ty) - 2)
         .setScale(0.7)
         .setAlpha(0.6);
       rc.sparkle = this.add
@@ -3108,10 +3159,8 @@ export class FarmScene extends Phaser.Scene {
           x: { min: -7, max: 7 },
           y: { min: -12, max: 2 },
         })
-        .setDepth(this.cropDepth(ty) + 1);
+        .setDepth(this.cropDepth(rc.ty) + 1);
     }
-
-    rc.sig = sig;
   }
 
   // Destroy one remote crop sprite and its mutation visuals.
@@ -3360,6 +3409,7 @@ export class FarmScene extends Phaser.Scene {
     this.broadcastSelf(time);
     this.broadcastFarmHeartbeat(time);
     this.updateRemotes(delta);
+    this.updateRemoteFarms(delta); // smoothly simulate peers' crop growth
     this.updateGuide();
 
     // Swing the orchard gate open when the farmer is near.

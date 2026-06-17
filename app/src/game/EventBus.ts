@@ -31,9 +31,10 @@ export interface GameEvents {
   'mp:leave': { id: string }; // network -> FarmScene: a remote player left
   'mp:status': string; // network -> UI: human-readable status line (also mirrored to 'toast')
   // Live crop sync: a compact snapshot of a player's crops, RELATIVE to their
-  // plot origin. Each tuple is [dx, dy, plantId, stage, mature(0|1), mutId('' = none)].
-  'mp:farm': { crops: Array<[number, number, string, number, 0 | 1, string]> }; // FarmScene -> network (no id/plot; net stamps the sender's current.id/plot, like mp:self)
-  'mp:remoteFarm': { id: string; plot: number; crops: Array<[number, number, string, number, 0 | 1, string]> }; // network -> FarmScene: a remote player's crop snapshot
+  // plot origin. Each tuple is [dx, dy, plantId, grownMs, growMs, mature(0|1),
+  // mutId('' = none)] — peers simulate growth from grownMs/growMs for smoothness.
+  'mp:farm': { crops: Array<[number, number, string, number, number, 0 | 1, string]> }; // FarmScene -> network (no id/plot; net stamps the sender's current.id/plot, like mp:self)
+  'mp:remoteFarm': { id: string; plot: number; crops: Array<[number, number, string, number, number, 0 | 1, string]> }; // network -> FarmScene: a remote player's crop snapshot
 }
 
 type Handler<T> = (payload: T) => void;

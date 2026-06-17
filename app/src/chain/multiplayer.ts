@@ -22,8 +22,8 @@ type PresenceMeta = { id: string; name: string; plot: number };
 type PosPayload = { id: string; x: number; y: number; facing: string };
 
 // A single crop in a farm snapshot, RELATIVE to the sender's plot origin:
-// [dx, dy, plantId, stage, mature(0|1), mutId('' = none)].
-type CropTuple = [number, number, string, number, 0 | 1, string];
+// [dx, dy, plantId, grownMs, growMs, mature(0|1), mutId('' = none)].
+type CropTuple = [number, number, string, number, number, 0 | 1, string];
 
 // Broadcast 'farm' payload (a player's full crop snapshot).
 type FarmPayload = { id: string; plot: number; crops: CropTuple[] };
