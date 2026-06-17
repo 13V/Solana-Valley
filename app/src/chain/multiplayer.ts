@@ -182,10 +182,10 @@ function onSelfCatch({ fishId, rarity, x, y }: { fishId: string; rarity: number;
 
 // Broadcast that we started/ended a cast so peers can show us holding the rod
 // over the water (the catch event covers only the landed fish). Best-effort.
-function onSelfFish({ casting, x, y, facing }: { casting: boolean; x: number; y: number; facing: string }): void {
+function onSelfFish({ casting, x, y, px, py, facing }: { casting: boolean; x: number; y: number; px: number; py: number; facing: string }): void {
   if (!channel || !current) return;
   try {
-    void channel.send({ type: 'broadcast', event: 'fish', payload: { id: current.id, casting, x, y, facing } });
+    void channel.send({ type: 'broadcast', event: 'fish', payload: { id: current.id, casting, x, y, px, py, facing } });
   } catch {
     // ignore — best effort
   }
@@ -323,15 +323,21 @@ export function joinIsland(island: number, self: Self): void {
     // Remote cast state -> render the peer holding the rod over the water.
     ch.on('broadcast', { event: 'fish' }, (msg) => {
       const c = (msg as { payload?: unknown }).payload as
-        | { id?: unknown; casting?: unknown; x?: unknown; y?: unknown; facing?: unknown }
+        | { id?: unknown; casting?: unknown; x?: unknown; y?: unknown; px?: unknown; py?: unknown; facing?: unknown }
         | undefined;
       if (!c || typeof c.id !== 'string' || typeof c.casting !== 'boolean') return;
       if (current && c.id === current.id) return; // ignore our own echo
+      // x/y = bobber target on the water; px/py = caster's foot position. Older
+      // clients omit px/py — fall back to the bobber target so they still render.
+      const x = typeof c.x === 'number' ? c.x : 0;
+      const y = typeof c.y === 'number' ? c.y : 0;
       bus.emit('mp:remoteFish', {
         id: c.id,
         casting: c.casting,
-        x: typeof c.x === 'number' ? c.x : 0,
-        y: typeof c.y === 'number' ? c.y : 0,
+        x,
+        y,
+        px: typeof c.px === 'number' ? c.px : x,
+        py: typeof c.py === 'number' ? c.py : y,
         facing: typeof c.facing === 'string' ? c.facing : 'down',
       });
     });

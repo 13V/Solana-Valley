@@ -48,9 +48,12 @@ export interface GameEvents {
   'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
   'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
   // Cast state so peers can render a remote player actually casting (rod-hold
-  // animation + a bobber on the water), not just the final catch.
-  'mp:fish': { casting: boolean; x: number; y: number; facing: string }; // FarmScene -> network: started/ended a cast (net stamps our id)
-  'mp:remoteFish': { id: string; casting: boolean; x: number; y: number; facing: string }; // network -> FarmScene: a peer started/ended a cast
+  // animation + a bobber on the water), not just the final catch. x/y is the
+  // bobber TARGET on the water; px/py is the caster's foot position (where the
+  // rod-hold avatar stands) so a peer who hasn't seen us move yet still places
+  // the avatar on land — not floating on the water at the bobber.
+  'mp:fish': { casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // FarmScene -> network: started/ended a cast (net stamps our id)
+  'mp:remoteFish': { id: string; casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // network -> FarmScene: a peer started/ended a cast
 }
 
 type Handler<T> = (payload: T) => void;

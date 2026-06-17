@@ -2698,7 +2698,9 @@ export class FarmScene extends Phaser.Scene {
         : cy < this.player.y ? 'up' : 'down';
 
     // Tell island peers we've started a cast so they render us holding the rod.
-    bus.emit('mp:fish', { casting: true, x: cx, y: cy, facing: this.facing });
+    // x/y is the bobber target on the water; px/py is where we stand (so a peer
+    // who hasn't seen us move places the avatar on land, not on the water).
+    bus.emit('mp:fish', { casting: true, x: cx, y: cy, px: this.player.x, py: this.player.y, facing: this.facing });
 
     // Rod-tip offset per facing — the player visibly holds the rod, so the line
     // emanates from roughly the rod tip rather than dead-centre. Tunable.
@@ -2718,7 +2720,7 @@ export class FarmScene extends Phaser.Scene {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
         this.casting = false;
-        bus.emit('mp:fish', { casting: false, x: cx, y: cy, facing: this.facing });
+        bus.emit('mp:fish', { casting: false, x: cx, y: cy, px: this.player.x, py: this.player.y, facing: this.facing });
         // Return the player from the cast pose to the normal idle.
         this.player.setFlipX(false);
         this.player.setTexture('pchar', 0);
@@ -3410,10 +3412,15 @@ export class FarmScene extends Phaser.Scene {
 
   // A remote player started/ended a cast (broadcast over the island channel).
   // Cosmetic only: show them holding the rod over the water with a bobber + line.
-  private onRemoteFish({ id, casting, x, y, facing }: GameEvents['mp:remoteFish']) {
+  private onRemoteFish({ id, casting, x, y, px, py, facing }: GameEvents['mp:remoteFish']) {
     let rp = this.remotePlayers.get(id);
     if (casting) {
-      if (!rp) rp = this.createRemote(id, id.slice(0, 4), x, y, this.toDir(facing));
+      // The avatar stands at px/py (foot position); the bobber goes at x/y (the
+      // water target). Pin the avatar to px/py so a peer we've never seen move
+      // appears on land holding the rod, not floating on the water.
+      if (!rp) rp = this.createRemote(id, id.slice(0, 4), px, py, this.toDir(facing));
+      rp.targetX = px;
+      rp.targetY = py;
       rp.facing = this.toDir(facing);
       this.endRemoteFishFx(rp); // clear any stale bobber/line first
       const bobber = this.anims.exists('bobber_idle')
@@ -3602,6 +3609,15 @@ export class FarmScene extends Phaser.Scene {
       if (rp.casting) {
         rp.sprite.x = rp.targetX;
         rp.sprite.y = rp.targetY;
+        // Re-assert the rod-hold each frame (key-resolution + flip identical to
+        // the local cast) so a stray idle/walk play or anim reset can never drop
+        // the pose mid-cast — it holds for the whole cast. `play(..., true)` is a
+        // no-op once it's already running, so this is cheap.
+        const wait = `pfish-wait-${rp.facing}`;
+        if (this.anims.exists(wait)) {
+          rp.sprite.setFlipX(rp.facing === 'right');
+          rp.sprite.play(wait, true);
+        }
         const c = rp.casting;
         c.bobber.y = c.ty + Math.sin(this.time.now / 300) * 2;
         c.line.clear();
