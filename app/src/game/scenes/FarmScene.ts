@@ -1013,7 +1013,8 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
 
-    // The player's interactive farm: a tinted crop bed that unlocks row-by-row.
+    // The player's interactive farm: an untinted crop bed (blends with the
+    // surrounding grass) that unlocks row-by-row as you level up.
     this.markPlayerFarm();
     this.addPlotSign(h.signCx, backY, '★ Your Homestead', true);
 
@@ -1108,17 +1109,17 @@ export class FarmScene extends Phaser.Scene {
     return ty >= f.py + f.ph - this.unlockedFarmRows();
   }
 
-  // Player's crop bed: unlocked rows get the soft checkerboard tint; still-locked
-  // rows are dimmed so the farm visibly grows as you level up.
+  // Player's crop bed: the grass is left at its natural colour so the plot blends
+  // seamlessly with the surrounding world (no checkerboard tint or locked-row
+  // dimming). Which rows are tillable is gated in `till()` via unlockedFarmRows(),
+  // so the unlock-by-level behaviour is unchanged — it just isn't shown as a tint.
   private markPlayerFarm() {
     const f = this.myFarmRect();
     const x0 = f.px, x1 = f.px + f.pw - 1;
     const y0 = f.py, y1 = f.py + f.ph - 1;
-    const top = y1 - this.unlockedFarmRows() + 1;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        if (!this.ground[y] || !this.ground[y][x]) continue;
-        this.ground[y][x].setTint(y >= top ? ((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c) : 0xc3cda4);
+        this.ground[y]?.[x]?.clearTint();
       }
     }
   }
