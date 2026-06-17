@@ -29,6 +29,9 @@ export function App() {
   const [panel, setPanel] = useState<Panel>(() =>
     localStorage.getItem(HELP_SEEN_KEY) ? null : 'help',
   );
+  // Hold back the goals HUD + tutorial coach until the first-run Help panel is
+  // dismissed, so a new player isn't hit with three overlays stacked at once.
+  const [helpSeen, setHelpSeen] = useState(() => !!localStorage.getItem(HELP_SEEN_KEY));
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -51,6 +54,7 @@ export function App() {
   const close = () => setPanel(null);
   const closeHelp = () => {
     localStorage.setItem(HELP_SEEN_KEY, '1');
+    setHelpSeen(true);
     setPanel(null);
   };
 
@@ -71,10 +75,10 @@ export function App() {
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           {panel === 'settings' && <SettingsPanel onClose={close} />}
-          <GoalsHud />
+          {helpSeen && <GoalsHud />}
           <Hotbar />
           <TouchControls />
-          <TutorialCoach />
+          {helpSeen && <TutorialCoach />}
           <Toasts />
         </div>
       </div>
