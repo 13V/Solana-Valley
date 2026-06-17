@@ -269,10 +269,6 @@ export function PlantTipBody({
         </div>
       )}
 
-      {s.locked && (
-        <div className="ui-tip-locked">🔒 Unlocks at Lv {s.unlockLevel}</div>
-      )}
-
       {(s.saleBoosted || s.growthBoosted) && (
         <div className="ui-tip-note">Live values include your upgrades.</div>
       )}

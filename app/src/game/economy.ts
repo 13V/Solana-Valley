@@ -34,9 +34,9 @@ export const RARITY: Record<
   Rare: { color: 0x4ea1ff, css: '#4ea1ff', glow: 0x1e5fae, present: 0.6, qty: [3, 6] },
   Legendary: { color: 0xffc23d, css: '#ffc23d', glow: 0xc8901a, present: 0.32, qty: [2, 4] },
   Mythical: { color: 0xb56bff, css: '#b56bff', glow: 0x7a2fd0, present: 0.14, qty: [1, 2] },
-  Divine: { color: 0xff5d5d, css: '#ff5d5d', glow: 0xc02020, present: 0.06, qty: [1, 1] },
-  Prismatic: { color: 0xff8ad8, css: '#ff8ad8', glow: 0xff66cc, present: 0.02, qty: [1, 1] },
-  Celestial: { color: 0x9fe8ff, css: '#9fe8ff', glow: 0x6fd8ff, present: 0.009, qty: [1, 1] },
+  Divine: { color: 0xff5d5d, css: '#ff5d5d', glow: 0xc02020, present: 0.06, qty: [1, 2] },
+  Prismatic: { color: 0xff8ad8, css: '#ff8ad8', glow: 0xff66cc, present: 0.02, qty: [1, 2] },
+  Celestial: { color: 0x9fe8ff, css: '#9fe8ff', glow: 0x6fd8ff, present: 0.009, qty: [1, 2] },
 };
 
 export type Plant = {
@@ -217,17 +217,17 @@ function randInt(min: number, max: number): number {
   return Math.floor(min + Math.random() * (max - min + 1));
 }
 
-// Roll a fresh shop stock map (plantId -> count). Commons always present;
-// rarer tiers appear with decreasing probability — that's the "wait for the
-// rare restock" chase. `rareLuck` (>1, the Shop Supply "Connoisseur's Eye" fork)
-// multiplies the appearance chance of the rarer (Rare+) tiers, clamped to 1.
-export function rollShop(level = 99, rareLuck = 1): Record<string, number> {
+// Roll a fresh shop stock map (plantId -> count). Stock is purely RARITY-based
+// (GAG-style): commons are always present in bulk, and each rarer tier appears
+// with steeply lower odds and tiny stock (1-2), down to the occasional lone
+// Celestial. There is NO level gating — every tier can show up from day one;
+// the seed PRICE is the gate (a new player simply can't afford the rare seeds
+// yet, which makes spotting one a goal to chase). `rareLuck` (>1, the Shop
+// Supply "Connoisseur's Eye" fork) lifts the appearance odds of the rarer
+// (Rare+) tiers, clamped to 1.
+export function rollShop(rareLuck = 1): Record<string, number> {
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
-    if (RARITY_UNLOCK[p.rarity] > level) {
-      stock[p.id] = 0; // tier not unlocked yet
-      continue;
-    }
     const r = RARITY[p.rarity];
     const present = rareLuck > 1 && rarityRank(p.rarity) >= 2 ? Math.min(1, r.present * rareLuck) : r.present;
     stock[p.id] = Math.random() < present ? randInt(r.qty[0], r.qty[1]) : 0;

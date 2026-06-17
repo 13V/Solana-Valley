@@ -1,4 +1,4 @@
-import { PLANTS, RARITY, RARITY_UNLOCK } from '../game/economy';
+import { PLANTS, RARITY } from '../game/economy';
 import { useGameState, useClock } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
@@ -21,11 +21,10 @@ export function Shop({ onClose }: { onClose: () => void }) {
       <div className="rows">
         {PLANTS.map((p) => {
           const r = RARITY[p.rarity];
-          const locked = RARITY_UNLOCK[p.rarity] > progress.level;
           const stock = stockById[p.id] ?? 0;
           const afford = coins >= p.seedCost;
           return (
-            <div className={`row ${locked ? 'locked' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
+            <div className="row" key={p.id} style={{ borderLeftColor: r.css }}>
               <span className="dot" style={{ background: r.css, color: r.css }} />
               <Tooltip content={<PlantTipBody plant={p} progress={progress} />}>
                 <CropIcon id={p.id} kind="seed" />
@@ -35,15 +34,15 @@ export function Shop({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className="row-meta">{p.growthSeconds}s · {p.baseValue.toLocaleString()}🪙</span>
               </Tooltip>
-              <span className={`stock ${stock > 0 && !locked ? '' : 'out'}`}>
-                {locked ? '🔒' : stock > 0 ? `×${stock}` : '—'}
+              <span className={`stock ${stock > 0 ? '' : 'out'}`}>
+                {stock > 0 ? `×${stock}` : '—'}
               </span>
               <button
                 className="btn sm"
-                disabled={locked || stock <= 0 || !afford}
+                disabled={stock <= 0 || !afford}
                 onClick={() => bus.emit('ui:buySeed', p.id)}
               >
-                {locked ? `Lv ${RARITY_UNLOCK[p.rarity]}` : `${p.seedCost.toLocaleString()}🪙`}
+                {p.seedCost.toLocaleString()}🪙
               </button>
             </div>
           );

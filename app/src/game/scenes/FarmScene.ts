@@ -18,7 +18,6 @@ import {
   PLANTS,
   PLANT_BY_ID,
   RARITY,
-  RARITY_UNLOCK,
   rarityRank,
   pickMutation,
   cropValue,
@@ -518,7 +517,7 @@ export class FarmScene extends Phaser.Scene {
     this.input.on('pointermove', () => (this.pointerInside = true));
     this.input.on('gameout', () => (this.pointerInside = false));
 
-    this.shopStock = rollShop(levelInfo(this.xp).level);
+    this.shopStock = rollShop();
     if (this.persist) this.loadSave();
 
     // Scatter forage nodes across the open world (after any save load so they
@@ -1701,10 +1700,8 @@ export class FarmScene extends Phaser.Scene {
   private buySeed(plantId: string) {
     const plant = PLANT_BY_ID[plantId];
     if (!plant) return;
-    if (RARITY_UNLOCK[plant.rarity] > levelInfo(this.xp).level) {
-      this.toast(`${plant.rarity} unlocks at level ${RARITY_UNLOCK[plant.rarity]}`);
-      return;
-    }
+    // No level gate: any seed in stock is buyable if you can afford it (price is
+    // the gate now). Rare seeds simply rarely appear and cost a lot.
     if ((this.shopStock[plantId] ?? 0) <= 0) {
       this.toast('Out of stock');
       return;
@@ -1902,7 +1899,7 @@ export class FarmScene extends Phaser.Scene {
   // Roll the shop at the player's current level, applying the Shop Supply
   // "Connoisseur's Eye" fork's rare-seed luck when chosen.
   private rollShopForPlayer(): Record<string, number> {
-    return rollShop(levelInfo(this.xp).level, this.fork('supply').rareSeedLuckMult ?? 1);
+    return rollShop(this.fork('supply').rareSeedLuckMult ?? 1);
   }
 
   private gainXp(amount: number) {

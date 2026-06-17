@@ -10,7 +10,6 @@
 
 import {
   RARITY,
-  RARITY_UNLOCK,
   MUTATIONS,
   QUALITY,
   type Mutation,
@@ -111,8 +110,6 @@ export type PlantStats = {
   /** Grow time after the Fertilizer growth-speed upgrade. */
   effectiveGrowthSeconds: number;
   growthBoosted: boolean;
-  locked: boolean;
-  unlockLevel: number;
   fortuneLevel: number;
   fortuneBoosted: boolean;
   mutations: MutationOdds[];
@@ -125,7 +122,6 @@ function upgradeLevel(progress: Progress | undefined, id: string): number {
 }
 
 export function plantStats(plant: Plant, progress?: Progress): PlantStats {
-  const level = progress?.level ?? 1;
   const growthLvl = upgradeLevel(progress, 'growth');
   const marketLvl = upgradeLevel(progress, 'market');
   const fortuneLvl = upgradeLevel(progress, 'fortune');
@@ -147,8 +143,6 @@ export function plantStats(plant: Plant, progress?: Progress): PlantStats {
     baseGrowthSeconds: plant.growthSeconds,
     effectiveGrowthSeconds,
     growthBoosted: growthLvl > 0,
-    locked: RARITY_UNLOCK[plant.rarity] > level,
-    unlockLevel: RARITY_UNLOCK[plant.rarity],
     fortuneLevel: fortuneLvl,
     fortuneBoosted: fortuneLvl > 0,
     mutations: topMutationOdds(plant, fortuneLvl, 3),
