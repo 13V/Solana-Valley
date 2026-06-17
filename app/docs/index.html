@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sprout Valley — Docs & Tokenomics</title>
+    <meta
+      name="description"
+      content="The official Sprout Valley ($SPROUT) docs — a cozy Stardew-style farming game on Solana. How to play, crops & rarity, skills, the economy, $SPROUT tokenomics, staking, the marketplace, the roadmap, and fair-play."
+    />
+    <link rel="canonical" href="https://sproutvalley.fun/docs/" />
+    <!-- Social cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Sprout Valley — Docs & Tokenomics" />
+    <meta
+      property="og:description"
+      content="A cozy farming game on Solana with a rare-crop economy. Read the full docs: gameplay, $SPROUT tokenomics, staking, the marketplace and roadmap."
+    />
+    <meta property="og:url" content="https://sproutvalley.fun/docs/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sprout Valley — Docs & Tokenomics" />
+    <meta
+      name="twitter:description"
+      content="A cozy farming game on Solana with a rare-crop economy. Read the full docs."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Pixelify+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fbf7ec;
+        --bg-soft: #fffdf7;
+        --panel: #ffffff;
+        --ink: #33291c;
+        --ink-soft: #6b5d49;
+        --line: #e8dcc4;
+        --line-soft: #f0e8d6;
+        --green: #4ea24a;
+        --green-deep: #3a7d3a;
+        --gold: #e0a92e;
+        --gold-soft: #f6dd9b;
+        --sky: #6cb7e6;
+        --shadow: 0 2px 0 rgba(0, 0, 0, 0.04), 0 10px 30px rgba(120, 90, 40, 0.08);
+        --radius: 16px;
+        /* rarity (from the game's economy) */
+        --r-common: #9aa4ad;
+        --r-uncommon: #46b746;
+        --r-rare: #2f8be0;
+        --r-legendary: #e0a92e;
+        --r-mythical: #9a4fe0;
+        --r-divine: #e04a4a;
+        --r-prismatic: #e060c0;
+        --r-celestial: #4fb8e0;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+      body {
+        margin: 0;
+        font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(1200px 520px at 80% -10%, #eaf6e0 0%, rgba(234, 246, 224, 0) 60%),
+          radial-gradient(900px 480px at -10% 0%, #fdeecb 0%, rgba(253, 238, 203, 0) 55%),
+          var(--bg);
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--green-deep); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code {
+        font-family: 'Pixelify Sans', ui-monospace, monospace;
+        background: #f3ecdb;
+        border: 1px solid var(--line);
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-size: 0.92em;
+      }
+      h1, h2, h3, h4 { font-family: 'Pixelify Sans', 'Nunito', sans-serif; line-height: 1.15; }
+
+      /* ---------- top bar ---------- */
+      .topbar {
+        position: sticky; top: 0; z-index: 50;
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 20px;
+        background: rgba(251, 247, 236, 0.86);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; font-family: 'Pixelify Sans'; font-weight: 700; font-size: 20px; color: var(--ink); }
+      .brand .leaf { font-size: 24px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.08)); }
+      .brand .tick { color: var(--green); }
+      .topbar .spacer { flex: 1; }
+      .topbar a.nav { color: var(--ink-soft); font-weight: 700; padding: 7px 12px; border-radius: 10px; }
+      .topbar a.nav:hover { background: #f1e9d6; text-decoration: none; color: var(--ink); }
+      .btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: linear-gradient(180deg, #5cb957, var(--green));
+        color: #fff !important; font-weight: 800;
+        padding: 8px 16px; border-radius: 12px;
+        border: 1px solid var(--green-deep);
+        box-shadow: 0 2px 0 var(--green-deep), 0 6px 14px rgba(78,162,74,.3);
+      }
+      .btn:hover { filter: brightness(1.05); text-decoration: none; transform: translateY(-1px); }
+      .btn.gold { background: linear-gradient(180deg, #f3cf6b, var(--gold)); border-color: #b9851d; box-shadow: 0 2px 0 #b9851d, 0 6px 14px rgba(224,169,46,.3); color: #4a3608 !important; }
+      .menu-toggle { display: none; background: #f1e9d6; border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px; font-size: 18px; cursor: pointer; }
+
+      /* ---------- layout ---------- */
+      .layout { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 256px 1fr; gap: 36px; padding: 0 20px; }
+      .sidebar { position: sticky; top: 70px; align-self: start; height: calc(100vh - 86px); overflow-y: auto; padding: 22px 6px 40px; }
+      .sidebar h5 { margin: 18px 0 6px; font-family: 'Pixelify Sans'; text-transform: uppercase; letter-spacing: .06em; font-size: 12px; color: var(--gold); }
+      .sidebar a { display: block; padding: 6px 12px; border-radius: 9px; color: var(--ink-soft); font-weight: 600; font-size: 15px; border-left: 3px solid transparent; }
+      .sidebar a:hover { background: #f1e9d6; text-decoration: none; color: var(--ink); }
+      .sidebar a.active { background: #eaf6e0; color: var(--green-deep); border-left-color: var(--green); }
+
+      main { padding: 32px 0 96px; min-width: 0; }
+
+      /* ---------- hero ---------- */
+      .hero {
+        background: linear-gradient(135deg, #f6fbef 0%, #fdf3d6 100%);
+        border: 1px solid var(--line); border-radius: 22px;
+        padding: 40px 36px; margin-bottom: 36px; position: relative; overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      .hero::after { content: '🌾'; position: absolute; right: -8px; bottom: -18px; font-size: 130px; opacity: .12; transform: rotate(-8deg); }
+      .hero h1 { font-size: 44px; margin: 0 0 8px; }
+      .hero .sub { font-size: 19px; color: var(--ink-soft); max-width: 640px; margin: 0 0 20px; font-weight: 600; }
+      .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 700; color: var(--ink-soft); margin: 0 6px 8px 0; }
+
+      section { scroll-margin-top: 84px; padding: 14px 0 8px; border-top: 1px solid var(--line-soft); margin-top: 30px; }
+      section:first-of-type { border-top: 0; margin-top: 0; }
+      section > h2 { font-size: 30px; margin: 18px 0 6px; display: flex; align-items: center; gap: 10px; }
+      section > h3 { font-size: 21px; margin: 26px 0 6px; }
+      p { margin: 10px 0; }
+      ul, ol { margin: 10px 0; padding-left: 22px; }
+      li { margin: 5px 0; }
+
+      /* ---------- status badges ---------- */
+      .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; vertical-align: middle; font-family: 'Nunito'; }
+      .badge.live { background: #e3f5db; color: #2f7d2f; border: 1px solid #bfe6ac; }
+      .badge.launch { background: #fdeecb; color: #9b6b16; border: 1px solid #f1d690; }
+      .badge.road { background: #e7f0fb; color: #2f6bb0; border: 1px solid #bcd5f0; }
+
+      /* ---------- cards / callouts ---------- */
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 16px 0; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px; box-shadow: var(--shadow); }
+      .card h4 { margin: 0 0 6px; font-size: 17px; }
+      .card p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+      .callout { border-radius: var(--radius); padding: 14px 18px; margin: 18px 0; border: 1px solid; display: flex; gap: 12px; align-items: flex-start; }
+      .callout .ico { font-size: 22px; line-height: 1.4; }
+      .callout.info { background: #eef6fd; border-color: #cfe4f6; }
+      .callout.warn { background: #fef4e6; border-color: #f6dcb0; }
+      .callout.note { background: #f3f7ee; border-color: #d9e8c9; }
+
+      /* ---------- tables ---------- */
+      .table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+      table { width: 100%; border-collapse: collapse; background: var(--panel); font-size: 14.5px; }
+      th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+      thead th { background: #f6efdd; font-family: 'Pixelify Sans'; font-weight: 600; color: var(--ink); position: sticky; top: 0; }
+      tbody tr:last-child td { border-bottom: 0; }
+      tbody tr:hover { background: #fbf6e9; }
+      td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
+
+      .rar { font-weight: 800; }
+      .rar.common { color: var(--r-common); } .rar.uncommon { color: var(--r-uncommon); }
+      .rar.rare { color: var(--r-rare); } .rar.legendary { color: var(--r-legendary); }
+      .rar.mythical { color: var(--r-mythical); } .rar.divine { color: var(--r-divine); }
+      .rar.prismatic { color: var(--r-prismatic); } .rar.celestial { color: var(--r-celestial); }
+
+      /* ---------- faq ---------- */
+      details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px; margin: 10px 0; box-shadow: var(--shadow); }
+      details summary { cursor: pointer; font-weight: 800; padding: 10px 0; list-style: none; font-family: 'Pixelify Sans'; }
+      details summary::-webkit-details-marker { display: none; }
+      details summary::before { content: '＋'; color: var(--green); font-weight: 700; margin-right: 10px; }
+      details[open] summary::before { content: '－'; }
+      details p { color: var(--ink-soft); }
+
+      /* ---------- footer ---------- */
+      footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 30px 20px 60px; color: var(--ink-soft); font-size: 14px; }
+      footer .foot-inner { max-width: 1240px; margin: 0 auto; }
+      footer .links { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+      .disclaimer { font-size: 12.5px; opacity: .85; max-width: 880px; }
+
+      @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+        .sidebar {
+          position: fixed; left: 0; right: 0; top: 60px; bottom: 0; height: auto;
+          background: var(--bg-soft); border-right: 1px solid var(--line);
+          padding: 16px 20px 40px; transform: translateX(-100%); transition: transform .22s ease; z-index: 40;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .menu-toggle { display: inline-block; }
+        .topbar a.nav.hide-sm { display: none; }
+        .hero h1 { font-size: 34px; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ===================== TOP BAR ===================== -->
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="Menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <a class="brand" href="../">
+        <span class="leaf">🌱</span> Sprout&nbsp;Valley <span class="tick">docs</span>
+      </a>
+      <span class="spacer"></span>
+      <a class="nav hide-sm" href="#tokenomics">Tokenomics</a>
+      <a class="nav hide-sm" href="#roadmap">Roadmap</a>
+      <a class="nav hide-sm" href="#faq">FAQ</a>
+      <a class="btn" href="../">▶ Play</a>
+    </header>
+
+    <div class="layout">
+      <!-- ===================== SIDEBAR ===================== -->
+      <nav class="sidebar" id="sidebar">
+        <h5>Start here</h5>
+        <a href="#overview">Overview</a>
+        <a href="#quickstart">Quick start</a>
+        <a href="#loop">The core loop</a>
+        <h5>Gameplay</h5>
+        <a href="#crops">Crops &amp; rarity</a>
+        <a href="#mutations">Mutations</a>
+        <a href="#progression">Levels &amp; achievements</a>
+        <a href="#upgrades">Upgrades</a>
+        <a href="#skills">Skills &amp; perks</a>
+        <a href="#animals">Animals &amp; orchard</a>
+        <a href="#fishing">Fishing</a>
+        <a href="#foraging">Foraging</a>
+        <a href="#atmosphere">World &amp; atmosphere</a>
+        <h5>Economy &amp; $SPROUT</h5>
+        <a href="#economy">Two-currency economy</a>
+        <a href="#tokenomics">$SPROUT tokenomics</a>
+        <a href="#harvest-pool">Community Harvest Pool</a>
+        <a href="#staking">Staking</a>
+        <a href="#marketplace">Marketplace</a>
+        <h5>Project</h5>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#fairplay">Fair play &amp; anti-cheat</a>
+        <a href="#solana">Solana &amp; wallet</a>
+        <a href="#faq">FAQ</a>
+        <a href="#disclaimer">Disclaimer</a>
+      </nav>
+
+      <!-- ===================== MAIN ===================== -->
+      <main>
+        <div class="hero">
+          <h1>🌱 Sprout Valley</h1>
+          <p class="sub">A cozy, Stardew-style farming game with a rare-crop economy — built on <strong>Solana</strong>. Plant, harvest, chase lucky mutations, and grow a farm that's truly yours.</p>
+          <div>
+            <span class="pill">🎮 Free to play</span>
+            <span class="pill">⛓️ Powered by Solana</span>
+            <span class="pill">🪙 $SPROUT</span>
+            <span class="pill">😌 Cozy, not predatory</span>
+          </div>
+          <div class="cta">
+            <a class="btn" href="../">▶ Play now</a>
+            <a class="btn gold" href="#tokenomics">🪙 Read the tokenomics</a>
+          </div>
+        </div>
+
+        <!-- OVERVIEW -->
+        <section id="overview">
+          <h2>📖 Overview</h2>
+          <p><strong>Sprout Valley</strong> is a wholesome farming game in the spirit of <em>Stardew Valley</em>, crossed with a <em>"Grow a Garden"</em>-style rare-crop economy. You're given your own plot in a shared valley: till the soil, plant seeds, water your crops, and harvest them in real time. Rarer crops and lucky mutations are worth dramatically more — chasing them is the heart of the game.</p>
+          <p>The design splits cleanly into <strong>play-off-chain / own-on-chain</strong>: the cozy moment-to-moment farming runs instantly and for free in your browser, while the things you truly <em>own and trade</em> — the <code>$SPROUT</code> token, rare items, and the player marketplace — settle on <strong>Solana</strong>.</p>
+          <div class="grid">
+            <div class="card"><h4>🌾 Deep farming loop</h4><p>19 plants across 8 rarity tiers, value-multiplying mutations, a restocking seed shop, and 5 levelling skills.</p></div>
+            <div class="card"><h4>🐔 A living homestead</h4><p>Chickens, cows and fruit trees produce passive income — and breed, so your herd grows itself.</p></div>
+            <div class="card"><h4>🪙 Real ownership</h4><p>$SPROUT, a marketplace, and revenue-funded rewards — designed to be sustainable, never a Ponzi.</p></div>
+          </div>
+          <div class="callout info">
+            <span class="ico">ℹ️</span>
+            <div><strong>What's live today:</strong> the full single-player game is playable now (farming, economy, skills, animals, fishing, day/night, autosave) with Solana <strong>wallet connect on devnet</strong>. The on-chain economy — the <code>$SPROUT</code> token, staking and the marketplace — rolls out per the <a href="#roadmap">roadmap</a>. Sections below are tagged <span class="badge live">Live</span>, <span class="badge launch">Rolling out</span>, or <span class="badge road">Roadmap</span>.</div>
+          </div>
+        </section>
+
+        <!-- QUICK START -->
+        <section id="quickstart">
+          <h2>🚀 Quick start <span class="badge live">Live</span></h2>
+          <ol>
+            <li><strong>Open the game</strong> at <a href="https://sproutvalley.fun">sproutvalley.fun</a> (or hit <a href="../">▶ Play</a>). It runs right in your browser — no install.</li>
+            <li><strong>Find ★ Your Plot.</strong> You farm your own allocated plot in a valley of 20; the camera follows you as you explore.</li>
+            <li><strong>Run the loop:</strong> Hoe the grass → plant a Seed → Water it → wait for it to ripen → click to harvest → sell in the Harvest panel.</li>
+            <li><strong>(Optional) Connect a wallet.</strong> Phantom or Solflare on <strong>devnet</strong> shows your address &amp; live SOL balance. Nothing here touches real funds yet.</li>
+          </ol>
+          <h3>Controls</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Action</th><th>Input</th></tr></thead>
+              <tbody>
+                <tr><td>Move</td><td><code>WASD</code> or arrow keys (camera follows you)</td></tr>
+                <tr><td>Select tool</td><td><code>1</code> Hoe · <code>2</code> Watering Can · <code>3</code> Seeds (or click the hotbar)</td></tr>
+                <tr><td>Use tool on a tile</td><td>Click a tile within reach (cursor turns red if you can't farm there)</td></tr>
+                <tr><td>Harvest</td><td>Click a ripe crop</td></tr>
+                <tr><td>Fish</td><td>Click the pond or sea, then click again the moment it bites</td></tr>
+                <tr><td>Panels</td><td>Shop · Seeds · Harvest · Animals · Upgrades · Skills · Almanac · Coats — top HUD</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- LOOP -->
+        <section id="loop">
+          <h2>🔁 The core loop <span class="badge live">Live</span></h2>
+          <p>Everything orbits one satisfying cycle:</p>
+          <p style="font-family:'Pixelify Sans';font-size:18px;color:var(--green-deep)">🪓 Hoe&nbsp; → &nbsp;🌱 Plant&nbsp; → &nbsp;💧 Water&nbsp; → &nbsp;⏳ Grow&nbsp; → &nbsp;🧺 Harvest&nbsp; → &nbsp;🪙 Sell&nbsp; → &nbsp;⬆️ Reinvest</p>
+          <ul>
+            <li><strong>Watering doubles growth speed</strong>, and watered crops earn a <strong>Wet bonus (×1.5 value)</strong> at harvest. Rain waters every tilled tile for free.</li>
+            <li>Selling crops earns <strong>coins</strong> (spend on seeds, upgrades, animals) and <strong>XP</strong> (level up to unlock rarer seed tiers).</li>
+            <li>Reinvest into upgrades and rarer seeds — the loop compounds as you climb the rarity ladder.</li>
+          </ul>
+        </section>
+
+        <!-- CROPS & RARITY -->
+        <section id="crops">
+          <h2>🌾 Crops &amp; rarity <span class="badge live">Live</span></h2>
+          <p>There are <strong>19 plants across 8 rarity tiers</strong>. Each tier unlocks in the shop at a player level, appears less often on restock, and sells for far more. This is the same rarity ladder used across the whole game (crops, fish, and future items).</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tier</th><th class="num">Shop unlock</th><th>Restock frequency</th><th>Example crops</th></tr></thead>
+              <tbody>
+                <tr><td><span class="dot" style="background:var(--r-common)"></span><span class="rar common">Common</span></td><td class="num">Lv 1</td><td>Always stocked</td><td>Carrot, Spinach, Lettuce, Turnip</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-uncommon)"></span><span class="rar uncommon">Uncommon</span></td><td class="num">Lv 2</td><td>Very common</td><td>Tomato, Cauliflower, Eggplant</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-rare)"></span><span class="rar rare">Rare</span></td><td class="num">Lv 5</td><td>Often</td><td>Beetroot, Cucumber</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-legendary)"></span><span class="rar legendary">Legendary</span></td><td class="num">Lv 9</td><td>Sometimes</td><td>Corn, Pumpkin</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-mythical)"></span><span class="rar mythical">Mythical</span></td><td class="num">Lv 14</td><td>Rarely</td><td>Pink Cabbage, Golden Corn</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-divine)"></span><span class="rar divine">Divine</span></td><td class="num">Lv 20</td><td>Scarce</td><td>Blue Rose, Frost Pumpkin</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-prismatic)"></span><span class="rar prismatic">Prismatic</span></td><td class="num">Lv 28</td><td>Very scarce</td><td>Star Fruit, Moonpetal</td></tr>
+                <tr><td><span class="dot" style="background:var(--r-celestial)"></span><span class="rar celestial">Celestial</span></td><td class="num">Lv 36</td><td>Legendary drop</td><td>Galaxy Fruit, Voidbloom</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The <strong>restocking seed shop</strong> is the chase: rare seeds only appear sometimes, so you check back and pounce on a good restock. A few representative crops, from humblest to rarest:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Crop</th><th>Rarity</th><th class="num">Seed cost</th><th class="num">Base value</th><th class="num">Grow time</th></tr></thead>
+              <tbody>
+                <tr><td>Carrot</td><td><span class="rar common">Common</span></td><td class="num">9</td><td class="num">18</td><td class="num">22s</td></tr>
+                <tr><td>Tomato</td><td><span class="rar uncommon">Uncommon</span></td><td class="num">36</td><td class="num">78</td><td class="num">42s</td></tr>
+                <tr><td>Cucumber</td><td><span class="rar rare">Rare</span></td><td class="num">120</td><td class="num">282</td><td class="num">78s</td></tr>
+                <tr><td>Pumpkin</td><td><span class="rar legendary">Legendary</span></td><td class="num">300</td><td class="num">820</td><td class="num">124s</td></tr>
+                <tr><td>Golden Corn</td><td><span class="rar mythical">Mythical</span></td><td class="num">820</td><td class="num">2,500</td><td class="num">172s</td></tr>
+                <tr><td>Frost Pumpkin</td><td><span class="rar divine">Divine</span></td><td class="num">2,100</td><td class="num">8,200</td><td class="num">230s</td></tr>
+                <tr><td>Moonpetal</td><td><span class="rar prismatic">Prismatic</span></td><td class="num">6,400</td><td class="num">30,000</td><td class="num">285s</td></tr>
+                <tr><td>Voidbloom</td><td><span class="rar celestial">Celestial</span></td><td class="num">26,000</td><td class="num">145,000</td><td class="num">400s</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="callout note"><span class="ico">📓</span><span>The in-game <strong>Almanac</strong> tracks every plant and mutation you've discovered — completing the set is its own reward (and an achievement).</span></p>
+        </section>
+
+        <!-- MUTATIONS -->
+        <section id="mutations">
+          <h2>✨ Mutations <span class="badge live">Live</span></h2>
+          <p>When you harvest, a crop can roll a <strong>mutation</strong> that multiplies its value. Mutated crops visibly glow and sparkle. The <strong>Fortune</strong> upgrade and the Farming <strong>Fortune</strong> perk increase your odds of the good ones.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Mutation</th><th class="num">Value multiplier</th><th class="num">Approx. base odds</th></tr></thead>
+              <tbody>
+                <tr><td>Normal</td><td class="num">×1</td><td class="num">~77%</td></tr>
+                <tr><td>Shiny</td><td class="num">×2</td><td class="num">~14%</td></tr>
+                <tr><td>Frosted</td><td class="num">×8</td><td class="num">~4.6%</td></tr>
+                <tr><td>🌟 Gold</td><td class="num">×20</td><td class="num">~3.1%</td></tr>
+                <tr><td>🌈 Rainbow</td><td class="num">×50</td><td class="num">~0.8%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Mutations stack with the <strong>Wet bonus (×1.5)</strong>. A Rainbow harvest on a high-tier crop is a jackpot moment — e.g., a watered Rainbow Voidbloom is worth <strong>~10.9 million coins</strong> (145,000 × 50 × 1.5).</p>
+        </section>
+
+        <!-- PROGRESSION -->
+        <section id="progression">
+          <h2>📈 Levels &amp; achievements <span class="badge live">Live</span></h2>
+          <p>Harvesting and selling earns <strong>XP</strong>; rarer crops grant more. Levelling up <strong>unlocks higher rarity tiers</strong> in the shop, so you naturally graduate from carrots to Celestial blooms. Achievements pay out coin bonuses:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Achievement</th><th>Goal</th><th class="num">Reward</th></tr></thead>
+              <tbody>
+                <tr><td>First Sprout</td><td>Harvest your first crop</td><td class="num">50</td></tr>
+                <tr><td>Green Thumb</td><td>Harvest 50 crops</td><td class="num">500</td></tr>
+                <tr><td>Oddity</td><td>Find your first mutation</td><td class="num">250</td></tr>
+                <tr><td>Mutation Master</td><td>Find 25 mutations</td><td class="num">3,000</td></tr>
+                <tr><td>Master Collector</td><td>Discover all 19 plants</td><td class="num">12,000</td></tr>
+                <tr><td>Valley Tycoon</td><td>Earn 100,000 coins total</td><td class="num">15,000</td></tr>
+                <tr><td>Seasoned Farmer</td><td>Reach level 10</td><td class="num">2,000</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- UPGRADES -->
+        <section id="upgrades">
+          <h2>⬆️ Upgrades <span class="badge live">Live</span></h2>
+          <p>Permanent, coin-bought upgrades that compound the economy:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Upgrade</th><th class="num">Max</th><th>Effect</th></tr></thead>
+              <tbody>
+                <tr><td>Hoe</td><td class="num">3</td><td>Bigger till area — up to 7×7 tiles at once</td></tr>
+                <tr><td>Watering Can</td><td class="num">3</td><td>Bigger watering area — up to 7×7 tiles at once</td></tr>
+                <tr><td>Fertilizer</td><td class="num">5</td><td>+15% growth speed per level (up to +75%)</td></tr>
+                <tr><td>Fortune</td><td class="num">5</td><td>+20% mutation luck per level (up to +100%)</td></tr>
+                <tr><td>Shop Supply</td><td class="num">3</td><td>Shop restocks up to 60s faster</td></tr>
+                <tr><td>Sprinkler</td><td class="num">3</td><td>Auto-waters your crops on a timer</td></tr>
+                <tr><td>Market Stall</td><td class="num">5</td><td>+10% crop sale price per level (up to +50%)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SKILLS -->
+        <section id="skills">
+          <h2>🎯 Skills &amp; perks <span class="badge live">Live</span></h2>
+          <p>Five skills level <strong>1 → 20</strong> from the activities you do, each with a smooth per-level passive <em>plus</em> <strong>milestone perk choices</strong> at levels 5, 10 and 15 (pick 1 of 2), a <strong>level-20 capstone</strong>, and endless <strong>mastery stars</strong> beyond 20.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Skill</th><th>Levelled by</th><th>Capstone (Lv 20)</th></tr></thead>
+              <tbody>
+                <tr><td>🌾 Farming</td><td>Harvesting crops</td><td><strong>Master Farmer</strong> — 15% auto-replant on harvest · +15% value</td></tr>
+                <tr><td>🐄 Ranching</td><td>Collecting eggs, milk &amp; fruit</td><td><strong>Rancher Lord</strong> — +25% product value · +6% golden chance</td></tr>
+                <tr><td>🥚 Breeding</td><td>Raising baby animals</td><td><strong>Master Breeder</strong> — +25% rare babies · +20% faster</td></tr>
+                <tr><td>🎣 Fishing</td><td>Casting at the water</td><td><strong>Legendary Angler</strong> — can hook legendary fish · +30% value</td></tr>
+                <tr><td>🍄 Foraging</td><td>Gathering wild finds</td><td><strong>Forest Spirit</strong> — 6% chance of a gem · +30% value</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Example milestone choice (Farming, Lv 10): <strong>Fortune</strong> (+50% mutation luck) <em>or</em> <strong>Bountiful</strong> (12% chance a harvest yields two). Builds are yours to shape.</p>
+        </section>
+
+        <!-- ANIMALS -->
+        <section id="animals">
+          <h2>🐔 Animals &amp; orchard <span class="badge live">Live</span></h2>
+          <p>Your homestead is a passive-income engine. Buy a producer (unlocked by level); it makes a product on a timer that you click to collect for coins + XP. Animals wander a pen; trees stand in the orchard.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Producer</th><th class="num">Cost</th><th class="num">Unlock</th><th>Produces</th><th class="num">Value</th><th class="num">Timer</th></tr></thead>
+              <tbody>
+                <tr><td>🐔 Chicken</td><td class="num">150</td><td class="num">Lv 3</td><td>Egg</td><td class="num">28</td><td class="num">30s</td></tr>
+                <tr><td>🐄 Cow</td><td class="num">600</td><td class="num">Lv 6</td><td>Milk</td><td class="num">85</td><td class="num">60s</td></tr>
+                <tr><td>🍎 Apple Tree</td><td class="num">500</td><td class="num">Lv 4</td><td>Apple</td><td class="num">120</td><td class="num">45s</td></tr>
+                <tr><td>🍊 Orange Tree</td><td class="num">900</td><td class="num">Lv 8</td><td>Orange</td><td class="num">230</td><td class="num">55s</td></tr>
+                <tr><td>🍑 Peach Tree</td><td class="num">1,500</td><td class="num">Lv 12</td><td>Peach</td><td class="num">420</td><td class="num">70s</td></tr>
+                <tr><td>🍐 Pear Tree</td><td class="num">2,400</td><td class="num">Lv 16</td><td>Pear</td><td class="num">680</td><td class="num">85s</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Animals spawn in random <strong>colours</strong> — keep an eye out for a rare <strong>blue chicken</strong> or <strong>purple cow</strong>. Keep a pair and they <strong>breed</strong>: babies appear and grow into adults, so your herd grows itself (up to a cap you can raise with the Breeding skill).</p>
+        </section>
+
+        <!-- FISHING -->
+        <section id="fishing">
+          <h2>🎣 Fishing <span class="badge live">Live</span></h2>
+          <p>Cast at the pond (fresh water) or the open sea (salt water) and play the one-click <strong>cast → bite → hook</strong> minigame: the rod arcs out, the bobber settles, <strong>bubbles rise when a fish is interested</strong>, then the bobber <strong>dunks</strong> — click the moment it does to set the hook. Miss the window and it gets away.</p>
+          <p>Fish run the <strong>same 8-tier rarity ladder</strong> as crops, from everyday Minnows up to Celestial white-whales like the <em>Leviathan Eel</em>. The Fishing skill's luck tilts the odds toward rarer catches, and the ocean holds bigger, more valuable species than the pond.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tier</th><th>Example fish</th><th class="num">Value range</th></tr></thead>
+              <tbody>
+                <tr><td><span class="rar common">Common</span></td><td>Minnow, Bluegill, Sardine</td><td class="num">12 – 30</td></tr>
+                <tr><td><span class="rar rare">Rare</span></td><td>Largemouth Bass, Rainbow Trout</td><td class="num">150 – 380</td></tr>
+                <tr><td><span class="rar mythical">Mythical</span></td><td>Manta Ray, Crimson Betta</td><td class="num">1,500 – 2,400</td></tr>
+                <tr><td><span class="rar prismatic">Prismatic</span></td><td>Prism Tang, Rainbow Axolotl</td><td class="num">17,000 – 30,000</td></tr>
+                <tr><td><span class="rar celestial">Celestial</span></td><td>Void Kraken, Leviathan Eel</td><td class="num">66,000 – 140,000</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- FORAGING -->
+        <section id="foraging">
+          <h2>🍄 Foraging <span class="badge live">Live</span></h2>
+          <p>Wild finds spawn across the open world — mushrooms, berries, herbs, and rarer treasures like crystal shards and golden truffles. Gather a node for coins + Foraging XP; nodes respawn over time, and the skill's luck tilts toward rarer finds. The <strong>Forest Spirit</strong> capstone even gives a chance to turn up a gem.</p>
+        </section>
+
+        <!-- ATMOSPHERE -->
+        <section id="atmosphere">
+          <h2>🌤️ World &amp; atmosphere <span class="badge live">Live</span></h2>
+          <div class="grid">
+            <div class="card"><h4>🌗 Day / night cycle</h4><p>An in-game clock with sunrise/sunset tints, a soft vignette, and fireflies at night.</p></div>
+            <div class="card"><h4>🌧️ Weather</h4><p>Passing showers roll in and water every tilled tile for free while they last.</p></div>
+            <div class="card"><h4>💾 Autosave</h4><p>Your whole farm — coins, seeds, harvest, shop and time — persists locally across reloads.</p></div>
+            <div class="card"><h4>🔊 Sound</h4><p>Synthesised WebAudio effects (no audio files), with a HUD mute toggle.</p></div>
+          </div>
+        </section>
+
+        <!-- ECONOMY -->
+        <section id="economy">
+          <h2>💰 Two-currency economy <span class="badge launch">Rolling out</span></h2>
+          <p>The cozy game stays fast and free; <strong>real value lives only at the edges</strong>. This is the single most important idea in Sprout Valley's economy — it's what keeps the game fun and keeps the token honest.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Layer</th><th>On-chain?</th><th>Used for</th></tr></thead>
+              <tbody>
+                <tr><td><strong>🪙 Coins</strong> (in-game)</td><td>❌ Off-chain</td><td>The entire cozy loop: seeds, upgrades, animals, day-to-day farming. Instant, free, fun — and <strong>not withdrawable</strong>.</td></tr>
+                <tr><td><strong>🌱 $SPROUT</strong> (SPL token)</td><td>✅ Solana</td><td>Marketplace currency, premium cosmetics, staking, prestige, and <strong>withdrawable rewards</strong>.</td></tr>
+                <tr><td><strong>◎ SOL</strong> (native)</td><td>✅ Solana</td><td>Headline prizes only (seasonal / leaderboard), paid from treasury yield &amp; fees.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout info"><span class="ico">🤖</span><div>Because ~99% of play happens in the free off-chain coin loop, <strong>a bot farming coins gains nothing real</strong>. Only the verifiable, capped reward layer ever touches money.</div></div>
+        </section>
+
+        <!-- TOKENOMICS -->
+        <section id="tokenomics">
+          <h2>🪙 $SPROUT tokenomics <span class="badge launch">Rolling out</span></h2>
+          <p class="callout warn"><span class="ico">⚠️</span><span><strong>This is a design, not a promise.</strong> Numbers are starting points to tune. Nothing here is financial advice — see the <a href="#disclaimer">disclaimer</a>.</span></p>
+
+          <h3>The core principle</h3>
+          <p style="font-family:'Pixelify Sans';font-size:18px;color:var(--green-deep)">Pay out real yield, never printed yield.</p>
+          <p>Every reward is funded by money that <em>actually came in</em> — marketplace fees, cosmetic sales, and treasury staking yield. The reward pool can only distribute what it holds, so it can <strong>never death-spiral</strong>. Rewards are funded only by real revenue — not by new-player inflows (Ponzi) or token emissions (inflation).</p>
+
+          <h3>Supply &amp; allocation</h3>
+          <p>$SPROUT launches with a <strong>fixed supply</strong> for liquidity, treasury and ops — <strong>not</strong> as a per-play faucet.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Allocation</th><th class="num">%</th><th>Vesting</th><th>Purpose</th></tr></thead>
+              <tbody>
+                <tr><td>Liquidity (DEX)</td><td class="num">30%</td><td>Locked</td><td>A tradeable market so $SPROUT has real value</td></tr>
+                <tr><td>Community treasury</td><td class="num">25%</td><td>DAO / multisig</td><td>Backs the Harvest Pool &amp; seasonal events</td></tr>
+                <tr><td>Ecosystem / future rewards</td><td class="num">20%</td><td>Slow release</td><td>Long-term reserve — <em>not</em> auto-emitted</td></tr>
+                <tr><td>Team &amp; dev</td><td class="num">15%</td><td>1yr cliff, 3yr vest</td><td>Aligned and anti-dump</td></tr>
+                <tr><td>Launch airdrop (cosmetic-first)</td><td class="num">10%</td><td>—</td><td>Reward early players without a cash incentive to farm</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Sinks &amp; faucets</h3>
+          <p>A token only holds value if it's <strong>consumed</strong> at least as fast as it's earned. Target: <strong>sinks ≥ faucets</strong> at all times.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Faucets (earn $SPROUT)</th><th>Sinks (spend / burn $SPROUT)</th></tr></thead>
+              <tbody>
+                <tr><td>Seasonal pool rewards</td><td>Premium / rare seeds</td></tr>
+                <tr><td>Quests &amp; bounties</td><td>Land / plot expansion</td></tr>
+                <tr><td>Referral rewards</td><td>Cosmetic mints (skins, décor)</td></tr>
+                <tr><td>One-time launch airdrop</td><td>Marketplace fees · "harvest tax"</td></tr>
+                <tr><td></td><td>Burn-to-reroll a mutation · Prestige</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Token info</h3>
+          <div class="table-wrap">
+            <table>
+              <tbody>
+                <tr><td><strong>Ticker</strong></td><td><code>$SPROUT</code></td></tr>
+                <tr><td><strong>Chain</strong></td><td>Solana (SPL token)</td></tr>
+                <tr><td><strong>Contract address</strong></td><td><code>Published at launch — verify only via official channels</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout warn"><span class="ico">🛡️</span><div><strong>Scam warning:</strong> the only authentic contract address is the one posted on our official <a href="https://sproutvalley.fun">site</a> and verified socials. Anyone DMing you a different address is a scammer.</div></div>
+        </section>
+
+        <!-- HARVEST POOL -->
+        <section id="harvest-pool">
+          <h2>🌾 Community Harvest Pool <span class="badge road">Roadmap</span></h2>
+          <p>A single, transparent, on-chain pool that <strong>self-balances</strong> — it pays out only what it takes in each season.</p>
+          <div class="grid">
+            <div class="card"><h4>Inflows (real revenue)</h4><p>A share of marketplace fees · a share of cosmetic/premium-seed sales · treasury staking <em>yield</em> (never principal) · the "harvest tax" sink.</p></div>
+            <div class="card"><h4>Outflows (capped ≤ inflows)</h4><p>Seasonal rewards · quests &amp; bounties · referral rewards · a small slice of SOL top prizes.</p></div>
+          </div>
+          <p><strong>The rule:</strong> <code>season payout ≤ pool balance</code>. If revenue dips, payouts shrink — the system bends, it never breaks.</p>
+          <h3>Rewards favour <em>contribution</em>, not <em>hours</em></h3>
+          <p>Paying per hour invites bots and ruins the cozy vibe. Instead, each season the pool splits by a <strong>contribution score</strong> built from things bots can't cheaply fake: Almanac discoveries, collection/quality milestones, achievements, and decorated-farm "likes" from other players — with only modest, diminishing-returns weight on raw volume.</p>
+          <div class="callout note"><span class="ico">🍯</span><div><strong>The honest takeaway:</strong> sustainable play-to-earn here is a <strong>cozy bonus + seasonal prizes</strong>, not a wage. It scales with the game — more trading and spend means a bigger pool. We will never print or Ponzi to inflate it.</div></div>
+        </section>
+
+        <!-- STAKING -->
+        <section id="staking">
+          <h2>🔒 Staking — the Garden Vault <span class="badge launch">Rolling out</span></h2>
+          <p>Lock <code>$SPROUT</code> in the <strong>Garden Vault</strong> for a cozy, tiered boost to your farm — and to qualify for the seasonal reward pool. Bigger stakes and longer locks earn bigger boosts.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tier</th><th>Stake</th><th>Boost (stacks with skills &amp; upgrades)</th></tr></thead>
+              <tbody>
+                <tr><td>🌱 Seedling</td><td>Small</td><td>+5% crop value &amp; growth</td></tr>
+                <tr><td>🌿 Sapling</td><td>Medium</td><td>+10% value &amp; growth · +10% mutation luck</td></tr>
+                <tr><td>🌸 Bloom</td><td>Large</td><td>+15% value &amp; growth · +20% luck · +1 daily rare-seed slot</td></tr>
+                <tr><td>🌕 Harvest Moon</td><td>Whale</td><td>+20% across the board · a share of the Community Harvest Pool</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul>
+            <li><strong>Time-lock + unstake cooldown</strong> — longer locks earn bigger multipliers; the cooldown blocks flash-loan/flip gaming. Locking supply is also a gentle <strong>sink</strong> that supports the token.</li>
+            <li><strong>Staking = reward-eligibility</strong> — the same lock that boosts your farm also makes you eligible for seasonal rewards, which doubles as Sybil resistance (fake accounts cost more than they earn).</li>
+            <li><strong>Boosts stay modest</strong> — a cozy bonus, never a pay-to-win wall.</li>
+          </ul>
+          <div class="callout warn"><span class="ico">⚠️</span><div>Staking goes live once the $SPROUT mint and authoritative anti-cheat are in place (see the <a href="#roadmap">roadmap</a> and <a href="#fairplay">fair-play</a> sections). Tiers and rates are a design proposal and will be tuned.</div></div>
+        </section>
+
+        <!-- MARKETPLACE -->
+        <section id="marketplace">
+          <h2>🛒 Marketplace <span class="badge road">Roadmap</span></h2>
+          <p>A player-to-player marketplace for rare crops, mutations and items — priced in <code>$SPROUT</code> and settled by an on-chain escrow program (list, fill, cancel). This turns the rare-crop chase into a real, player-driven economy.</p>
+          <p>A small <strong>marketplace fee</strong> is the main engine of the Community Harvest Pool: trading activity funds the rewards that flow back to engaged players. <strong>Wash-trading and self-dealing are excluded</strong> from fee-funded reward scoring.</p>
+        </section>
+
+        <!-- ROADMAP -->
+        <section id="roadmap">
+          <h2>🗺️ Roadmap</h2>
+          <h3>Launch day &amp; first weeks</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>When</th><th>Milestone</th></tr></thead>
+              <tbody>
+                <tr><td>5 min</td><td>🔒 Developer tokens locked for 6 months</td></tr>
+                <tr><td>10 min</td><td>📊 DexScreener paid listing live</td></tr>
+                <tr><td>10–60 min</td><td>🛠️ Live bug fixes &amp; economy tuning</td></tr>
+                <tr><td>4 hrs</td><td>🎮 Content update</td></tr>
+                <tr><td>8 hrs</td><td>🎮 Content update</td></tr>
+                <tr><td>12 hrs</td><td>💰 Staking goes live</td></tr>
+                <tr><td>18 hrs</td><td>🛒 Marketplace opens — earn $SPROUT</td></tr>
+                <tr><td>24 hrs</td><td>✨ Content update</td></tr>
+                <tr><td>2 weeks</td><td>📱 Mobile app launches</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Build milestones</h3>
+          <ul>
+            <li><span class="badge live">Done</span> <strong>M0 — Playable game:</strong> the full single-player cozy game, polished and persistent.</li>
+            <li><span class="badge launch">Now</span> <strong>M1 — $SPROUT SPL token:</strong> the on-chain currency; shop &amp; rewards settle in real tokens.</li>
+            <li><span class="badge road">Next</span> <strong>M2 — Authoritative anti-cheat &amp; land ownership:</strong> server/chain-verified harvests; plots as on-chain assets.</li>
+            <li><span class="badge road">Next</span> <strong>M3 — Items on-chain:</strong> harvested produce (with rarity/mutation) as on-chain items.</li>
+            <li><span class="badge road">Next</span> <strong>M4 — Marketplace:</strong> escrow-based P2P trading for $SPROUT.</li>
+            <li><span class="badge road">Later</span> <strong>M5 — Depth:</strong> seasons, more content, quests, social/multiplayer.</li>
+            <li><span class="badge road">Later</span> <strong>M6 — Polish &amp; mainnet:</strong> audits, settings, cloud saves, mainnet deploy.</li>
+          </ul>
+        </section>
+
+        <!-- FAIR PLAY -->
+        <section id="fairplay">
+          <h2>🛡️ Fair play &amp; anti-cheat <span class="badge road">Roadmap (M2)</span></h2>
+          <p>Honesty first: the game is <strong>100% client-side today</strong> (your save lives in your browser). That's perfect for a free single-player game — and it means <strong>no real value can be attached to it yet</strong>, because a client-trusted save could be edited or botted. Making value-minting <strong>trustworthy</strong> is a hard prerequisite for any withdrawable reward.</p>
+          <p>Before $SPROUT/SOL is ever on the line, the architecture moves to an <strong>authoritative server + on-chain settlement</strong> hybrid: the client predicts and renders, but the server owns the clock, the RNG and the economy, and only it (and the chain) can credit rewards.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Threat</th><th>Mitigation</th></tr></thead>
+              <tbody>
+                <tr><td>Save tampering</td><td>Server/chain is the source of truth; the local save is a cache only</td></tr>
+                <tr><td>Clock / time-warp</td><td>Server owns time; growth is computed from server timestamps</td></tr>
+                <tr><td>RNG manipulation (re-rolling mutations)</td><td>Server-seeded RNG (commit-reveal) or on-chain VRF for high-value rolls</td></tr>
+                <tr><td>Botting &amp; Sybil</td><td>Rate limits, per-wallet/season caps, stake-to-earn, contribution scoring</td></tr>
+                <tr><td>Wash trading</td><td>Graph/heuristic detection; self-dealing excluded from rewards</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="callout note"><span class="ico">😌</span><span>The free, single-player <strong>cozy mode stays client-side forever</strong>. Only the rewarded / on-chain mode uses the authoritative path, so the cozy experience is never burdened by latency.</span></p>
+        </section>
+
+        <!-- SOLANA -->
+        <section id="solana">
+          <h2>⛓️ Solana &amp; your wallet <span class="badge live">Live (devnet)</span></h2>
+          <p>Sprout Valley is built for <strong>Solana</strong> — fast, cheap transactions suit a game with frequent actions. Today you can connect <strong>Phantom</strong> or <strong>Solflare</strong> on <strong>devnet</strong> to see your address and live SOL balance; in-game coins remain an off-chain placeholder for the planned $SPROUT token.</p>
+          <ol>
+            <li>Install <a href="https://phantom.app/">Phantom</a> (or Solflare) and switch the network to <strong>Devnet</strong>.</li>
+            <li>Click <strong>Select Wallet</strong> in the game and approve the connection.</li>
+            <li>Grab free devnet SOL from the <a href="https://faucet.solana.com/">faucet</a> to experiment.</li>
+          </ol>
+          <p class="callout info"><span class="ico">🔐</span><span>Sprout Valley will never ask for your seed phrase or a transaction that drains your wallet. Connecting only shares your public address. Devnet only for now — nothing touches real funds.</span></p>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq">
+          <h2>❓ FAQ</h2>
+          <details><summary>Is the game free to play?</summary><p>Yes. The entire cozy farming loop is free and runs in your browser. $SPROUT, the marketplace and rewards are an optional layer at the edges — you never have to spend to enjoy the game.</p></details>
+          <details><summary>Do I need crypto or a wallet to play?</summary><p>No. You can play the full game with no wallet at all. Connecting a Solana wallet (devnet) is optional and currently just shows your address and balance.</p></details>
+          <details><summary>Is it pay-to-win?</summary><p>No. Boosts from staking and cosmetics are deliberately modest, and progression is driven by playing — not by buying power. Rewards favour <em>contribution</em> (discoveries, quality, collections), not raw spend or grind.</p></details>
+          <details><summary>How do players actually earn real value?</summary><p>Through the revenue-funded Community Harvest Pool: a share of marketplace fees, cosmetic sales and treasury yield is paid out each season, split by contribution. It's a cozy bonus, not a salary — and it can only ever pay out what it took in.</p></details>
+          <details><summary>What stops bots from draining the rewards?</summary><p>Bots can farm free off-chain coins all they like — that's worthless. The reward layer is server/chain-authoritative with per-wallet caps, contribution scoring, stake-to-earn and bot/wash-trade detection. See <a href="#fairplay">fair play</a>.</p></details>
+          <details><summary>When does $SPROUT / staking / the marketplace go live?</summary><p>See the <a href="#roadmap">roadmap</a>. These roll out in stages; staking and the marketplace require the token mint and authoritative anti-cheat to be in place first.</p></details>
+          <details><summary>Where do I find the official contract address?</summary><p>Only from our official <a href="https://sproutvalley.fun">website</a> and verified social channels. Treat any address DMed to you as a scam.</p></details>
+          <details><summary>Will my farm be wiped?</summary><p>Your single-player save persists locally. As on-chain features and cloud saves arrive, we'll communicate any migrations clearly in advance.</p></details>
+        </section>
+
+        <!-- DISCLAIMER -->
+        <section id="disclaimer">
+          <h2>⚖️ Disclaimer</h2>
+          <p class="disclaimer">
+            Sprout Valley is a game. The tokenomics, staking and reward designs described here are <strong>proposals under active development</strong> and may change; figures are illustrative starting points, not guarantees of value, yield or returns. <strong>Nothing on this page is financial, investment, or legal advice.</strong> $SPROUT is a utility token intended for use within the game and its ecosystem; it is not an investment contract and should not be purchased with an expectation of profit. Digital assets are volatile and you may lose value. Real-money / withdrawable features are subject to anti-cheat readiness, liquidity, and legal/regulatory review (including securities, gambling, money-transmission, tax, age and geographic restrictions), and may be limited, gated or unavailable in your jurisdiction. The game currently operates on Solana <strong>devnet</strong>; always verify the official contract address through our official channels and never share your seed phrase. Play responsibly.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer>
+      <div class="foot-inner">
+        <div class="links">
+          <a href="../">▶ Play</a>
+          <a href="https://sproutvalley.fun">🌐 sproutvalley.fun</a>
+          <!-- TODO: replace with your real social links before publishing -->
+          <a href="#" rel="noopener">𝕏 Twitter</a>
+          <a href="#" rel="noopener">💬 Telegram</a>
+          <a href="#tokenomics">🪙 Tokenomics</a>
+        </div>
+        <p>🌱 <strong>Sprout Valley</strong> — cozy farming, real ownership, on Solana. Built to last.</p>
+        <p class="disclaimer">© Sprout Valley. Game art uses the Sprout Lands pack by Cup Nooble under license (in-game only). Brand art is original. This site is informational; see the <a href="#disclaimer">disclaimer</a>.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Scrollspy: highlight the sidebar link for the section in view.
+      (function () {
+        var links = Array.prototype.slice.call(document.querySelectorAll('.sidebar a'));
+        var byId = {};
+        links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+        var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+        var current = null;
+        var obs = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) {
+                if (current) current.classList.remove('active');
+                var a = byId[e.target.id];
+                if (a) { a.classList.add('active'); current = a; }
+              }
+            });
+          },
+          { rootMargin: '-80px 0px -65% 0px', threshold: 0 }
+        );
+        sections.forEach(function (s) { obs.observe(s); });
+
+        // Close the mobile sidebar after picking a link.
+        links.forEach(function (a) {
+          a.addEventListener('click', function () {
+            document.getElementById('sidebar').classList.remove('open');
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
