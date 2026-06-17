@@ -1,10 +1,11 @@
-import { UPGRADES } from '../game/progression';
+import { UPGRADES, upgradeUnlocked } from '../game/progression';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 
 export function UpgradesPanel({ onClose }: { onClose: () => void }) {
   const { coins, progress } = useGameState();
   const up = progress.upgrades;
+  const level = progress.level;
 
   return (
     <div className="panel">
@@ -17,6 +18,7 @@ export function UpgradesPanel({ onClose }: { onClose: () => void }) {
         {UPGRADES.map((u) => {
           const lvl = up[u.id] ?? 0;
           const maxed = lvl >= u.max;
+          const locked = !upgradeUnlocked(u, level);
           const cost = maxed ? 0 : u.cost(lvl);
           const afford = coins >= cost;
           return (
@@ -31,10 +33,10 @@ export function UpgradesPanel({ onClose }: { onClose: () => void }) {
               </span>
               <button
                 className="btn sm"
-                disabled={maxed || !afford}
+                disabled={maxed || locked || !afford}
                 onClick={() => bus.emit('ui:buyUpgrade', u.id)}
               >
-                {maxed ? 'MAX' : `${cost.toLocaleString()}🪙`}
+                {maxed ? 'MAX' : locked ? `🔒 Lv ${u.req}` : `${cost.toLocaleString()}🪙`}
               </button>
             </div>
           );

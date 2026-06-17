@@ -42,6 +42,7 @@ import {
   restockReductionMs,
   sprinklerIntervalMs,
   toolRadius,
+  upgradeUnlocked,
   type UpgradeId,
   type Upgrades,
 } from '../progression';
@@ -156,6 +157,14 @@ type Animal = {
 
 const SAVE_KEY = 'solana-valley:save';
 const SAVE_VERSION = 11; // bumped: Cozy Homestead plot layout relocated the farm
+
+// Max global XP a single watering action can grant (1 per newly-wet tile), so a
+// large watering/sprinkler radius can't be spammed into a big XP payout.
+const WATER_XP_CAP = 5;
+
+// Extra mutation-luck multiplier applied at maturity when the tile is wet — a
+// small nudge on top of the Fortune upgrade + Farming skill luck.
+const WET_MUTATION_LUCK = 1.12;
 
 // A gatherable forage node sitting on open grass.
 type ForageNode = {
@@ -1187,14 +1196,17 @@ export class FarmScene extends Phaser.Scene {
         bus.emit('action', 'till');
       }
     } else if (this.selected === 'can') {
-      let did = false;
+      let watered = 0;
       this.forArea(tx, ty, toolRadius(this.upgrades.water), (x, y) => {
-        if (this.waterTile(x, y)) did = true;
+        if (this.waterTile(x, y)) watered++;
       });
-      if (did) {
+      if (watered > 0) {
         this.playAction('water');
         sfx.play('water'); // once per click, not per watered tile
         bus.emit('action', 'water');
+        // A tiny global-XP trickle for tending crops: +1 per newly-watered tile,
+        // capped per action so a big sprinkler radius can't be cheesed for XP.
+        this.gainXp(Math.min(watered, WATER_XP_CAP));
       }
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
@@ -1221,10 +1233,14 @@ export class FarmScene extends Phaser.Scene {
     return true;
   }
 
+  // Returns true only when a *dry* tilled tile becomes wet — re-watering an
+  // already-wet tile re-applies the timer but doesn't count (so it can't be
+  // spammed for the watering XP trickle).
   private waterTile(x: number, y: number): boolean {
     if (!this.tiles[y][x].tilled) return false;
+    const wasDry = !this.isWet(x, y);
     this.water(x, y);
-    return true;
+    return wasDry;
   }
 
   private water(tx: number, ty: number) {
@@ -1283,8 +1299,12 @@ export class FarmScene extends Phaser.Scene {
   private matureCrop(crop: Crop) {
     crop.mature = true;
     crop.stage = STAGES - 1;
-    crop.mutation = this.forcedMutation ?? pickMutation(fortuneLuck(this.upgrades.fortune) * this.mods().mutationLuckMult);
-    crop.wetAtMature = this.isWet(crop.tx, crop.ty);
+    // Mutation luck = Fortune upgrade × Farming-skill luck, with a small extra
+    // nudge if the tile is wet at maturity (watering pays off beyond growth/sale).
+    const wet = this.isWet(crop.tx, crop.ty);
+    const luck = fortuneLuck(this.upgrades.fortune) * this.mods().mutationLuckMult * (wet ? WET_MUTATION_LUCK : 1);
+    crop.mutation = this.forcedMutation ?? pickMutation(luck);
+    crop.wetAtMature = wet;
     crop.quality = rollQuality(this.qualityLuck());
     crop.matureAt = this.time.now;
     crop.withered = false;
@@ -1806,8 +1826,9 @@ export class FarmScene extends Phaser.Scene {
       if (!this.achievements.has(a.id) && a.test(stats)) {
         this.achievements.add(a.id);
         this.coins += a.reward;
+        this.gainXp(a.xp); // achievements feed the global level too
         sfx.play('achievement');
-        this.toast(`🏆 ${a.name}!  +${a.reward}🪙`);
+        this.toast(`🏆 ${a.name}!  +${a.reward}🪙 · +${a.xp} XP`);
       }
     }
   }
@@ -1815,6 +1836,11 @@ export class FarmScene extends Phaser.Scene {
   private buyUpgrade(id: string) {
     const def = UPGRADE_BY_ID[id as UpgradeId];
     if (!def) return;
+    const playerLevel = levelInfo(this.xp).level;
+    if (!upgradeUnlocked(def, playerLevel)) {
+      this.toast(`Reach level ${def.req} to unlock the ${def.name}`);
+      return;
+    }
     const lvl = this.upgrades[def.id];
     if (lvl >= def.max) {
       this.toast('Already maxed');
@@ -2152,6 +2178,7 @@ export class FarmScene extends Phaser.Scene {
         this.coins += coins;
         this.earned += coins;
         this.addSkillXp('fishing', 12); // still grants fishing XP
+        this.gainXp(harvestXp(coins)); // and the global level
         sfx.play('achievement');
         const chest = this.add.image(cx, cy - 6, 'p_star').setScale(3).setDepth(99990).setTint(0xffd21a);
         this.tweens.add({
@@ -2175,6 +2202,7 @@ export class FarmScene extends Phaser.Scene {
       this.coins += coins;
       this.earned += coins;
       this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
+      this.gainXp(harvestXp(coins)); // fishing feeds the global level (scaled to value)
       sfx.play(legendary ? 'achievement' : 'sell');
       // A brief fish popup that arcs up out of the water, tinted to the catch.
       const fish = this.add.image(cx, cy - 6, 'p_fish').setScale(legendary ? 3 : 2.4).setDepth(99990).setTint(legendary ? 0xffd21a : f.tint);
@@ -2282,6 +2310,7 @@ export class FarmScene extends Phaser.Scene {
       this.coins += coins;
       this.earned += coins;
       this.addSkillXp('foraging', forageXp(n.forage));
+      this.gainXp(harvestXp(coins)); // foraging feeds the global level (scaled to value)
       sfx.play(gem ? 'achievement' : 'sell');
       this.burst(cx, cy - 6, 'p_star', {
         speed: { min: 30, max: 90 }, lifespan: 700, scale: { start: 1, end: 0 },

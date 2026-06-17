@@ -39,6 +39,7 @@ export type UpgradeDef = {
   max: number;
   cost: (level: number) => number; // cost to go from `level` -> level+1
   desc: (level: number) => string; // effect at a given level
+  req?: number; // required global level to buy at all (undefined = always available)
 };
 
 const areaDesc = (lvl: number) => ['1 tile', '3×3 tiles', '5×5 tiles', '7×7 tiles'][lvl] ?? 'huge';
@@ -47,9 +48,9 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'water', name: 'Watering Can', icon: 'assets/sprout-ui/tool_can.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
   { id: 'hoe', name: 'Hoe', icon: 'assets/sprout-ui/tool_hoe.png', max: 3, cost: (l) => 150 * (l + 1) * (l + 1), desc: areaDesc },
   { id: 'growth', name: 'Fertilizer', icon: 'assets/sprout-ui/tool_seed.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
-  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck` },
+  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 400 * (l + 1) * (l + 1), desc: (l) => `+${l * 20}% mutation luck`, req: 4 },
   { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
-  { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`) },
+  { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`), req: 6 },
   { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 350 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
 ];
 
@@ -68,6 +69,9 @@ export const restockReductionMs = (lvl: number) => lvl * 20_000;
 export const marketBonus = (lvl: number) => 1 + 0.1 * lvl; // crop sale price multiplier
 export const sprinklerIntervalMs = (lvl: number) => (lvl > 0 ? 45_000 / lvl : Infinity);
 
+// An upgrade is buyable only once the player's global level meets its `req`.
+export const upgradeUnlocked = (def: UpgradeDef, level: number) => !def.req || level >= def.req;
+
 // ---- achievements -------------------------------------------------------
 
 export type ProgressStats = {
@@ -83,18 +87,23 @@ export type Achievement = {
   name: string;
   desc: string;
   reward: number; // coins
+  xp: number; // global XP granted on claim (≈ reward/10, min 25)
   test: (s: ProgressStats) => boolean;
 };
 
+// Global XP for an achievement: roughly proportional to its coin reward so big
+// milestones nudge the level meter, with a small floor so cheap ones still count.
+const achXp = (reward: number) => Math.max(25, Math.round(reward / 10));
+
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_harvest', name: 'First Sprout', desc: 'Harvest your first crop', reward: 50, test: (s) => s.harvested >= 1 },
-  { id: 'green_thumb', name: 'Green Thumb', desc: 'Harvest 50 crops', reward: 500, test: (s) => s.harvested >= 50 },
-  { id: 'farmhand', name: 'Farmhand', desc: 'Harvest 250 crops', reward: 2500, test: (s) => s.harvested >= 250 },
-  { id: 'first_mutation', name: 'Oddity', desc: 'Find your first mutation', reward: 250, test: (s) => s.mutationsFound >= 1 },
-  { id: 'mutant', name: 'Mutation Master', desc: 'Find 25 mutations', reward: 3000, test: (s) => s.mutationsFound >= 25 },
-  { id: 'botanist', name: 'Botanist', desc: 'Discover 8 different plants', reward: 1000, test: (s) => s.plantsDiscovered >= 8 },
-  { id: 'collector', name: 'Master Collector', desc: 'Discover all 19 plants', reward: 12000, test: (s) => s.plantsDiscovered >= 19 },
-  { id: 'rich', name: 'Tidy Profit', desc: 'Earn 10,000 coins total', reward: 1000, test: (s) => s.earned >= 10000 },
-  { id: 'tycoon', name: 'Valley Tycoon', desc: 'Earn 100,000 coins total', reward: 15000, test: (s) => s.earned >= 100000 },
-  { id: 'seasoned', name: 'Seasoned Farmer', desc: 'Reach level 10', reward: 2000, test: (s) => s.level >= 10 },
+  { id: 'first_harvest', name: 'First Sprout', desc: 'Harvest your first crop', reward: 50, xp: achXp(50), test: (s) => s.harvested >= 1 },
+  { id: 'green_thumb', name: 'Green Thumb', desc: 'Harvest 50 crops', reward: 500, xp: achXp(500), test: (s) => s.harvested >= 50 },
+  { id: 'farmhand', name: 'Farmhand', desc: 'Harvest 250 crops', reward: 2500, xp: achXp(2500), test: (s) => s.harvested >= 250 },
+  { id: 'first_mutation', name: 'Oddity', desc: 'Find your first mutation', reward: 250, xp: achXp(250), test: (s) => s.mutationsFound >= 1 },
+  { id: 'mutant', name: 'Mutation Master', desc: 'Find 25 mutations', reward: 3000, xp: achXp(3000), test: (s) => s.mutationsFound >= 25 },
+  { id: 'botanist', name: 'Botanist', desc: 'Discover 8 different plants', reward: 1000, xp: achXp(1000), test: (s) => s.plantsDiscovered >= 8 },
+  { id: 'collector', name: 'Master Collector', desc: 'Discover all 19 plants', reward: 12000, xp: achXp(12000), test: (s) => s.plantsDiscovered >= 19 },
+  { id: 'rich', name: 'Tidy Profit', desc: 'Earn 10,000 coins total', reward: 1000, xp: achXp(1000), test: (s) => s.earned >= 10000 },
+  { id: 'tycoon', name: 'Valley Tycoon', desc: 'Earn 100,000 coins total', reward: 15000, xp: achXp(15000), test: (s) => s.earned >= 100000 },
+  { id: 'seasoned', name: 'Seasoned Farmer', desc: 'Reach level 10', reward: 2000, xp: achXp(2000), test: (s) => s.level >= 10 },
 ];
