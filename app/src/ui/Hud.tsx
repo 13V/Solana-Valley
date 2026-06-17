@@ -74,6 +74,11 @@ export function Hud({
           <img className="dn-frame" src={`assets/sprout-ui/widget_${phase}.png?6`} alt={PHASE_ICON[phase].emoji} />
           <span className="dn-date">Day {day} · {clock}</span>
         </div>
+        {/* Compact day/time pill shown only on mobile, where the big decorative
+            day/night widget is hidden to save screen space (see mobile.css). */}
+        <span className="badge daynight-mini" title={`Day ${day} · ${clock}`}>
+          {PHASE_ICON[phase].emoji} Day {day} · {clock}
+        </span>
         <div className="hud-stats">
           <span className="badge coins">
             <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
