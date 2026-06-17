@@ -1,0 +1,96 @@
+/* =====================================================================
+   MOBILE / SMALL-SCREEN LAYOUT
+   ---------------------------------------------------------------------
+   The HUD chrome is sized for desktop widths. On phones the centered
+   10-icon toolbar and the top-right wallet/island cluster overflow the
+   viewport (see the toolbar getting clipped at both edges and the
+   "Connect wallet…" hint running off the right). This sheet fluidly
+   shrinks the chrome so everything fits from ~320px up.
+
+   Imported LAST (see main.tsx) so these win over index.css / icons.css /
+   the per-component sheets without needing !important on every rule.
+   Media queries don't change specificity, so selectors here mirror the
+   base ones and rely on load order to break ties.
+   ===================================================================== */
+
+@media (max-width: 640px) {
+  /* Tighter screen-edge padding to reclaim width for the HUD rows. */
+  .hud {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  /* --- Top toolbar: all 10 icon buttons must stay on one row ---------
+     Size each button fluidly from the viewport width so the row always
+     fits: (100vw − side margins − gaps − tray border) / 10 buttons,
+     capped at the desktop 44px. */
+  .hud-buttons {
+    top: 4px;
+    gap: 2px;
+  }
+  .iconbtn {
+    width: clamp(26px, calc((100vw - 48px) / 10), 44px);
+    height: clamp(26px, calc((100vw - 48px) / 10), 44px);
+    font-size: 15px;
+  }
+  /* Icon scales with its (now fluid) button instead of a fixed 24px. */
+  .iconbtn .btn-ico {
+    width: 64%;
+    height: 64%;
+  }
+  /* Thin the wooden tray's border/padding so it doesn't eat the row. */
+  .ui-skin .hud-buttons {
+    border-width: 6px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  /* --- Top-left day/night + stats stack ----------------------------- */
+  .daynight {
+    width: 124px;
+  }
+
+  /* --- Top-right wallet / island cluster ----------------------------
+     Cap the cluster width so the long "Connect wallet for multiplayer"
+     hint wraps instead of running off-screen, and shrink the chrome. */
+  .hud-right {
+    max-width: 56vw;
+    gap: 5px 6px;
+  }
+  .hud-right .badge {
+    white-space: normal;
+    font-size: 11px;
+    padding: 4px 7px;
+    line-height: 1.25;
+  }
+  .hud-right .btn.sm {
+    font-size: 11px;
+  }
+  .wallet-adapter-button {
+    height: 30px !important;
+    font-size: 11px !important;
+    padding: 0 8px !important;
+  }
+
+  /* --- Goals checklist ----------------------------------------------
+     Narrower and nudged up beneath the smaller stat stack. Stays
+     collapsible via its header. */
+  .goals-hud {
+    top: 196px;
+    width: 148px;
+    font-size: 11px;
+  }
+  .goals-head,
+  .goals-master,
+  .goals-label {
+    font-size: 11px;
+  }
+
+  /* --- Hotbar: keep all three tool slots on one row on narrow phones - */
+  .hotbar {
+    gap: 5px;
+  }
+  .slot {
+    width: clamp(74px, calc((100vw - 28px) / 3 - 6px), 104px);
+  }
+}
