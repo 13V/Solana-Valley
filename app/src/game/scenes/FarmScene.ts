@@ -197,7 +197,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 14; // bumped: added plotExpansion (purchased crop-bed columns; defaults to 0 on older saves)
+const SAVE_VERSION = 15; // bumped: added px/py player position + plotIndex (owned homestead) so refresh restores where you were; defaults preserve older saves
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -249,6 +249,12 @@ type SaveData = {
   perks: ChosenPerks;
   respecs?: number; // v12+: perk respecs done. Optional so older saves still load.
   plotExpansion?: number; // v14+: purchased crop-bed expansion columns. Optional so older saves default to 0.
+  // v15+: where the player was standing (rounded world pixels) and which homestead
+  // they owned, so a refresh/reconnect restores position + plot instead of yanking
+  // them to the create() spawn. Optional so older saves default cleanly.
+  px?: number;
+  py?: number;
+  plotIndex?: number;
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -2605,6 +2611,11 @@ export class FarmScene extends Phaser.Scene {
       perks: this.perks,
       respecs: this.respecs,
       plotExpansion: this.plotExpansion,
+      // Restore the player exactly where they were on the next load (rounded to
+      // whole pixels — sub-pixel precision is meaningless here).
+      px: Math.round(this.player.x),
+      py: Math.round(this.player.y),
+      plotIndex: this.myPlotIndex,
     };
     try {
       const json = JSON.stringify(data);
@@ -2624,12 +2635,22 @@ export class FarmScene extends Phaser.Scene {
     } catch {
       return false;
     }
-    // Accept the current version (14) and v11–v13. Each bump only ADDED fields:
+    // Accept the current version (15) and v11–v14. Each bump only ADDED fields:
     // v11→v12 added the `respecs` counter; v12→v13 added `upgradeForks`;
-    // v13→v14 added `plotExpansion`. Every other field is read defensively with
-    // `?? default`, so older saves migrate cleanly — respecs defaults to 0,
-    // upgradeForks defaults to {} and plotExpansion defaults to 0 below.
-    if (!data || (data.v !== SAVE_VERSION && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
+    // v13→v14 added `plotExpansion`; v14→v15 added `px`/`py`/`plotIndex`. Every
+    // other field is read defensively with `?? default`, so older saves migrate
+    // cleanly — respecs defaults to 0, upgradeForks defaults to {}, plotExpansion
+    // defaults to 0, and the v15 position/plot fields default below.
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 14 && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
+
+    // Re-point the owned plot BEFORE any tiles/crops are placed: tile/crop coords
+    // are stored relative to the owned-plot origin (myFarmRect), so the index must
+    // be correct before placement or the farm renders on the wrong homestead.
+    // Absent (older saves / single-player) ⇒ plot 0, the create() default.
+    this.myPlotIndex =
+      Number.isInteger(data.plotIndex) && data.plotIndex! >= 0 && data.plotIndex! < HOMESTEADS.length
+        ? data.plotIndex!
+        : 0;
 
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
@@ -2738,7 +2759,28 @@ export class FarmScene extends Phaser.Scene {
         crop.sprite.setFrame(plant.cropRow * 5 + ns);
       }
     }
+
+    // create() set up the owned-plot visuals for the DEFAULT plot 0 before this
+    // load ran; re-run them now so a restored non-0 plot gets its overlays/gate.
+    // Idempotent and safe for plot 0 too.
+    this.setupOwnedPlot();
+
+    // Restore the player exactly where they were (v15+). Absent ⇒ leave the
+    // create() spawn (centre of the owned farm).
+    if (typeof data.px === 'number' && typeof data.py === 'number') {
+      this.player.setPosition(data.px, data.py);
+    }
     return true;
+  }
+
+  // (Re)apply the visuals for the currently-owned homestead: tilled overlays,
+  // the crop-bed tint/unlock rows, and the swinging gate. Used after a save load
+  // restores a non-0 plot and on a multiplayer plot change. Idempotent — safe to
+  // run for plot 0 or repeatedly.
+  private setupOwnedPlot() {
+    this.ensureFarmOverlays();
+    this.markPlayerFarm();
+    this.moveGateTo(this.myPlotIndex);
   }
 
   private toast(msg: string) {
@@ -2943,6 +2985,9 @@ export class FarmScene extends Phaser.Scene {
       if (p.id === this.myMpId) continue; // never spawn an avatar for ourselves
       let rp = this.remotePlayers.get(p.id);
       if (!rp) {
+        // A brand-new peer just appeared — rebroadcast our farm snapshot promptly
+        // (next heartbeat) so they see our existing crops without waiting.
+        this.farmDirty = true;
         // Place them at their own plot's gate until their first pose arrives.
         const gate = homesteadGateTile(p.plot);
         rp = this.createRemote(
@@ -3294,13 +3339,14 @@ export class FarmScene extends Phaser.Scene {
     if (next !== this.myPlotIndex) {
       this.clearFarmTint(this.myPlotIndex); // un-tint the previously-owned bed
       this.myPlotIndex = next;
-      this.ensureFarmOverlays();            // create the new bed's tilled overlays
-      this.markPlayerFarm();                // tint + unlock-rows on the new bed
-      this.moveGateTo(next);                // relocate the swinging gate
+      this.setupOwnedPlot();                // new bed's overlays + tint + gate
+      // A genuine new/changed plot relocates the player to the plaza and guides
+      // them to the gate. A refresh/reconnect that returns the SAME plot does NOT
+      // teleport — the player stays exactly where they were (and at the position
+      // restored from the save).
+      this.spawnAtPlaza();
+      this.showGuideToGate();
     }
-    // Always (re)spawn at the plaza centre and guide the player to the gate.
-    this.spawnAtPlaza();
-    this.showGuideToGate();
   }
 
   // Reset a homestead's crop-bed ground tint back to plain (used when leaving an

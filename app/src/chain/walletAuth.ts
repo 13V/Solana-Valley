@@ -40,6 +40,65 @@ export function buildAuthMessage(wallet: string, now: Date = new Date()): string
 // the lifetime of the page (which is the lifetime of a "session" here).
 const cache = new Map<string, WalletAuth>();
 
+// localStorage key for a wallet's persisted auth, so a page refresh reuses an
+// existing valid signature instead of re-prompting the SAME user on their own
+// device. Server verification is unchanged — a stale stored sig is simply not
+// reused (it would be rejected anyway).
+const storageKey = (wallet: string) => `solana-valley:auth:${wallet}`;
+
+// Server accepts signatures up to 24h old; leave ~1h of margin so a reused sig
+// doesn't age out mid-request. Below this, treat a stored auth as expired.
+const AUTH_TTL_MS = 23 * 60 * 60 * 1000;
+
+// Pull the embedded ISO `ts:` out of a signed message and return its epoch ms,
+// or null if absent/unparseable. Matches the format from buildAuthMessage and
+// the server's timestamp check in app/api/_auth.ts.
+function authTimestampMs(message: string): number | null {
+  const match = message.match(
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/,
+  );
+  if (!match) return null;
+  const ts = Date.parse(match[0]);
+  return Number.isNaN(ts) ? null : ts;
+}
+
+// True while a stored auth is still inside the (margined) 24h server window.
+function isAuthFresh(auth: WalletAuth): boolean {
+  const ts = authTimestampMs(auth.message);
+  if (ts === null) return false;
+  return Date.now() - ts < AUTH_TTL_MS;
+}
+
+// Read a persisted auth for `wallet` from localStorage. Returns null if absent,
+// malformed, or stale. All access is guarded — storage may be unavailable.
+function loadStoredAuth(wallet: string): WalletAuth | null {
+  try {
+    const raw = localStorage.getItem(storageKey(wallet));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<WalletAuth>;
+    if (
+      parsed?.wallet !== wallet ||
+      typeof parsed.message !== 'string' ||
+      typeof parsed.signature !== 'string'
+    ) {
+      return null;
+    }
+    const auth: WalletAuth = { wallet, message: parsed.message, signature: parsed.signature };
+    return isAuthFresh(auth) ? auth : null;
+  } catch {
+    return null;
+  }
+}
+
+// Persist a freshly-signed auth so a refresh reuses it within the valid window.
+function storeAuth(auth: WalletAuth): void {
+  try {
+    localStorage.setItem(storageKey(auth.wallet), JSON.stringify(auth));
+  } catch {
+    // storage may be unavailable (private mode); the in-memory cache still works
+  }
+}
+
 // In-flight signing promises, keyed by wallet, so concurrent callers (cloud-save
 // + multiplayer mounting together) share a SINGLE signature prompt instead of
 // racing two wallet popups.
@@ -55,8 +114,16 @@ export async function getWalletAuth(
   if (!publicKey || !signMessage) return null;
   const wallet = publicKey.toBase58();
 
+  // In-memory cache (this tab), then localStorage (survives a refresh) — reuse a
+  // stored auth only while it's still within the server's valid window.
   const cached = cache.get(wallet);
-  if (cached) return cached;
+  if (cached && isAuthFresh(cached)) return cached;
+
+  const stored = loadStoredAuth(wallet);
+  if (stored) {
+    cache.set(wallet, stored);
+    return stored;
+  }
 
   const pending = inFlight.get(wallet);
   if (pending) return pending;
@@ -68,6 +135,7 @@ export async function getWalletAuth(
       const signature = bs58.encode(sigBytes);
       const auth: WalletAuth = { wallet, message, signature };
       cache.set(wallet, auth);
+      storeAuth(auth); // write through so a refresh reuses it within 24h
       return auth;
     } catch {
       // User rejected the prompt or the wallet errored: disable gracefully.
@@ -87,7 +155,15 @@ export function clearWalletAuth(wallet?: string): void {
   if (wallet) {
     cache.delete(wallet);
     inFlight.delete(wallet);
+    try { localStorage.removeItem(storageKey(wallet)); } catch { /* ignore */ }
   } else {
+    // Clear every persisted auth too, not just the in-memory caches.
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('solana-valley:auth:')) localStorage.removeItem(k);
+      }
+    } catch { /* ignore */ }
     cache.clear();
     inFlight.clear();
   }
