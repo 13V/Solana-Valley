@@ -22,7 +22,7 @@ export async function fetchShopBought(
       .from('shop_buys')
       .select('plant,bought')
       .eq('island', island)
-      .eq('window', window);
+      .eq('win', window);
     if (error || !data) return null;
     const out: Record<string, number> = {};
     for (const row of data as Array<{ plant: string; bought: number }>) {
@@ -47,7 +47,7 @@ export async function buySeedRemote(
   try {
     const { data, error } = await supabase.rpc('buy_seed', {
       p_island: island,
-      p_window: window,
+      p_win: window,
       p_plant: plant,
       p_cap: cap,
     });
