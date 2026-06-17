@@ -33,6 +33,7 @@ import {
 import {
   ACHIEVEMENTS,
   EMPTY_UPGRADES,
+  EMPTY_UPGRADE_FORKS,
   UPGRADE_BY_ID,
   fortuneLuck,
   growthFactor,
@@ -44,8 +45,11 @@ import {
   sprinklerIntervalMs,
   toolRadius,
   upgradeUnlocked,
+  upgradeForkAvailable,
+  forkEffect,
   type UpgradeId,
   type Upgrades,
+  type UpgradeForks,
 } from '../progression';
 import { collectionBonus } from '../collection';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
@@ -159,7 +163,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 12; // bumped: added perk-respec counter (defaults to 0 on older saves)
+const SAVE_VERSION = 13; // bumped: added maxed-upgrade forks (defaults to {} on older saves)
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -199,6 +203,7 @@ type SaveData = {
   // progression
   xp: number;
   upgrades: Upgrades;
+  upgradeForks?: UpgradeForks; // v13+: chosen maxed-upgrade forks. Optional so older saves still load.
   earned: number;
   harvested: number;
   mutationsFound: number;
@@ -253,6 +258,8 @@ export class FarmScene extends Phaser.Scene {
   // progression
   private xp = 0;
   private upgrades: Upgrades = { ...EMPTY_UPGRADES };
+  // Chosen maxed-upgrade specializations (upgrade id -> fork id). See progression.ts.
+  private upgradeForks: UpgradeForks = { ...EMPTY_UPGRADE_FORKS };
   private earned = 0;
   private harvested = 0;
   private mutationsFound = 0;
@@ -460,6 +467,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
+      bus.on('ui:chooseUpgradeFork', ({ id, fork }) => this.chooseUpgradeFork(id, fork)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
@@ -514,6 +522,12 @@ export class FarmScene extends Phaser.Scene {
 
   private recomputeMods() {
     this.modCache = activeModifiers(this.skills, this.perks);
+  }
+
+  // Active fork-effect bag for a maxed upgrade (neutral defaults if unchosen/no
+  // fork). Effect sites read named fields off this (see progression.forkEffect).
+  private fork(id: UpgradeId) {
+    return forkEffect(id, this.upgradeForks);
   }
 
   // ---- owned-plot geometry (driven by myPlotIndex) ------------------------
@@ -1308,8 +1322,20 @@ export class FarmScene extends Phaser.Scene {
     // Mutation luck = Fortune upgrade × Farming-skill luck, with a small extra
     // nudge if the tile is wet at maturity (watering pays off beyond growth/sale).
     const wet = this.isWet(crop.tx, crop.ty);
-    const luck = fortuneLuck(this.upgrades.fortune) * this.mods().mutationLuckMult * (wet ? WET_MUTATION_LUCK : 1);
-    crop.mutation = this.forcedMutation ?? pickMutation(luck);
+    // Fortune "Lucky Clover" fork adds flat mutation luck; Sprinkler "Misting"
+    // fork adds extra luck only on wet tiles. "Jackpot" fork biases the top
+    // mutations (Gold/Rainbow) via topLuck instead of lifting every tier.
+    const fortuneFork = this.fork('fortune');
+    const mistBonus = wet ? this.fork('sprinkler').mutationLuckMult ?? 0 : 0;
+    const luck =
+      fortuneLuck(this.upgrades.fortune) *
+      this.mods().mutationLuckMult *
+      (1 + (fortuneFork.mutationLuckMult ?? 0) + mistBonus) *
+      (wet ? WET_MUTATION_LUCK : 1);
+    // topMutationLuckMult is an additive bonus to the top-mutation multiplier
+    // (1 ⇒ ×2 jackpot odds, 0 ⇒ none) to match the rest of the additive bag.
+    const topLuck = 1 + (fortuneFork.topMutationLuckMult ?? 0);
+    crop.mutation = this.forcedMutation ?? pickMutation(luck, topLuck);
     crop.wetAtMature = wet;
     crop.quality = rollQuality(this.qualityLuck());
     crop.matureAt = this.time.now;
@@ -1439,8 +1465,10 @@ export class FarmScene extends Phaser.Scene {
     const m = crop.mutation ?? MUTATION_BY_ID.normal;
     const value = cropValue(crop.plant, m, crop.wetAtMature, crop.quality, crop.withered);
     const sk = stackKey(crop.plant.id, m.id, crop.wetAtMature, crop.quality, crop.withered);
-    // Bountiful / Master Farmer: a chance this harvest yields two of the crop.
-    const doubled = Math.random() < mods.cropDoubleChance;
+    // Bountiful / Master Farmer (skill) + Fertilizer "Bountiful" fork: a chance
+    // this harvest yields two of the crop.
+    const doubleChance = mods.cropDoubleChance + (this.fork('growth').cropDoubleChance ?? 0);
+    const doubled = Math.random() < doubleChance;
     this.harvestInv[sk] = (this.harvestInv[sk] ?? 0) + (doubled ? 2 : 1);
 
     const cx = tx * TILE + TILE / 2;
@@ -1618,6 +1646,16 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // Per-crop sale value for one stack item, before count/global multipliers but
+  // INCLUDING the Market Stall forks: "Connoisseur" lifts Legendary+ crops, then
+  // "Wholesale" adds a flat coin bonus per crop. Shared by sellStack/sellAll.
+  private cropSaleUnit(plant: Plant, mutation: Mutation, wet: boolean, quality: Quality, withered: boolean): number {
+    const fork = this.fork('market');
+    let v = cropValue(plant, mutation, wet, quality, withered);
+    if ((fork.rareSaleMult ?? 0) > 0 && rarityRank(plant.rarity) >= 3) v *= 1 + (fork.rareSaleMult ?? 0);
+    return v + (fork.saleFlatBonus ?? 0);
+  }
+
   private sellStack(key: string) {
     const count = this.harvestInv[key] ?? 0;
     if (count <= 0) return;
@@ -1625,7 +1663,7 @@ export class FarmScene extends Phaser.Scene {
     const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
     const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const value = Math.round(
-      cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
+      this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
         this.mods().cropValueMult *
@@ -1665,7 +1703,7 @@ export class FarmScene extends Phaser.Scene {
     for (const [key, count] of Object.entries(this.harvestInv)) {
       const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
       const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
-      total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
+      total += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
     }
     total = Math.round(total * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult());
     if (total <= 0) {
@@ -1766,10 +1804,18 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private restock() {
-    this.shopStock = rollShop(levelInfo(this.xp).level);
-    this.restockMs = Math.max(20_000, RESTOCK_MS - restockReductionMs(this.upgrades.supply));
+    this.shopStock = this.rollShopForPlayer();
+    // Shop Supply "Stockpile" fork shaves additional time off the restock timer.
+    const reduction = restockReductionMs(this.upgrades.supply) + (this.fork('supply').restockReductionMs ?? 0);
+    this.restockMs = Math.max(20_000, RESTOCK_MS - reduction);
     this.toast('🛒 The seed shop restocked!');
     this.emitState();
+  }
+
+  // Roll the shop at the player's current level, applying the Shop Supply
+  // "Connoisseur's Eye" fork's rare-seed luck when chosen.
+  private rollShopForPlayer(): Record<string, number> {
+    return rollShop(levelInfo(this.xp).level, this.fork('supply').rareSeedLuckMult ?? 1);
   }
 
   private gainXp(amount: number) {
@@ -1779,7 +1825,7 @@ export class FarmScene extends Phaser.Scene {
     if (after > before) {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
-      this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
+      this.shopStock = this.rollShopForPlayer(); // reveal newly-unlocked tiers right away
       if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 2 + before)) {
         this.markPlayerFarm(); // reveal the newly-unlocked crop row
         this.toast('🌱 New farm row unlocked!');
@@ -1840,9 +1886,10 @@ export class FarmScene extends Phaser.Scene {
     this.saveState();
   }
 
-  // Wipe all chosen milestone perks for an escalating coin cost (first is free),
-  // so every unlocked milestone becomes a pending choice again. Skill XP/levels
-  // are untouched — only the perk picks reset. A plain coin sink, no dark pattern.
+  // Wipe all chosen milestone perks AND maxed-upgrade forks for an escalating
+  // coin cost (first is free), so every unlocked milestone/fork becomes a pending
+  // choice again. Skill XP/levels and upgrade levels are untouched — only the
+  // picks reset. A plain coin sink, no dark pattern.
   private respecPerks() {
     const cost = respecCost(this.respecs);
     if (this.coins < cost) {
@@ -1852,9 +1899,10 @@ export class FarmScene extends Phaser.Scene {
     this.coins -= cost;
     this.respecs += 1;
     this.perks = { ...EMPTY_PERKS };
+    this.upgradeForks = { ...EMPTY_UPGRADE_FORKS }; // forks reset alongside perks
     this.recomputeMods(); // dropping perks changes the modifier bag immediately
     sfx.play('upgrade');
-    this.toast('Perks reset — choose again!');
+    this.toast('Perks & upgrade forks reset — choose again!');
     this.emitState();
     this.saveState();
   }
@@ -1899,8 +1947,30 @@ export class FarmScene extends Phaser.Scene {
     this.coins -= cost;
     this.upgrades[def.id] = lvl + 1;
     sfx.play('upgrade');
-    this.toast(`${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`);
+    let msg = `${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`;
+    // Reaching MAX on a fork-able upgrade unlocks its 1-of-2 specialization.
+    if (def.fork && this.upgrades[def.id] >= def.max) {
+      msg += ' MAX — choose a specialization in Upgrades!';
+    }
+    this.toast(msg);
     this.emitState();
+  }
+
+  // Lock in a maxed upgrade's 1-of-2 specialization (mirrors choosePerk). Only
+  // valid once the upgrade is at MAX level and the fork id is one of the two on
+  // offer; once chosen it's locked (a perk respec clears it — see respecPerks).
+  private chooseUpgradeFork(id: UpgradeId, fork: string) {
+    const def = UPGRADE_BY_ID[id];
+    if (!def?.fork) return;
+    if (!upgradeForkAvailable(def, this.upgrades[id] ?? 0)) return; // not maxed yet
+    if (fork !== def.fork.a.id && fork !== def.fork.b.id) return; // unknown fork id
+    if (this.upgradeForks[id]) return; // already chosen (respec to change)
+    this.upgradeForks[id] = fork;
+    const chosen = fork === def.fork.a.id ? def.fork.a : def.fork.b;
+    sfx.play('upgrade');
+    this.toast(`${def.icon} ${chosen.name} — ${chosen.desc}`);
+    this.emitState();
+    this.saveState();
   }
 
   // ---- animals ------------------------------------------------------------
@@ -2418,6 +2488,7 @@ export class FarmScene extends Phaser.Scene {
       crops,
       xp: this.xp,
       upgrades: this.upgrades,
+      upgradeForks: this.upgradeForks,
       earned: this.earned,
       harvested: this.harvested,
       mutationsFound: this.mutationsFound,
@@ -2447,10 +2518,11 @@ export class FarmScene extends Phaser.Scene {
     } catch {
       return false;
     }
-    // Accept the current version and v11. v11→v12 only added the additive
-    // `respecs` field (every other field is read defensively with `?? default`),
-    // so an older save migrates cleanly with respecs defaulting to 0 below.
-    if (!data || (data.v !== SAVE_VERSION && data.v !== 11)) return false;
+    // Accept the current version (13), v12 and v11. Each bump only ADDED fields:
+    // v11→v12 added the `respecs` counter; v12→v13 added `upgradeForks`. Every
+    // other field is read defensively with `?? default`, so older saves migrate
+    // cleanly — respecs defaults to 0 and upgradeForks defaults to {} below.
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 12 && data.v !== 11)) return false;
 
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
@@ -2463,6 +2535,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.xp = data.xp ?? 0;
     this.upgrades = { ...EMPTY_UPGRADES, ...(data.upgrades ?? {}) };
+    this.upgradeForks = { ...EMPTY_UPGRADE_FORKS, ...(data.upgradeForks ?? {}) }; // v13 field; older saves default to {}
     this.earned = data.earned ?? 0;
     this.harvested = data.harvested ?? 0;
     this.mutationsFound = data.mutationsFound ?? 0;
@@ -2582,6 +2655,7 @@ export class FarmScene extends Phaser.Scene {
       skills: { ...this.skills },
       perks: { ...this.perks },
       respecs: this.respecs,
+      upgradeForks: { ...this.upgradeForks },
     });
   }
 
@@ -3032,7 +3106,9 @@ export class FarmScene extends Phaser.Scene {
       // skill. Clamped at MAX_GROWTH_MULT so stacked bonuses can't trivialize
       // growth (keeps wet/Fertilizer meaningful with a sane floor on grow time).
       // growthMult is a debug/dev knob and stays outside the clamp.
-      const speed = Math.min(MAX_GROWTH_MULT, (wet ? 2 : 1) * growthFactor(this.upgrades.growth) * this.mods().cropGrowthMult);
+      // Fertilizer "Rapid" fork adds extra growth speed, still under the clamp.
+      const rapid = 1 + (this.fork('growth').growthMult ?? 0);
+      const speed = Math.min(MAX_GROWTH_MULT, (wet ? 2 : 1) * growthFactor(this.upgrades.growth) * rapid * this.mods().cropGrowthMult);
       crop.grownMs += delta * this.growthMult * speed;
       const total = this.cropGrowMs(crop);
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
@@ -3072,8 +3148,10 @@ export class FarmScene extends Phaser.Scene {
     this.fireflies.emitting = (frac < 0.3 || frac >= 0.82) && !this.raining;
     this.updateWeather(time);
 
-    // Sprinkler upgrade keeps tilled tiles watered on a timer.
-    if (time - this.lastSprinkle > sprinklerIntervalMs(this.upgrades.sprinkler) / this.growthMult) {
+    // Sprinkler upgrade keeps tilled tiles watered on a timer. The "Wide" fork
+    // shortens that interval so soil is re-wet more often.
+    const sprinklerInterval = sprinklerIntervalMs(this.upgrades.sprinkler) * (this.fork('sprinkler').sprinklerIntervalMult ?? 1);
+    if (time - this.lastSprinkle > sprinklerInterval / this.growthMult) {
       this.lastSprinkle = time;
       if (this.upgrades.sprinkler > 0) this.rainWater();
     }

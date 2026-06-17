@@ -1,5 +1,6 @@
 import type { UiState, ClockState } from './types';
 import type { SkillId } from './skills';
+import type { UpgradeId } from './progression';
 
 // Typed pub/sub bridge between the Phaser game (authoritative state) and the
 // React UI overlay. The game emits `state`/`clock`/`toast`; the UI emits
@@ -16,6 +17,7 @@ export interface GameEvents {
   'ui:sellStack': string; // harvest stack key
   'ui:sellAll': void;
   'ui:buyUpgrade': string; // upgrade id
+  'ui:chooseUpgradeFork': { id: UpgradeId; fork: string }; // pick a maxed upgrade's 1-of-2 specialization
   'ui:buyAnimal': string; // animal id
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
   'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones

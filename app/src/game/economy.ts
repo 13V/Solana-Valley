@@ -94,16 +94,20 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
-// Player level at which each rarity tier becomes available in the shop.
+// Player level at which each rarity tier becomes available in the shop. Re-tuned
+// to spread unlocks more evenly across the mid-game: the old curve front-loaded
+// the early tiers then left long dead zones (Legendary→Divine→Celestial spanned
+// ~6/8/8 levels with nothing new). The steps below climb steadily (≈+5/level) so
+// there's a fresh tier to chase roughly every five levels through Lv 30.
 export const RARITY_UNLOCK: Record<Rarity, number> = {
   Common: 1,
-  Uncommon: 2,
-  Rare: 5,
-  Legendary: 9,
-  Mythical: 14,
+  Uncommon: 3,
+  Rare: 7,
+  Legendary: 11,
+  Mythical: 15,
   Divine: 20,
-  Prismatic: 28,
-  Celestial: 36,
+  Prismatic: 25,
+  Celestial: 30,
 };
 
 // ---- mutations ----------------------------------------------------------
@@ -132,9 +136,15 @@ export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
 
 const MUT_TOTAL = MUTATIONS.reduce((s, m) => s + m.weight, 0);
 
+// Top-tier mutations the Fortune "Jackpot" fork specifically biases toward.
+const TOP_MUTATIONS = new Set(['gold', 'rainbow']);
+
 // `luck` (>=1) scales up the odds of non-normal mutations (the Fortune upgrade).
-export function pickMutation(luck = 1): Mutation {
-  if (luck <= 1) {
+// `topLuck` (>=1) applies an EXTRA multiplier to just the top mutations
+// (Gold/Rainbow) — the Fortune "Jackpot" fork — so it skews toward the jackpots
+// rather than lifting every tier evenly.
+export function pickMutation(luck = 1, topLuck = 1): Mutation {
+  if (luck <= 1 && topLuck <= 1) {
     let r = Math.random() * MUT_TOTAL;
     for (const m of MUTATIONS) {
       r -= m.weight;
@@ -142,7 +152,10 @@ export function pickMutation(luck = 1): Mutation {
     }
     return MUTATIONS[0];
   }
-  const weights = MUTATIONS.map((m) => (m.id === 'normal' ? m.weight : m.weight * luck));
+  const weights = MUTATIONS.map((m) => {
+    if (m.id === 'normal') return m.weight;
+    return m.weight * luck * (TOP_MUTATIONS.has(m.id) ? topLuck : 1);
+  });
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < MUTATIONS.length; i++) {
@@ -206,8 +219,9 @@ function randInt(min: number, max: number): number {
 
 // Roll a fresh shop stock map (plantId -> count). Commons always present;
 // rarer tiers appear with decreasing probability — that's the "wait for the
-// rare restock" chase.
-export function rollShop(level = 99): Record<string, number> {
+// rare restock" chase. `rareLuck` (>1, the Shop Supply "Connoisseur's Eye" fork)
+// multiplies the appearance chance of the rarer (Rare+) tiers, clamped to 1.
+export function rollShop(level = 99, rareLuck = 1): Record<string, number> {
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
     if (RARITY_UNLOCK[p.rarity] > level) {
@@ -215,7 +229,8 @@ export function rollShop(level = 99): Record<string, number> {
       continue;
     }
     const r = RARITY[p.rarity];
-    stock[p.id] = Math.random() < r.present ? randInt(r.qty[0], r.qty[1]) : 0;
+    const present = rareLuck > 1 && rarityRank(p.rarity) >= 2 ? Math.min(1, r.present * rareLuck) : r.present;
+    stock[p.id] = Math.random() < present ? randInt(r.qty[0], r.qty[1]) : 0;
   }
   return stock;
 }

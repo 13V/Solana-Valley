@@ -32,6 +32,25 @@ export function harvestXp(baseValue: number): number {
 
 export type UpgradeId = 'water' | 'hoe' | 'growth' | 'fortune' | 'supply' | 'sprinkler' | 'market';
 
+// A one-time specialization offered when an upgrade hits MAX level. Mirrors the
+// skill milestone perk pattern (skills.ts): pick 1-of-2 to fork the upgrade down
+// a thematic path. Effects are a small typed bag the FarmScene effect sites read
+// (see UPGRADE_FORK_DEFAULTS + forkEffect). Keep values CONSERVATIVE so no fork
+// dominates the others.
+export type ForkEffect = {
+  sprinklerIntervalMult?: number; // multiplies the sprinkler auto-water interval (<1 = waters more often)
+  growthMult?: number; // extra crop growth-speed multiplier (still under MAX_GROWTH_MULT)
+  cropDoubleChance?: number; // chance a harvest yields an extra crop
+  mutationLuckMult?: number; // extra mutation-luck multiplier
+  topMutationLuckMult?: number; // extra luck applied ONLY to the top mutations (Gold/Rainbow)
+  saleFlatBonus?: number; // flat extra coins per crop sold
+  rareSaleMult?: number; // extra sale multiplier for higher-rarity crops (Legendary+)
+  restockReductionMs?: number; // extra shop-restock speedup (ms)
+  rareSeedLuckMult?: number; // better odds of rarer seeds appearing on a restock
+};
+
+export type Fork = { id: string; name: string; desc: string; eff: ForkEffect };
+
 export type UpgradeDef = {
   id: UpgradeId;
   name: string;
@@ -40,6 +59,9 @@ export type UpgradeDef = {
   cost: (level: number) => number; // cost to go from `level` -> level+1
   desc: (level: number) => string; // effect at a given level
   req?: number; // required global level to buy at all (undefined = always available)
+  // Optional 1-of-2 specialization unlocked at MAX level (see Fork above). An
+  // upgrade without a meaningful dual path simply omits this (e.g. Hoe/Can).
+  fork?: { a: Fork; b: Fork };
 };
 
 const areaDesc = (lvl: number) => ['1 tile', '3×3 tiles', '5×5 tiles', '7×7 tiles'][lvl] ?? 'huge';
@@ -50,15 +72,35 @@ export const UPGRADES: UpgradeDef[] = [
   // attainable mid-game and worth grabbing.
   { id: 'water', name: 'Watering Can', icon: 'assets/sprout-ui/tool_can.png', max: 3, cost: (l) => 200 + 350 * l, desc: areaDesc },
   { id: 'hoe', name: 'Hoe', icon: 'assets/sprout-ui/tool_hoe.png', max: 3, cost: (l) => 200 + 350 * l, desc: areaDesc },
-  { id: 'growth', name: 'Fertilizer', icon: 'assets/sprout-ui/tool_seed.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed` },
+  { id: 'growth', name: 'Fertilizer', icon: 'assets/sprout-ui/tool_seed.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 15}% growth speed`,
+    fork: {
+      a: { id: 'rapid', name: 'Rapid', desc: '+25% growth speed (under the growth cap)', eff: { growthMult: 0.25 } },
+      b: { id: 'bountiful', name: 'Bountiful', desc: '10% chance a harvest yields a bonus crop', eff: { cropDoubleChance: 0.10 } },
+    } },
   // Fortune: was the priciest upgrade yet the weakest payoff. Cheaper curve +
   // a stronger per-level effect (+30% luck/level) so its ROI matches the rest.
-  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 30}% mutation luck`, req: 4 },
-  { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster` },
-  { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`), req: 6 },
+  { id: 'fortune', name: 'Fortune', icon: 'assets/sprout-ui/icon_star.png', max: 5, cost: (l) => 250 * (l + 1) * (l + 1), desc: (l) => `+${l * 30}% mutation luck`, req: 4,
+    fork: {
+      a: { id: 'clover', name: 'Lucky Clover', desc: '+40% mutation luck across the board', eff: { mutationLuckMult: 0.40 } },
+      b: { id: 'jackpot', name: 'Jackpot', desc: '×2 odds of the top mutations (Gold/Rainbow)', eff: { topMutationLuckMult: 1 } },
+    } },
+  { id: 'supply', name: 'Shop Supply', icon: 'assets/sprout-ui/ic_cart_brown.png', max: 3, cost: (l) => 300 * (l + 1) * (l + 1), desc: (l) => `restock ${l * 20}s faster`,
+    fork: {
+      a: { id: 'stockpile', name: 'Stockpile', desc: 'restock another 15s faster', eff: { restockReductionMs: 15_000 } },
+      b: { id: 'eye', name: "Connoisseur's Eye", desc: '+60% odds of rare seeds on restock', eff: { rareSeedLuckMult: 1.6 } },
+    } },
+  { id: 'sprinkler', name: 'Sprinkler', icon: 'assets/sprout-ui/ic_pond.png', max: 3, cost: (l) => 500 * (l + 1) * (l + 1), desc: (l) => (l === 0 ? 'off' : `auto-waters every ${Math.round(45 / l)}s`), req: 6,
+    fork: {
+      a: { id: 'wide', name: 'Wide', desc: 'auto-waters 25% more often (keeps more soil wet)', eff: { sprinklerIntervalMult: 0.75 } },
+      b: { id: 'misting', name: 'Misting', desc: '+25% mutation luck on watered (wet) tiles', eff: { mutationLuckMult: 0.25 } },
+    } },
   // Market Stall: the best ROI of the lot, so nudged a touch pricier. Its bonus
   // is now surfaced in the sell toast (FarmScene) so players feel it land.
-  { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 450 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price` },
+  { id: 'market', name: 'Market Stall', icon: 'assets/sprout-ui/icon_coin.png', max: 5, cost: (l) => 450 * (l + 1) * (l + 1), desc: (l) => `+${l * 10}% crop sale price`,
+    fork: {
+      a: { id: 'wholesale', name: 'Wholesale', desc: '+12 coins flat per crop sold', eff: { saleFlatBonus: 12 } },
+      b: { id: 'connoisseur', name: 'Connoisseur', desc: '+30% sale price on Legendary+ crops', eff: { rareSaleMult: 0.30 } },
+    } },
 ];
 
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
@@ -85,6 +127,50 @@ export const MAX_GROWTH_MULT = 5;
 
 // An upgrade is buyable only once the player's global level meets its `req`.
 export const upgradeUnlocked = (def: UpgradeDef, level: number) => !def.req || level >= def.req;
+
+// ---- upgrade forks ------------------------------------------------------
+
+// Chosen forks: upgrade id -> chosen fork id. Mirrors ChosenPerks in skills.ts.
+export type UpgradeForks = Partial<Record<UpgradeId, string>>;
+export const EMPTY_UPGRADE_FORKS: UpgradeForks = {};
+
+// Neutral fork-effect bag (every site reads from this shape; absent paths are 0/1).
+export const EMPTY_FORK_EFFECT: Required<ForkEffect> = {
+  sprinklerIntervalMult: 1,
+  growthMult: 0,
+  cropDoubleChance: 0,
+  mutationLuckMult: 0,
+  topMutationLuckMult: 0,
+  saleFlatBonus: 0,
+  rareSaleMult: 0,
+  restockReductionMs: 0,
+  rareSeedLuckMult: 0,
+};
+
+// A fork is only choosable once its upgrade is at MAX level.
+export const upgradeForkAvailable = (def: UpgradeDef, lvl: number) => !!def.fork && lvl >= def.max;
+
+// Resolve the active fork effect for a single upgrade (or the neutral bag if no
+// fork is chosen / the upgrade has no fork). Effect-site callers read named
+// fields off the result and fall back to the neutral defaults automatically.
+export function forkEffect(id: UpgradeId, forks: UpgradeForks): ForkEffect {
+  const def = UPGRADE_BY_ID[id];
+  const chosen = forks[id];
+  if (!def?.fork || !chosen) return EMPTY_FORK_EFFECT;
+  if (chosen === def.fork.a.id) return def.fork.a.eff;
+  if (chosen === def.fork.b.id) return def.fork.b.eff;
+  return EMPTY_FORK_EFFECT;
+}
+
+// The chosen Fork object for an upgrade, or null (used by the UI to label it).
+export function chosenFork(id: UpgradeId, forks: UpgradeForks): Fork | null {
+  const def = UPGRADE_BY_ID[id];
+  const chosen = forks[id];
+  if (!def?.fork || !chosen) return null;
+  if (chosen === def.fork.a.id) return def.fork.a;
+  if (chosen === def.fork.b.id) return def.fork.b;
+  return null;
+}
 
 // ---- achievements -------------------------------------------------------
 
