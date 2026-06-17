@@ -19,6 +19,7 @@ import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { MultiplayerSync } from '../chain/MultiplayerSync';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
+import { ContractAddress } from './ContractAddress';
 import './settings'; // self-applies saved accessibility/volume settings on load
 
 const HELP_SEEN_KEY = 'solana-valley:seen-help';
@@ -82,6 +83,7 @@ export function App() {
           <TouchControls />
           {helpSeen && <TutorialCoach />}
           <Toasts />
+          <ContractAddress />
         </div>
       </div>
     </WalletProvider>

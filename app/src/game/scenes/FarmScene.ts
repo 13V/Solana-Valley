@@ -3263,7 +3263,9 @@ export class FarmScene extends Phaser.Scene {
     const sh = this.scale.height;
     const margin = 12;
     const ox = this.minimapCoarse ? sw - mapW - pad * 2 - margin : margin;
-    const oy = sh - mapH - pad * 2 - margin;
+    // On touch the minimap shares the bottom-right corner with the CA pill, so
+    // lift it to sit above that pill.
+    const oy = sh - mapH - pad * 2 - margin - (this.minimapCoarse ? 40 : 0);
     const bx = ox + pad;
     const by = oy + pad;
     const wx = (x: number) => bx + x * scale;

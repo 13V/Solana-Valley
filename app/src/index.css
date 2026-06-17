@@ -48,6 +48,40 @@ body {
   pointer-events: none;
 }
 
+/* Contract-address pill, pinned bottom-right (copy on click). */
+.ca-pill {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(12, 20, 14, 0.82);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ca-pill:hover {
+  border-color: var(--accent);
+}
+.ca-label {
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+.ca-addr {
+  opacity: 0.92;
+}
+.ca-copy {
+  opacity: 0.7;
+}
+
 .overlay > * {
   pointer-events: auto;
 }
