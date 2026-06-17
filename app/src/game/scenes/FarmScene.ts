@@ -2317,7 +2317,10 @@ export class FarmScene extends Phaser.Scene {
         this.tiles[y][x].obstacle = true;
         this.tiles[y][x].tilled = false;
         this.pondTiles.add(this.key(x, y));
-        this.addCollider(px, py, TILE * 2, TILE * 2);
+        // One tile-sized collider per water tile. (Was TILE*2 — a 64px box on a
+        // 32px tile, which overhung ~16px onto the grass and made an invisible
+        // wall ringing the pond.)
+        this.addCollider(px, py, TILE, TILE);
       }
     }
 
