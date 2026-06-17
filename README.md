@@ -82,7 +82,7 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 - **Synthesized sound effects** (WebAudio, no audio files) with a HUD mute toggle.
 
 **Solana**
-- Connect Phantom/Solflare (devnet); see your address and live SOL balance.
+- Connect Phantom/Solflare (mainnet-beta); see your address and live SOL balance.
 - In-game coins are an off-chain placeholder for the planned `$VALLEY` SPL token.
 
 ## Controls
@@ -116,9 +116,10 @@ npm run preview    # serve the production build
 npm run typecheck  # tsc --noEmit
 ```
 
-To use wallet features, install [Phantom](https://phantom.app/), switch it to
-**Devnet**, then click **Select Wallet**. Grab free devnet SOL from the
-[faucet](https://faucet.solana.com/).
+To use wallet features, install [Phantom](https://phantom.app/) (on
+**Mainnet**), then click **Select Wallet**. Wallet connect is used only to read
+your balance and to sign a one-off auth message for cloud save + multiplayer —
+the game has no on-chain transactions yet, so connecting touches no real funds.
 
 ### Dev / debug URL params
 
@@ -164,4 +165,5 @@ transaction handlers can drop in without restructuring gameplay. Details in
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the Anchor plan in
 [`programs/README.md`](programs/README.md).
 
-> Devnet only for now — nothing here touches real funds.
+> No on-chain transactions yet — wallet connect only reads your balance and
+> signs an auth message, so nothing here moves real funds.

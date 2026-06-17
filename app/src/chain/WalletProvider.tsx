@@ -8,11 +8,17 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 
-// Wraps the app in Solana wallet context. Devnet for now so testing is free;
-// switch to mainnet-beta once the on-chain program ships.
+// Wraps the app in Solana wallet context. Mainnet-beta: the RPC endpoint comes
+// from VITE_SOLANA_RPC (set a reliable provider — Helius/QuickNode/Alchemy — in
+// the Vercel env) and falls back to the public cluster URL, which is heavily
+// rate-limited. The RPC is only used to read the SOL balance; wallet signing
+// (cloud save + multiplayer auth) is network-independent.
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  const network = WalletAdapterNetwork.Mainnet;
+  const endpoint = useMemo(
+    () => import.meta.env.VITE_SOLANA_RPC || clusterApiUrl(network),
+    [network],
+  );
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
     [],
