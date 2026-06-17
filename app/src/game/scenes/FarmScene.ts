@@ -594,13 +594,13 @@ export class FarmScene extends Phaser.Scene {
     if (!skin) return;
     if (!this.ownedSkins.has(id)) {
       if (this.coins < skin.cost) {
-        bus.emit('toast', `Need ${skin.cost.toLocaleString()}🪙 for the ${skin.name} outfit`);
+        bus.emit('toast', `Need ${skin.cost.toLocaleString()}🪙 for the ${skin.name} coat`);
         return;
       }
       this.coins -= skin.cost;
       this.ownedSkins.add(id);
       sfx.play('buy');
-      bus.emit('toast', `Unlocked the ${skin.name} outfit!`);
+      bus.emit('toast', `Unlocked the ${skin.name} coat! 🐾`);
     }
     this.applySkin(id);
     this.saveState();

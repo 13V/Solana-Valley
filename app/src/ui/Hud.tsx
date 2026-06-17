@@ -30,7 +30,7 @@ const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; la
   { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
   { id: 'skills', emoji: '🎯', img: 'assets/sprout-ui/icon_star.png', label: 'Skills' },
   { id: 'almanac', emoji: '📖', img: 'assets/sprout-ui/icon_almanac.png', label: 'Almanac' },
-  { id: 'wardrobe', emoji: '👕', label: 'Wardrobe' },
+  { id: 'wardrobe', emoji: '🐾', label: 'Cat Coats' },
   { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 

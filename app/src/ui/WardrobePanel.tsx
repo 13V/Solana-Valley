@@ -2,8 +2,8 @@ import { SKINS, skinSwatch } from '../game/skins';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 
-// Cozy outfit recolours for the farmer. Classic is free; the rest are a small
-// coin sink. Selecting an unowned outfit buys it (the game validates coins).
+// Cozy coat recolours for the player's cat. Classic is free; the rest are a
+// small coin sink. Selecting an unowned coat buys it (the game validates coins).
 export function WardrobePanel({ onClose }: { onClose: () => void }) {
   const { coins, skin, ownedSkins } = useGameState();
   const owned = new Set(ownedSkins);
@@ -11,8 +11,8 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel">
       <div className="panel-head">
-        <h3>👕 Wardrobe</h3>
-        <span className="muted">recolour your farmhand — cosmetic only</span>
+        <h3>🐾 Cat Coats</h3>
+        <span className="muted">recolour your cat — cosmetic only</span>
         <button className="x" onClick={onClose}>
           <img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" />
         </button>
