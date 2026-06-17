@@ -32,7 +32,9 @@ const PLOTS_PER_ISLAND = 20; // plots 0..19 on each island
 const MAX_ATTEMPTS = 8; // bounded retries when a UNIQUE(island, plot) race loses
 // A plot whose `updated_at` is older than this is treated as abandoned and may
 // be reclaimed by a new player. The client heartbeats well within this window.
-const STALE_MS = 120_000; // ~2 minutes
+const STALE_MS = 300_000; // ~5 minutes (the client heartbeats every ~60s, so an
+// active player stays well within this; gives returning players a longer grace
+// period before their plot can be reclaimed)
 
 type PlotRow = { wallet: string; island: number; plot: number; name: string };
 
