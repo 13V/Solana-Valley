@@ -984,9 +984,9 @@ export class FarmScene extends Phaser.Scene {
     for (const h of HOMESTEADS) this.buildHomestead(h);
   }
 
-  // One self-contained homestead: an outer fence (with a front gate gap), a
-  // cottage top-left, a 7×7 crop farm on the left, and two separate animal areas
-  // on the right — a chicken pen (with coop) and a cow pasture — plus an orchard.
+  // One self-contained homestead: an outer fence (with a front gate gap), a 7×7
+  // crop farm on the left, and two separate animal areas on the right — a chicken
+  // pen (with coop) and a cow pasture — plus an orchard.
   private buildHomestead(h: Homestead) {
     const it = h.interior;
     const gateCx = Math.floor((it.x0 + it.x1) / 2);
@@ -997,10 +997,8 @@ export class FarmScene extends Phaser.Scene {
       top: true, bottom: true, left: true, right: true, gap: [gateCx, gateY],
     });
 
-    // Every plot uses the same "Cozy Homestead" design: cottage centrepiece,
-    // chicken house + run, and a cow pen. House FIRST so its footprint is
-    // flagged before the fence autotiles.
-    this.placeCottage(h);
+    // Every plot uses the same "Cozy Homestead" design: a chicken house + run
+    // and a cow pen (no cottage). Fence first so the pens autotile against it.
     fence();
     this.buildChickenPen(h);
     this.buildCowPen(h);
@@ -1042,26 +1040,6 @@ export class FarmScene extends Phaser.Scene {
     put(gateCx, topY, flip ? 35 : 29);
     put(gateCx - 1, topY + 1, flip ? 28 : 34);
     put(gateCx, topY + 1, flip ? 29 : 35);
-  }
-
-  // A roofed cottage anchored at the homestead's house corner. Each homestead
-  // gets a different roof colour from the coop sheet; the footprint is flagged so
-  // fences/scatter steer clear.
-  private placeCottage(h: Homestead) {
-    const cx = h.house.cx * TILE + TILE / 2;
-    const base = (h.house.baseRow + 1) * TILE;
-    // A proper brick cottage with a red roof — visually distinct from the coop.
-    this.add.image(cx, base, 'cottage_nice').setOrigin(0.5, 1).setScale(1.7).setDepth(base);
-    for (let ty = h.house.baseRow - 3; ty <= h.house.baseRow; ty++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const tx = h.house.cx + dx;
-        if (this.inBounds(tx, ty)) this.tiles[ty][tx].obstacle = true;
-      }
-    }
-    this.addCollider(cx, base - 14, 88, 24);
-    // A couple of potted plants flanking the door.
-    this.add.image((h.house.cx - 1) * TILE, (h.house.baseRow + 1) * TILE, 'furniture', 12).setScale(2).setDepth((h.house.baseRow + 1) * TILE);
-    this.add.image((h.house.cx + 1) * TILE, (h.house.baseRow + 1) * TILE, 'furniture', 13).setScale(2).setDepth((h.house.baseRow + 1) * TILE);
   }
 
   // The chicken pen: a small orange-roof coop crowning the top edge, a U-shaped
