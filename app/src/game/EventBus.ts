@@ -19,6 +19,7 @@ export interface GameEvents {
   'ui:buyUpgrade': string; // upgrade id
   'ui:chooseUpgradeFork': { id: UpgradeId; fork: string }; // pick a maxed upgrade's 1-of-2 specialization
   'ui:buyAnimal': string; // animal id
+  'ui:buyExpansion': void; // buy the next crop-bed expansion column
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
   'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones
 

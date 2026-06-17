@@ -15,6 +15,33 @@ export function UpgradesPanel({ onClose }: { onClose: () => void }) {
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="rows">
+        {/* Garden Expansion: a plain, escalating coin sink that widens the
+            farmable crop bed by one column at a time (capped server-side). */}
+        {(() => {
+          const exp = progress.plotExpansion ?? 0;
+          const expMax = progress.plotExpansionMax ?? 0;
+          const expCost = progress.plotExpansionCost ?? 0;
+          const expMaxed = exp >= expMax;
+          const expAfford = coins >= expCost;
+          return (
+            <div className="row" key="garden-expansion" style={{ borderLeftColor: '#7bd66a' }}>
+              <span className="row-name" style={{ flex: 1 }}>
+                🌱 Garden Expansion <span className="lvltag">{exp}/{expMax} cols</span>
+                <span className="row-sub">
+                  Widen your crop bed by one column.
+                  {!expMaxed && <span className="next"> → {exp + 1}/{expMax} columns</span>}
+                </span>
+              </span>
+              <button
+                className="btn sm"
+                disabled={expMaxed || !expAfford}
+                onClick={() => bus.emit('ui:buyExpansion', undefined)}
+              >
+                {expMaxed ? 'MAX' : `${expCost.toLocaleString()}🪙`}
+              </button>
+            </div>
+          );
+        })()}
         {UPGRADES.map((u) => {
           const lvl = up[u.id] ?? 0;
           const maxed = lvl >= u.max;

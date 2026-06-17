@@ -16,6 +16,11 @@ export type Progress = {
   discoveredPlants: string[];
   discoveredMutations: string[];
   achievements: string[]; // unlocked ids
+  // Purchasable crop-bed expansion: how many extra columns have been bought,
+  // the cap, and the coin cost of the next one (0 once fully expanded).
+  plotExpansion: number;
+  plotExpansionMax: number;
+  plotExpansionCost: number;
 };
 
 // State the Phaser game pushes up to the React UI on change.

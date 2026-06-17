@@ -64,6 +64,8 @@ import {
   isInPlot,
   homesteadGateTile,
   plazaCenterTile,
+  MAX_PLOT_EXPANSION,
+  plotExpansionCost,
   type Homestead,
   type Rect,
   type PlotRect,
@@ -163,7 +165,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 13; // bumped: added maxed-upgrade forks (defaults to {} on older saves)
+const SAVE_VERSION = 14; // bumped: added plotExpansion (purchased crop-bed columns; defaults to 0 on older saves)
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -214,6 +216,7 @@ type SaveData = {
   skills: Skills;
   perks: ChosenPerks;
   respecs?: number; // v12+: perk respecs done. Optional so older saves still load.
+  plotExpansion?: number; // v14+: purchased crop-bed expansion columns. Optional so older saves default to 0.
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -275,6 +278,11 @@ export class FarmScene extends Phaser.Scene {
   private skills: Skills = { ...EMPTY_SKILLS };
   private perks: ChosenPerks = { ...EMPTY_PERKS };
   private respecs = 0; // number of perk respecs done (drives the escalating respec cost)
+  // Purchased crop-bed expansion: how many extra columns (0..MAX_PLOT_EXPANSION)
+  // have been bought. These widen the farmable area to the RIGHT of the base bed
+  // into the free interior band (see plots.ts). Expressed relative to
+  // myFarmRect() so it follows a multiplayer plot re-assignment.
+  private plotExpansion = 0;
   // Aggregated multipliers/flags from skills + perks; recomputed on any change.
   private modCache: Modifiers = activeModifiers(this.skills, this.perks);
 
@@ -469,6 +477,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:chooseUpgradeFork', ({ id, fork }) => this.chooseUpgradeFork(id, fork)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
+      bus.on('ui:buyExpansion', () => this.buyExpansion()),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
@@ -538,8 +547,20 @@ export class FarmScene extends Phaser.Scene {
     return homesteadPlot(this.myPlotIndex);
   }
 
+  // The full farmable crop-bed rect: the base bed widened by however many
+  // expansion columns have been purchased. Expansion grows to the RIGHT (into
+  // the free interior band between the bed and the pens), so only `pw` changes.
+  // Everything farm-related (tilling, overlays, persistence) reads THIS so the
+  // expansion is automatically relative to whichever plot we own (multiplayer).
+  private expandedFarmRect(): PlotRect {
+    const f = this.myFarmRect();
+    const extra = Math.max(0, Math.min(MAX_PLOT_EXPANSION, this.plotExpansion));
+    return { px: f.px, py: f.py, pw: f.pw + extra, ph: f.ph };
+  }
+
+  // True for any farmable tile (base bed OR a purchased expansion column).
   private isInMyFarm(tx: number, ty: number): boolean {
-    return isInPlot(this.myFarmRect(), tx, ty);
+    return isInPlot(this.expandedFarmRect(), tx, ty);
   }
 
   // The walkable gate tile of the player's current homestead.
@@ -1105,13 +1126,17 @@ export class FarmScene extends Phaser.Scene {
   // Drop a few idle, static animals into a neighbour's pens for life: chickens in
   // the chicken pen, cows in the cow pasture.
   // How many of the crop bed's rows are unlocked — one more per player level,
-  // growing from the front (gate side) back toward the cottage.
+  // growing from the front (gate side) back toward the top. (Base bed is 10 rows
+  // tall; this free level-unlock is unchanged.)
   private unlockedFarmRows(): number {
     return Math.min(this.myFarmRect().ph, 2 + levelInfo(this.xp).level);
   }
 
+  // A tile is tillable when it sits inside the farmable bed (base + purchased
+  // expansion columns) AND within the level-unlocked rows. Expansion columns use
+  // the SAME row gate as the base bed, so buying width never grants extra rows.
   private isUnlockedFarm(tx: number, ty: number): boolean {
-    const f = this.myFarmRect();
+    const f = this.expandedFarmRect();
     if (!isInPlot(f, tx, ty)) return false;
     return ty >= f.py + f.ph - this.unlockedFarmRows();
   }
@@ -1121,7 +1146,7 @@ export class FarmScene extends Phaser.Scene {
   // dimming). Which rows are tillable is gated in `till()` via unlockedFarmRows(),
   // so the unlock-by-level behaviour is unchanged — it just isn't shown as a tint.
   private markPlayerFarm() {
-    const f = this.myFarmRect();
+    const f = this.expandedFarmRect();
     const x0 = f.px, x1 = f.px + f.pw - 1;
     const y0 = f.py, y1 = f.py + f.ph - 1;
     for (let y = y0; y <= y1; y++) {
@@ -1956,6 +1981,31 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // Buy the next crop-bed expansion column. A plain, escalating coin sink: each
+  // purchase widens the farmable bed by one column into the free interior band
+  // (right of the bed), capped at MAX_PLOT_EXPANSION. The new tiles become
+  // tillable immediately (they share the level-based row unlock) and get their
+  // tilled-dirt overlays so they render like the rest of the bed.
+  private buyExpansion() {
+    if (this.plotExpansion >= MAX_PLOT_EXPANSION) {
+      this.toast('Garden fully expanded');
+      return;
+    }
+    const cost = plotExpansionCost(this.plotExpansion);
+    if (this.coins < cost) {
+      this.toast('Not enough coins');
+      return;
+    }
+    this.coins -= cost;
+    this.plotExpansion += 1;
+    this.ensureFarmOverlays(); // create the new column's tilled overlays
+    this.markPlayerFarm();     // keep the wider bed's grass natural
+    sfx.play('upgrade');
+    this.toast(`🌱 Garden expanded! +1 column (${this.plotExpansion}/${MAX_PLOT_EXPANSION})`);
+    this.emitState();
+    this.saveState();
+  }
+
   // Lock in a maxed upgrade's 1-of-2 specialization (mirrors choosePerk). Only
   // valid once the upgrade is at MAX level and the fork id is one of the two on
   // offer; once chosen it's locked (a perk respec clears it — see respecPerks).
@@ -2499,6 +2549,7 @@ export class FarmScene extends Phaser.Scene {
       skills: this.skills,
       perks: this.perks,
       respecs: this.respecs,
+      plotExpansion: this.plotExpansion,
     };
     try {
       const json = JSON.stringify(data);
@@ -2518,11 +2569,12 @@ export class FarmScene extends Phaser.Scene {
     } catch {
       return false;
     }
-    // Accept the current version (13), v12 and v11. Each bump only ADDED fields:
-    // v11→v12 added the `respecs` counter; v12→v13 added `upgradeForks`. Every
-    // other field is read defensively with `?? default`, so older saves migrate
-    // cleanly — respecs defaults to 0 and upgradeForks defaults to {} below.
-    if (!data || (data.v !== SAVE_VERSION && data.v !== 12 && data.v !== 11)) return false;
+    // Accept the current version (14) and v11–v13. Each bump only ADDED fields:
+    // v11→v12 added the `respecs` counter; v12→v13 added `upgradeForks`;
+    // v13→v14 added `plotExpansion`. Every other field is read defensively with
+    // `?? default`, so older saves migrate cleanly — respecs defaults to 0,
+    // upgradeForks defaults to {} and plotExpansion defaults to 0 below.
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
 
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
@@ -2545,6 +2597,14 @@ export class FarmScene extends Phaser.Scene {
     this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
     this.respecs = data.respecs ?? 0; // additive v12 field; v11 saves default to 0
+    // Purchased crop-bed expansion (additive v14 field; older saves default to 0).
+    // Clamp to the cap so a corrupt/forward save can't widen past the free band.
+    this.plotExpansion = Math.max(0, Math.min(MAX_PLOT_EXPANSION, data.plotExpansion ?? 0));
+    // Now that the expansion width is known, create the extra columns' tilled
+    // overlays (buildWorld only made base-bed overlays, before this load ran) and
+    // re-mark the bed so the wider area renders/tills correctly.
+    this.ensureFarmOverlays();
+    this.markPlayerFarm();
     this.recomputeMods(); // restored skills/perks change the modifier bag
     this.animalCounts = data.animals ?? {};
     for (const [type, count] of Object.entries(this.animalCounts)) {
@@ -2651,6 +2711,10 @@ export class FarmScene extends Phaser.Scene {
         discoveredPlants: [...this.discoveredPlants],
         discoveredMutations: [...this.discoveredMutations],
         achievements: [...this.achievements],
+        plotExpansion: this.plotExpansion,
+        plotExpansionMax: MAX_PLOT_EXPANSION,
+        // 0 once fully expanded so the UI can show "MAX" without recomputing.
+        plotExpansionCost: this.plotExpansion >= MAX_PLOT_EXPANSION ? 0 : plotExpansionCost(this.plotExpansion),
       },
       skills: { ...this.skills },
       perks: { ...this.perks },
@@ -2900,17 +2964,19 @@ export class FarmScene extends Phaser.Scene {
   // old owned plot so it no longer reads as "yours").
   private clearFarmTint(index: number) {
     const f = homesteadPlot(index);
+    const extra = Math.max(0, Math.min(MAX_PLOT_EXPANSION, this.plotExpansion));
     for (let y = f.py; y < f.py + f.ph; y++) {
-      for (let x = f.px; x < f.px + f.pw; x++) {
+      for (let x = f.px; x < f.px + f.pw + extra; x++) {
         this.ground[y]?.[x]?.clearTint();
       }
     }
   }
 
   // Make sure tilled-dirt overlays exist across the currently-owned crop bed
-  // (overlays are created lazily so a re-pointed plot becomes tillable).
+  // including any purchased expansion columns (overlays are created lazily so a
+  // re-pointed plot or a freshly-bought column becomes tillable).
   private ensureFarmOverlays() {
-    const f = this.myFarmRect();
+    const f = this.expandedFarmRect();
     for (let y = f.py; y < f.py + f.ph; y++) {
       for (let x = f.px; x < f.px + f.pw; x++) {
         if (this.inBounds(x, y)) this.ensureOverlay(x, y);

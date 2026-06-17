@@ -10,7 +10,7 @@ export type OpenSide = 'N' | 'S';
 
 // ---- homestead geometry (tiles) -----------------------------------------
 // Interior of one homestead (inside the fence). Sub-areas are placed relative
-// to this interior's top-left corner. Big enough for a 7×7 farm plus two pens.
+// to this interior's top-left corner. Big enough for a 7×10 crop bed plus two pens.
 export const HS_IW = 19; // interior width
 export const HS_IH = 16; // interior height
 // Footprint incl. the 1-tile fence ring on every side.
@@ -44,6 +44,24 @@ export const SUB = {
   signCx: 9, // name sign column
 };
 
+// ---- purchasable crop-bed expansion -------------------------------------
+// The base bed is SUB.farm (cols x:1–7). The interior band x:8–10 between the
+// bed and the pens (chickenPen/cowPen both start at x:11) is genuinely-free
+// grass — no obstacles, pens, orchard or fence sit there. A purchased
+// expansion grows the FARMABLE area one column at a time into that band, across
+// the bed's own row range. Capped at 3 columns (x:8,9,10) so it never reaches
+// the pens at x:11. (orchard/house/sign all live elsewhere, so these columns
+// are safe for tilling.)
+export const MAX_PLOT_EXPANSION = 3;
+
+// Coin cost of the NEXT expansion column given how many are already bought.
+// A gentle geometric curve (base × 1.7^level) so each extra column is a
+// meaningful, escalating coin sink without being absurd: 500 → 850 → 1445.
+export const PLOT_EXPANSION_BASE_COST = 500;
+export function plotExpansionCost(level: number): number {
+  return Math.round(PLOT_EXPANSION_BASE_COST * Math.pow(1.7, level));
+}
+
 export type Homestead = {
   index: number;
   col: number; row: number; // grid position
@@ -51,7 +69,7 @@ export type Homestead = {
   ix: number; iy: number; // interior top-left (tile)
   interior: Rect; // full interior rect (inside the fence)
   house: { cx: number; baseRow: number };
-  farm: Rect; // 7×7 crop bed (inclusive tile rect)
+  farm: Rect; // 7×10 crop bed (inclusive tile rect)
   chickenPen: Rect; // chicken pen (inclusive tile rect)
   cowPen: Rect; // cow pasture (inclusive tile rect)
   orchard: Rect; // tree slots (inclusive tile rect)
