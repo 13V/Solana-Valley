@@ -12,6 +12,7 @@ import {
   WET_MS,
   DAY_LENGTH_MS,
   RESTOCK_MS,
+  GROWTH_TIME_SCALE,
 } from '../constants';
 import {
   PLANTS,
@@ -1527,7 +1528,7 @@ export class FarmScene extends Phaser.Scene {
   // Growth duration (ms) for the crop's current cycle: full the first time, then
   // the shorter `regrow` window after a multi-harvest reset.
   private cropGrowMs(crop: Crop): number {
-    return crop.growMs ?? crop.plant.growthSeconds * 1000;
+    return (crop.growMs ?? crop.plant.growthSeconds * 1000) * GROWTH_TIME_SCALE;
   }
 
   private harvest(tx: number, ty: number) {

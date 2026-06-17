@@ -24,6 +24,7 @@ import {
   marketBonus,
 } from '../game/progression';
 import type { Progress } from '../game/types';
+import { GROWTH_TIME_SCALE } from '../game/constants';
 
 // One mutation's live odds + payoff for a given plant.
 export type MutationOdds = {
@@ -133,7 +134,8 @@ export function plantStats(plant: Plant, progress?: Progress): PlantStats {
   const growth = growthFactor(growthLvl); // 1 + 0.15*lvl (faster -> divide time)
 
   const effectiveValue = Math.round(plant.baseValue * market);
-  const effectiveGrowthSeconds = plant.growthSeconds / growth;
+  // Mirror the gameplay grow time (FarmScene.cropGrowMs applies GROWTH_TIME_SCALE).
+  const effectiveGrowthSeconds = (plant.growthSeconds * GROWTH_TIME_SCALE) / growth;
 
   return {
     rarity: plant.rarity,

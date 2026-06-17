@@ -22,17 +22,17 @@ const SPECIAL_MUTATIONS = MUTATIONS.filter((m) => m.id !== 'normal');
 
 // ---- collection bonus ---------------------------------------------------
 
-// Per-discovery sale-value buffs. Tuned conservatively so even a full set adds
-// a sane multiplier on top of Market Stall + Farming skill perks (no runaway):
-//   plants:    19 × 1%  = +19%
-//   mutations:  4 × 1%  = + 4%
-//   8 tiers   × 3%      = +24% (each tier fully discovered)
-//   all plants finale   = +25%
-// Maxed total ≈ +72% (×1.72) — meaningful but never dominant.
-const PER_PLANT = 0.01;
-const PER_MUTATION = 0.01;
-const PER_TIER = 0.03; // flat buff for completing a whole rarity tier
-const ALL_PLANTS_FINALE = 0.25; // chunky buff for discovering every plant
+// Per-discovery sale-value buffs. Halved from the original tuning to rein in the
+// economy (the compounding multipliers were letting income run away):
+//   plants:    19 × 0.5% = +9.5%
+//   mutations:  4 × 0.5% = + 2%
+//   8 tiers   × 1.5%     = +12% (each tier fully discovered)
+//   all plants finale    = +12%
+// Maxed total ≈ +35% (×1.35) — a meaningful collection reward, not a runaway.
+const PER_PLANT = 0.005;
+const PER_MUTATION = 0.005;
+const PER_TIER = 0.015; // flat buff for completing a whole rarity tier
+const ALL_PLANTS_FINALE = 0.12; // chunky buff for discovering every plant
 
 export type CollectionBonus = {
   mult: number; // sale-value multiplier (1 = no bonus)

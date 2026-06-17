@@ -4,10 +4,12 @@
 
 // ---- levels -------------------------------------------------------------
 
-// Cumulative XP required to *reach* a given level (level 1 = 0 XP).
+// Cumulative XP required to *reach* a given level (level 1 = 0 XP). Steepened
+// (was 60·l^1.5) to slow the climb so high-value tiers unlock later — the early
+// curve let players reach the top crops far too fast.
 export function xpForLevel(level: number): number {
   let total = 0;
-  for (let l = 1; l < level; l++) total += Math.round(60 * Math.pow(l, 1.5));
+  for (let l = 1; l < level; l++) total += Math.round(100 * Math.pow(l, 1.6));
   return total;
 }
 
@@ -123,7 +125,7 @@ export const sprinklerIntervalMs = (lvl: number) => (lvl > 0 ? 45_000 / lvl : In
 // a wet tile trivializes growth into near-instant; this keeps watering and the
 // bonuses meaningful while leaving a sane floor on grow time. Applied in
 // FarmScene where the final growth rate is assembled.
-export const MAX_GROWTH_MULT = 5;
+export const MAX_GROWTH_MULT = 3;
 
 // An upgrade is buyable only once the player's global level meets its `req`.
 export const upgradeUnlocked = (def: UpgradeDef, level: number) => !def.req || level >= def.req;

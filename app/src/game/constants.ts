@@ -21,6 +21,10 @@ export const STAGES = 4; // crop visual stages (0..3)
 export const WET_MS = 45_000; // how long soil stays watered (2x growth while wet)
 export const DAY_LENGTH_MS = 8 * 60_000; // full day/night cycle
 export const RESTOCK_MS = 120_000; // seed shop restock interval
+// Global multiplier on every crop's grow time — a single economy-pacing knob.
+// >1 slows the whole farming loop down (income is gated by how fast crops ripen).
+// Applied wherever a crop's grow duration is computed (cropGrowMs + liveStats).
+export const GROWTH_TIME_SCALE = 1.8;
 
 export const COLORS = {
   grass: 0x5fa64d,
