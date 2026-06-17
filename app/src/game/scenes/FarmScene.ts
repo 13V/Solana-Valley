@@ -257,6 +257,7 @@ type SaveData = {
   px?: number;
   py?: number;
   plotIndex?: number;
+  island?: number; // multiplayer island we were on, so a return can prefer the same seat
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -2787,6 +2788,7 @@ export class FarmScene extends Phaser.Scene {
       px: Math.round(this.player.x),
       py: Math.round(this.player.y),
       plotIndex: this.myPlotIndex,
+      island: this.island,
     };
     try {
       const json = JSON.stringify(data);

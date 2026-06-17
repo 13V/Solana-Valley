@@ -55,26 +55,43 @@ export function MultiplayerSync() {
       const auth = await getWalletAuth(publicKey, signMessage);
       if (cancelled || !auth) return;
 
-      // Honour an invite link (?island=N): ask /api/join to seat us on that
-      // island if it has room (server falls back when full / on bad input).
+      // An invite link (?island=N) wins; otherwise resume our last seat from the
+      // save (island + plot) so a returning player lands back on their own spot if
+      // it's still free — and just gets the next available one if it's taken.
       const islandParam = new URLSearchParams(location.search).get('island');
-      const preferIsland = islandParam !== null ? Number(islandParam) : NaN;
+      const inviteIsland = islandParam !== null && Number.isInteger(Number(islandParam)) && Number(islandParam) >= 0
+        ? Number(islandParam)
+        : undefined;
+      let savedIsland: number | undefined;
+      let savedPlot: number | undefined;
+      try {
+        const s = JSON.parse(localStorage.getItem('solana-valley:save') || 'null');
+        if (s && Number.isInteger(s.island)) savedIsland = s.island;
+        if (s && Number.isInteger(s.plotIndex)) savedPlot = s.plotIndex;
+      } catch {
+        // no/garbled save -> no preference
+      }
+      const initialIsland = inviteIsland ?? savedIsland;
+      // Only ask for our exact old plot when resuming our OWN island (not on an
+      // invite to someone else's).
+      const initialPlot = inviteIsland !== undefined ? undefined : savedPlot;
 
-      const buildBody = (prefer?: number): Record<string, unknown> => {
+      const buildBody = (prefer?: number, preferPlot?: number): Record<string, unknown> => {
         const body: Record<string, unknown> = { ...auth };
         if (prefer !== undefined && Number.isInteger(prefer) && prefer >= 0) body.preferIsland = prefer;
+        if (preferPlot !== undefined && Number.isInteger(preferPlot) && preferPlot >= 0) body.preferPlot = preferPlot;
         // Re-send the name each time so a mid-session rename propagates via the
         // server's existing-wallet path.
         if (username) body.name = username;
         return body;
       };
 
-      const postJoin = async (prefer?: number): Promise<JoinResponse | null> => {
+      const postJoin = async (prefer?: number, preferPlot?: number): Promise<JoinResponse | null> => {
         try {
           const resp = await fetch('/api/join', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(buildBody(prefer)),
+            body: JSON.stringify(buildBody(prefer, preferPlot)),
           });
           if (!resp.ok) return null;
           const json = (await resp.json()) as Partial<JoinResponse>;
@@ -112,7 +129,7 @@ export function MultiplayerSync() {
         joinIsland(next.island, { id: auth.wallet, name: next.name, plot: next.plot });
       };
 
-      const initial = await postJoin(Number.isInteger(preferIsland) && preferIsland >= 0 ? preferIsland : undefined);
+      const initial = await postJoin(initialIsland, initialPlot);
       if (cancelled || !initial) return; // best-effort: stay single-player
       applySeat(initial);
 

@@ -32,9 +32,11 @@ const PLOTS_PER_ISLAND = 20; // plots 0..19 on each island
 const MAX_ATTEMPTS = 8; // bounded retries when a UNIQUE(island, plot) race loses
 // A plot whose `updated_at` is older than this is treated as abandoned and may
 // be reclaimed by a new player. The client heartbeats well within this window.
-const STALE_MS = 300_000; // ~5 minutes (the client heartbeats every ~60s, so an
-// active player stays well within this; gives returning players a longer grace
-// period before their plot can be reclaimed)
+const STALE_MS = 600_000; // ~10 minutes. The client heartbeats every ~60s, so an
+// active player stays well within this and survives a refresh / brief break; once
+// past it the seat is freed so neighbourhoods stay full of actually-online players
+// (we deliberately do NOT hoard plots for absent players — a returning player's
+// FARM is in their save and follows them to whatever seat they get).
 
 type PlotRow = { wallet: string; island: number; plot: number; name: string };
 
@@ -290,6 +292,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (Number.isInteger(n) && n >= 0) preferIsland = n;
   }
 
+  // Optional EXACT seat preference: a returning player passes their last
+  // (preferIsland, preferPlot) so we can hand them back the same spot when it's
+  // still free. If it's been taken, they just get the next available seat.
+  let preferPlot: number | null = null;
+  const rawPlot = body.preferPlot;
+  if (typeof rawPlot === 'number' || typeof rawPlot === 'string') {
+    const n = Number(rawPlot);
+    if (Number.isInteger(n) && n >= 0 && n < PLOTS_PER_ISLAND) preferPlot = n;
+  }
+
   try {
     // Fast path / HEARTBEAT: already seated -> refresh `updated_at` (so the seat
     // stays fresh) and return the SAME assignment. Preference is ignored once a
@@ -315,10 +327,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const cutoffIso = staleCutoffIso(Date.now());
 
       let slot: { island: number; plot: number } | null = null;
-      if (preferIsland !== null) {
+      // 1) Try to give a returning player their EXACT previous seat, if free.
+      if (preferIsland !== null && preferPlot !== null) {
+        const taken = await fetchFreshTakenPlots(baseUrl, serviceKey, preferIsland, cutoffIso);
+        if (!taken.has(preferPlot)) slot = { island: preferIsland, plot: preferPlot };
+      }
+      // 2) Else the lowest free plot on the preferred island.
+      if (!slot && preferIsland !== null) {
         slot = await findFreePlotOnIsland(baseUrl, serviceKey, preferIsland, cutoffIso);
         if (!slot) preferIsland = null; // preferred island full of fresh -> stop trying it
       }
+      // 3) Else the lowest free plot anywhere.
       if (!slot) slot = await findLowestFreeSlot(baseUrl, serviceKey, cutoffIso);
 
       // The slot is free of FRESH rows but may still carry a STALE row. Reclaim
