@@ -165,13 +165,17 @@ export function Hud({
             </button>
           </span>
         )}
-        {addr && (
-          <span className="badge">
-            {addr}
-            {sol !== null ? ` · ${sol.toFixed(2)} SOL` : ''}
-          </span>
-        )}
-        <WalletMultiButton />
+        {/* Wallet cluster: SOL balance + the connect/address button. The address
+            lives only on the WalletMultiButton now (it used to also be repeated in
+            a separate badge), so the bar reads cleanly. */}
+        <span className="wallet-group">
+          {addr && sol !== null && (
+            <span className="badge sol" title="Your wallet's SOL balance">
+              ◎ {sol.toFixed(2)} SOL
+            </span>
+          )}
+          <WalletMultiButton />
+        </span>
       </div>
     </div>
   );

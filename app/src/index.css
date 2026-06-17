@@ -72,8 +72,19 @@ body {
   gap: 8px;
 }
 
+/* The top-right HUD: a tidy row of two clusters — the multiplayer island
+   indicator (+ Invite) and the wallet controls — each kept together with a
+   slightly tighter inner gap than the gap between the clusters. Wraps to a new
+   line on narrow screens instead of overflowing. */
+.hud-right {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 10px;
+}
+
 /* Multiplayer island indicator + Invite button cluster (in the right group). */
-.island-group {
+.island-group,
+.wallet-group {
   display: flex;
   align-items: center;
   gap: 6px;
