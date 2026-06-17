@@ -44,7 +44,9 @@ export type Goal = {
 // The ladder, easiest → hardest. Rewards climb super-linearly so each rung
 // feels meaningfully bigger than the last.
 export const GOALS: Goal[] = [
-  { id: 'seed', label: 'Get your first seed', test: (s) => s.seedsOwned > 0, reward: { coins: 25, xp: 5 } },
+  // Satisfied once you own a seed OR have harvested (so it doesn't un-tick after
+  // you plant your starting seeds).
+  { id: 'seed', label: 'Get your first seed', test: (s) => s.seedsOwned > 0 || s.harvested > 0, reward: { coins: 25, xp: 5 } },
   { id: 'harvest1', label: 'Harvest your first crop', test: (s) => s.harvested >= 1, reward: { coins: 50, xp: 10 } },
   { id: 'coin100', label: 'Earn 100 coins', test: (s) => s.earned >= 100, reward: { coins: 75, xp: 15 } },
   { id: 'lvl2', label: 'Reach Level 2', test: (s) => s.level >= 2, reward: { coins: 100, xp: 20, seed: { id: 'tomato', count: 3 } } },

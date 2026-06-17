@@ -1150,7 +1150,6 @@ export class FarmScene extends Phaser.Scene {
     const gateCx = Math.floor((it.x0 + it.x1) / 2);
     const south = h.openSide === 'S';
     const gateY = south ? it.y1 + 1 : it.y0 - 1; // fence row that opens to the plaza
-    const backY = south ? it.y0 - 1 : it.y1 + 1; // opposite fence row (name sign)
     const fence = () => this.encloseRegion(it.x0 - 1, it.y0 - 1, it.x1 + 1, it.y1 + 1, {
       top: true, bottom: true, left: true, right: true, gap: [gateCx, gateY],
     });
@@ -1161,9 +1160,12 @@ export class FarmScene extends Phaser.Scene {
     this.buildChickenPen(h);
     this.buildCowPen(h);
     this.addGateStairs(gateCx, gateY, south);
-    // Floating holographic nameplate over the plot (replaces the wooden signs).
-    // Text is filled in from the roster (whose plot it is); "Available" until then.
-    this.addPlotHologram(plot, h.signCx, backY, plot === this.myPlotIndex ? 'Your Plot' : 'Available');
+    // Floating holographic nameplate at the GATE (just outside, toward the plaza)
+    // so it reads as the plot's entrance sign. Text comes from the roster (whose
+    // plot it is); "Available" until then.
+    const holoX = gateCx * TILE + TILE / 2;
+    const holoY = (south ? gateY + 1 : gateY - 1) * TILE + TILE / 2;
+    this.addPlotHologram(plot, holoX, holoY, plot === this.myPlotIndex ? 'Your Plot' : 'Available');
 
     if (!h.mine) return; // a furnished but unclaimed neighbour plot — no interactive farm
 
@@ -1173,10 +1175,8 @@ export class FarmScene extends Phaser.Scene {
     // Working front gate that swings open on approach.
     const gx = gateCx * TILE + TILE / 2;
     const gy = gateY * TILE + TILE / 2;
-    if (!this.anims.exists('gate-open')) {
-      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
-      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
-    }
+    // Static closed frame (the swing is a scale tween — the spritesheet's swing
+    // frames don't slice cleanly and looked like a spin).
     this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
   }
 
@@ -1269,9 +1269,7 @@ export class FarmScene extends Phaser.Scene {
   // A floating holographic nameplate over a plot, showing whose plot it is.
   // Cyan glow + gentle bob/flicker so it reads as a hologram. The text is updated
   // from the roster (see onRoster); starts as "Available"/"Your Plot".
-  private addPlotHologram(plot: number, cxTile: number, topTile: number, text: string) {
-    const x = cxTile * TILE;
-    const baseY = (topTile - 1) * TILE + 2;
+  private addPlotHologram(plot: number, x: number, baseY: number, text: string) {
     const label = this.add
       .text(x, baseY, text, {
         fontFamily: 'Pixelify Sans, monospace',
@@ -1283,7 +1281,7 @@ export class FarmScene extends Phaser.Scene {
         backgroundColor: 'rgba(8,38,52,0.5)',
         padding: { x: 7, y: 3 },
       })
-      .setOrigin(0.5, 1)
+      .setOrigin(0.5, 0.5)
       .setDepth(60000)
       .setAlpha(0.95);
     label.setShadow(0, 0, '#3fd2ff', 10, true, true); // cyan glow → holographic
@@ -1790,6 +1788,7 @@ export class FarmScene extends Phaser.Scene {
     sfx.play('buy');
     this.toast(`Bought ${plant.name} seed`);
     bus.emit('mp:shopBuy', { plantId }); // live nudge to island peers
+    this.checkGoals(); // claims "get your first seed" the moment you own one
     this.emitState();
 
     if (this.shopShared) {
@@ -3610,14 +3609,10 @@ export class FarmScene extends Phaser.Scene {
     const { tx, ty } = homesteadGateTile(index);
     const gx = tx * TILE + TILE / 2;
     const gy = ty * TILE + TILE / 2;
-    if (!this.anims.exists('gate-open')) {
-      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
-      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
-    }
     if (!this.gate) {
       this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
     } else {
-      this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0);
+      this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0).setScale(2);
     }
     this.gateOpen = false;
   }
@@ -3760,15 +3755,16 @@ export class FarmScene extends Phaser.Scene {
     this.updateRemoteFarms(delta); // smoothly simulate peers' crop growth
     this.updateGuide();
 
-    // Swing the orchard gate open when the farmer is near.
+    // Swing the gate open when the farmer is near — a quick scaleX tween (gate
+    // turns edge-on) instead of the goofy spritesheet spin.
     if (this.gate) {
       const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.gate.x, this.gate.y) < 56;
       if (near && !this.gateOpen) {
         this.gateOpen = true;
-        this.gate.play('gate-open');
+        this.tweens.add({ targets: this.gate, scaleX: 0.4, duration: 220, ease: 'Quad.easeOut' });
       } else if (!near && this.gateOpen) {
         this.gateOpen = false;
-        this.gate.play('gate-close');
+        this.tweens.add({ targets: this.gate, scaleX: 2, duration: 220, ease: 'Quad.easeIn' });
       }
     }
 
