@@ -3198,7 +3198,7 @@ export class FarmScene extends Phaser.Scene {
     const nameByPlot = new Map<number, string>();
     for (const p of players) {
       if (!Number.isInteger(p.plot)) continue;
-      nameByPlot.set(p.plot, p.id === this.myMpId ? (p.name || 'You') : (p.name || p.id.slice(0, 4)));
+      nameByPlot.set(p.plot, p.id === this.myMpId ? 'You' : (p.name || p.id.slice(0, 4)));
     }
     for (const [plot, label] of this.plotLabels) {
       label.setText(nameByPlot.get(plot) ?? 'Available');
@@ -3567,6 +3567,7 @@ export class FarmScene extends Phaser.Scene {
     this.farmDirty = true;
     const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : 0;
     if (next !== this.myPlotIndex) {
+      this.plotLabels.get(this.myPlotIndex)?.setText('Available'); // freed our old plot
       this.clearFarmTint(this.myPlotIndex); // un-tint the previously-owned bed
       this.myPlotIndex = next;
       this.setupOwnedPlot();                // new bed's overlays + tint + gate
@@ -3577,6 +3578,9 @@ export class FarmScene extends Phaser.Scene {
       this.spawnAtPlaza();
       this.showGuideToGate();
     }
+    // Label our own plot immediately — don't wait on (or depend on) realtime
+    // presence syncing, which can be slow/flaky right after connecting.
+    this.plotLabels.get(this.myPlotIndex)?.setText('You');
   }
 
   // Reset a homestead's crop-bed ground tint back to plain (used when leaving an
