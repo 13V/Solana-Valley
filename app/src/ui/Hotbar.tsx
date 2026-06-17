@@ -12,6 +12,7 @@ export function Hotbar() {
     <div className="hotbar">
       {TOOLS.map((tool, i) => {
         const isSeed = tool.id === 'seed';
+        const isRod = tool.id === 'rod';
         const label = isSeed && seedPlant ? seedPlant.name : tool.label;
         const accent = isSeed && seedPlant ? RARITY[seedPlant.rarity].css : undefined;
         return (
@@ -23,17 +24,22 @@ export function Hotbar() {
             title={label}
           >
             <span className="slot-key">{i + 1}</span>
-            <img
-              className="tool-ico"
-              src={
-                isSeed
-                  ? seedPlant
-                    ? `assets/crops/seed_${seedPlant.id}.png`
-                    : 'assets/sprout-ui/tool_seed.png'
-                  : `assets/sprout-ui/${tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`
-              }
-              alt={isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}
-            />
+            {isRod ? (
+              // No rod art ships yet — use the fishing emoji as the icon.
+              <span className="tool-ico" role="img" aria-label="🎣" style={{ fontSize: 22, lineHeight: '1', textAlign: 'center' }}>🎣</span>
+            ) : (
+              <img
+                className="tool-ico"
+                src={
+                  isSeed
+                    ? seedPlant
+                      ? `assets/crops/seed_${seedPlant.id}.png`
+                      : 'assets/sprout-ui/tool_seed.png'
+                    : `assets/sprout-ui/${tool.id === 'hoe' ? 'tool_hoe' : 'tool_can'}.png`
+                }
+                alt={isSeed ? '🌱' : tool.id === 'hoe' ? '⛏️' : '💧'}
+              />
+            )}
             <span className="slot-label">{label}</span>
             {isSeed && <span className="slot-count">{seedCount}</span>}
           </button>

@@ -43,6 +43,10 @@ export interface GameEvents {
   'mp:shopBuy': { plantId: string }; // FarmScene -> network: we bought one of this seed
   'mp:shopBought': { id: string; plantId: string }; // network -> FarmScene: a peer bought one (id = buyer)
   'mp:reverify': void; // FarmScene -> network: another player shares our plot; re-check our seat with the server NOW
+  // Fishing catch broadcast: a local catch is announced so peers can animate the
+  // fish flying into our avatar (cosmetic only — no coins/XP awarded on receive).
+  'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
+  'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
 }
 
 type Handler<T> = (payload: T) => void;

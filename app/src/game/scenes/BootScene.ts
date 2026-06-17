@@ -25,6 +25,17 @@ export class BootScene extends Phaser.Scene {
     // (down, up, left, right); rows 12–23 are tool-use poses.
     this.load.spritesheet('pchar', `${A}pchar.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
+    // Fish-Sheet: 9×8 grid of 32px frames (fish + tackle + treasures). Used by
+    // the fishing minigame for the catch sprite that flies into the player.
+    this.load.spritesheet('fish', `${A}fish.png`, { frameWidth: 32, frameHeight: 32 });
+    // Ocean Pack (Cup Nooble): the player's casting animations (front/back/side,
+    // 48px — the same character as pchar), the bobber + water-splash sheet, and a
+    // 16px underwater shadow-fish loop used as the "bite" tell.
+    for (const v of ['front', 'back', 'side']) {
+      this.load.spritesheet(`pfish_${v}`, `${A}fishing_${v}.png`, { frameWidth: 48, frameHeight: 48 });
+    }
+    this.load.spritesheet('fishing_splash', `${A}fishing_splash.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('fish_shadow_md', `${A}fish_shadow_md.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
     // Chickens (16px) and cows (32px) come in several palette swaps; one is
     // picked per animal for variety.
