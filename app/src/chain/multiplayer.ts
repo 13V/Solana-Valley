@@ -25,8 +25,12 @@ type PosPayload = { id: string; x: number; y: number; facing: string };
 // [dx, dy, plantId, grownMs, growMs, mature(0|1), mutId('' = none)].
 type CropTuple = [number, number, string, number, number, 0 | 1, string];
 
-// Broadcast 'farm' payload (a player's full crop snapshot).
-type FarmPayload = { id: string; plot: number; crops: CropTuple[] };
+// A single tilled-soil tile in a farm snapshot, RELATIVE to the sender's plot
+// origin: [dx, dy]. Visual-only; lets a peer's dirt beds render under their crops.
+type TilledTuple = [number, number];
+
+// Broadcast 'farm' payload (a player's full farm snapshot: crops + tilled soil).
+type FarmPayload = { id: string; plot: number; crops: CropTuple[]; tilled: TilledTuple[] };
 
 // Throttle local position broadcasts to ~10/sec.
 const POS_INTERVAL_MS = 100;
@@ -124,12 +128,13 @@ function sendFarm(p: FarmPayload): void {
 // FARM_INTERVAL_MS with a trailing flush so the latest snapshot always lands.
 // The game emits { crops } with no id/plot; we stamp current.id/plot here
 // (mirroring how onSelfPose stamps the id on a pose).
-function onSelfFarm(snapshot: { crops: CropTuple[] }): void {
+function onSelfFarm(snapshot: { crops: CropTuple[]; tilled: TilledTuple[] }): void {
   if (!channel || !current) return;
   const payload: FarmPayload = {
     id: current.id,
     plot: current.plot,
     crops: Array.isArray(snapshot.crops) ? snapshot.crops : [],
+    tilled: Array.isArray(snapshot.tilled) ? snapshot.tilled : [],
   };
 
   const now = Date.now();
@@ -245,6 +250,9 @@ export function joinIsland(island: number, self: Self): void {
       // Ignore any stray echo of ourselves (broadcast self:false should prevent
       // this, but guard anyway).
       if (current && f.id === current.id) return;
+      // Backward-tolerant: older clients don't send `tilled` — treat a missing or
+      // non-array value as "no tilled soil" so old/new clients interop cleanly.
+      if (!Array.isArray(f.tilled)) f.tilled = [];
       bus.emit('mp:remoteFarm', f);
     });
 

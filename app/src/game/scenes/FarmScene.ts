@@ -146,11 +146,14 @@ type RemoteCropSprite = {
   stage: number; // last-rendered visual stage (0..STAGES-1)
 };
 
-// One remote player's whole farm: which plot they're on + their crop sprites,
-// keyed by plot-relative "dx,dy" so snapshots can be diffed in place.
+// One remote player's whole farm: which plot they're on + their crop sprites and
+// tilled-soil images, both keyed by plot-relative "dx,dy" so snapshots can be
+// diffed in place. `tilled` images are pure visuals (they mirror local soil
+// overlays) drawn below the crop sprites; they never touch this.tiles.
 type RemoteFarm = {
   plot: number;
   sprites: Map<string, RemoteCropSprite>;
+  tilled: Map<string, Phaser.GameObjects.Image>;
 };
 
 // The player's two animal pens + orchard in *pixel* coords (derived from HOME).
@@ -3010,14 +3013,30 @@ export class FarmScene extends Phaser.Scene {
         c.mutation?.id ?? '',
       ]);
     }
-    bus.emit('mp:farm', { crops });
+    // Tilled-soil tiles (plot-relative), so peers see the dirt bed under the crops
+    // rather than crops floating on bare grass. Visual-only, capped to bound size.
+    const tilled: GameEvents['mp:farm']['tilled'] = [];
+    const MAX_TILLED = 200;
+    for (let y = 0; y < GRID_H && tilled.length < MAX_TILLED; y++) {
+      const row = this.tiles[y];
+      for (let x = 0; x < GRID_W; x++) {
+        if (row[x].tilled) {
+          tilled.push([x - ox, y - oy]);
+          if (tilled.length >= MAX_TILLED) break;
+        }
+      }
+    }
+    bus.emit('mp:farm', { crops, tilled });
   }
 
   // A remote player's crop snapshot arrived. Reconcile their visual-only crop
   // sprites against the new snapshot (add/update/remove). Defensive throughout —
   // a malformed tuple is skipped, never thrown.
-  private onRemoteFarm({ id, plot, crops }: GameEvents['mp:remoteFarm']) {
+  private onRemoteFarm({ id, plot, crops, tilled }: GameEvents['mp:remoteFarm']) {
     if (typeof id !== 'string' || !Array.isArray(crops)) return;
+    // `tilled` is optional on the wire (older clients omit it); treat anything
+    // that isn't an array as "no tilled soil".
+    const tilledList = Array.isArray(tilled) ? tilled : [];
     // Never draw over our own farm (our own crops are authoritative locally).
     if (plot === this.myPlotIndex) {
       this.removeRemoteFarm(id);
@@ -3033,11 +3052,40 @@ export class FarmScene extends Phaser.Scene {
       farm = undefined;
     }
     if (!farm) {
-      farm = { plot: next, sprites: new Map() };
+      farm = { plot: next, sprites: new Map(), tilled: new Map() };
       this.remoteFarms.set(id, farm);
     }
 
     const origin = homesteadPlot(next);
+
+    // ---- tilled soil (visual-only): add new beds, drop ones no longer tilled --
+    const seenTilled = new Set<string>();
+    for (const t of tilledList) {
+      if (!Array.isArray(t) || t.length < 2) continue;
+      const [dx, dy] = t;
+      if (typeof dx !== 'number' || typeof dy !== 'number') continue;
+      const key = `${dx},${dy}`;
+      seenTilled.add(key);
+      if (!farm.tilled.has(key)) {
+        const tx = origin.px + dx, ty = origin.py + dy;
+        // Same 'tilled' texture/scale/depth as a local soil overlay; crops drawn
+        // at cropDepth(ty)-1 sit on top. Use a fixed full-dirt frame (the local
+        // solidTilledFrame keys off this.tiles, which we must not touch).
+        const img = this.add
+          .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'tilled', 56)
+          .setScale(2)
+          .setDepth(1);
+        farm.tilled.set(key, img);
+      }
+    }
+    // DIFF: destroy soil images for tiles no longer tilled (un-tilled/replanted).
+    for (const [key, img] of [...farm.tilled]) {
+      if (!seenTilled.has(key)) {
+        img.destroy();
+        farm.tilled.delete(key);
+      }
+    }
+
     const seen = new Set<string>();
     for (const t of crops) {
       if (!Array.isArray(t) || t.length < 7) continue;
@@ -3193,6 +3241,8 @@ export class FarmScene extends Phaser.Scene {
     if (!farm) return;
     for (const rc of farm.sprites.values()) this.destroyRemoteCrop(rc);
     farm.sprites.clear();
+    for (const img of farm.tilled.values()) img.destroy();
+    farm.tilled.clear();
     this.remoteFarms.delete(id);
   }
 
