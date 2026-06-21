@@ -69,30 +69,30 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
       }
       if (
         !window.confirm(
-          `Redeem ${count}× ${name} for $SPROUT?\n\nThis consumes the item and credits your claimable balance at the current pool rate. Withdraw it from the reward widget.`,
+          `Trade ${count}× ${name} for $SPROUT?\n\nThe item is converted to $SPROUT and added to your claimable balance — withdraw it from the reward widget.`,
         )
       ) {
         return;
       }
       const session = await getWalletAuth(publicKey, signMessage);
       if (!session) {
-        bus.emit('toast', 'Wallet signature needed to redeem');
+        bus.emit('toast', 'Wallet signature needed to trade');
         return;
       }
-      bus.emit('toast', '🌱 Redeeming…');
+      bus.emit('toast', '🌱 Trading…');
       const result = await redeemValue(session, value, `${count}× ${name}`);
       if (!result) {
-        bus.emit('toast', 'Redeem failed — try again');
+        bus.emit('toast', 'Trade failed — try again');
         return;
       }
       if (!result.credited || result.credited === '0') {
-        bus.emit('toast', 'Redemption unavailable right now (daily cap reached or off)');
+        bus.emit('toast', "Can't trade right now (daily limit reached or not enabled yet)");
         return;
       }
       bus.emit('ui:redeemStack', { key, count });
       bus.emit(
         'toast',
-        `✓ Redeemed for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
+        `✓ Traded for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
       );
     },
     [connected, publicKey, signMessage],
@@ -157,7 +157,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   {connected && (
                     <button
                       className="btn sm"
-                      title="Redeem for real $SPROUT (capped daily pool)"
+                      title="Trade this for real $SPROUT"
                       onClick={() => redeem(row.k, row.count, row.unit * row.count, row.name)}
                     >
                       🌱

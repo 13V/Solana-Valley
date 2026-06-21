@@ -39,7 +39,7 @@ create table if not exists public.redemption_config (
   base_rate       numeric not null default 0,     -- $SPROUT BASE UNITS credited per 1 coin of item value (0 = effectively off)
   daily_budget    numeric not null default 0,     -- global cap: max total base units redeemable per UTC day
   wallet_daily_cap numeric not null default 0,    -- per-wallet cap: max base units one wallet can redeem per UTC day
-  rate_floor_bps  integer not null default 1000,  -- floating multiplier never drops below this (1000 = 10%)
+  rate_floor_bps  integer not null default 10000, -- 10000 = FLAT rate (simple item→$SPROUT); lower it (<10000) to make the rate drain with the daily budget instead
   enabled         boolean not null default false  -- master switch (off by default)
 );
 

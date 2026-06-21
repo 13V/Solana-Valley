@@ -168,11 +168,12 @@ the Harvest panel — instead of waiting for a season. To keep "redeem whenever"
 from becoming an open tap that drains the treasury, payouts draw from a **capped
 daily pool** (`supabase/redemption.sql`):
 
-- **`daily_budget`** — total base units redeemable per UTC day (the hard cap).
-- **`wallet_daily_cap`** — most one wallet can redeem per day.
-- **floating rate** — the multiplier drops as the day's budget drains
-  (`remaining / daily_budget`, floored at `rate_floor_bps`), so it self-throttles
-  instead of emptying first-come-first-served.
+- **`daily_budget`** — how much $SPROUT you fund the pool with per UTC day; total
+  payouts can never exceed it (the hard cap that protects the treasury).
+- **`wallet_daily_cap`** — most one wallet can take per day.
+- **flat rate by default** (`rate_floor_bps = 10000`) — payout is simply item
+  value × `base_rate`. (Optional: lower `rate_floor_bps` to make the rate drain
+  with the budget instead of staying flat.)
 
 Flow: 🌱 → `POST /api/redeem` → `redeem_items` RPC converts the item's coin value
 to $SPROUT at the current rate, clamps to both caps, and credits the wallet's
@@ -189,9 +190,9 @@ payout path.
 ```sql
 update public.redemption_config set
   base_rate        = 100,        -- $SPROUT base units per 1 coin of item value (tune!)
-  daily_budget     = 50000000000, -- 50,000 $SPROUT/day at 6 decimals
+  daily_budget     = 50000000000, -- 50,000 $SPROUT/day at 6 decimals (how much you fund)
   wallet_daily_cap = 1000000000,  -- 1,000 $SPROUT/wallet/day
-  rate_floor_bps   = 1000,        -- floor the rate at 10%
+  rate_floor_bps   = 10000,       -- 10000 = flat rate (simple trade)
   enabled          = true
 where id = 1;
 ```
