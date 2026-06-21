@@ -27,6 +27,24 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 (included under license — see [CREDITS](CREDITS.md)); crops and all effects
 (particles, glow, day/night, sound) are generated procedurally in code.
 
+## 🗺️ Map Editor
+
+A standalone, drag-and-drop tile **map editor** lives under
+[`map-editor/`](map-editor/) for building Stardew-style maps from the **Sprout
+Lands** tilesets (233 tile sheets, ~15,666 placeable 16×16 tiles).
+
+- **No build** — it's a plain static site (HTML/CSS/JS). Serve the folder over
+  http and open it:
+  ```bash
+  cd map-editor && python3 -m http.server   # then open http://localhost:8000
+  ```
+  It must be served over **http**, not opened as a `file://` — it fetches a tile
+  manifest at startup.
+- **Auto-deploys** to GitHub Pages via the `deploy-map-editor.yml` workflow.
+- See [`map-editor/README.md`](map-editor/README.md) for details.
+- Tiles are **Sprout Lands** by Cup Nooble (https://cupnooble.itch.io/) — see
+  [CREDITS](CREDITS.md).
+
 ---
 
 ## Features
