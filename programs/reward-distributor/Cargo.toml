@@ -1,0 +1,20 @@
+[package]
+name = "reward_distributor"
+version = "0.1.0"
+description = "Solana Valley trustless merkle reward distributor (self-claim $SPROUT against a published root)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "reward_distributor"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.30.1"
+anchor-spl = "0.30.1"
