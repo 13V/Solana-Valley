@@ -38,16 +38,22 @@ death-spiral (see `docs/MARKETPLACE.md` §6 / the tokenomics page).
 
 | Layer | What it is | Authority |
 |---|---|---|
-| **Entitlement** (`claimable`) | How much each wallet *may* claim | Server-computed, credited via `credit_reward` |
+| **Entitlement** (`claimable`) | How much each wallet *may* claim | Server-computed: seasonal distribution by contribution score, or direct `credit_reward` |
 | **Payout** (the transfer) | Moving real tokens to the wallet | Treasury key, signed in `/api/claim` |
 
 The payout is safe by construction (treasury can't be over-drained). **The thing
-to get right is the entitlement.** Credit it only from signals that can't be
-forged client-side — marketplace activity, on-chain stake, verified
-milestones/discoveries — **never** from the in-game coin balance, which is
-client-authoritative (`api/save.ts` stores it verbatim). Otherwise a modified
-client farms an outsized share of a real pool. Today crediting is a manual/cron
-step (`credit_reward`); wiring it to a real contribution score is the next task.
+to get right is the entitlement.** It's credited from a **contribution score**
+(`scripts/lib/contribution.mjs`) weighted toward signals that are hard to fake —
+discoveries, achievements, milestones — with **per-signal caps + diminishing
+returns** so even a forged save can't dominate, and the in-game **coin balance is
+deliberately ignored** (it's client-authoritative — `api/save.ts` stores it
+verbatim). See [Crediting rewards](#crediting-rewards-seasons--contribution-score).
+
+> ⚠️ Saves are still client-authoritative, so scores are *soft* until gameplay
+> moves on-chain (roadmap M2/M3). The caps make forgery non-catastrophic, not
+> impossible; an on-chain **stake** weight should multiply the score before this
+> backs large sums. The capped-pool-by-share model also means forgery only
+> *dilutes* the honest split — it can never drain more than the season's pool.
 
 ---
 
@@ -60,6 +66,10 @@ step (`credit_reward`); wiring it to a real contribution score is the next task.
 | `app/api/claim.ts` | `POST /api/claim` — reserve → on-chain transfer → finalize/cancel. |
 | `app/src/chain/rewards.ts` | Client fetch/claim helpers + `formatAmount`. |
 | `app/src/chain/RewardsClaim.tsx` | The claim widget (mounted in `App.tsx`). |
+| `supabase/seasons.sql` | `seasons` + `season_scores` tables + atomic `distribute_season` RPC (capped-pool-by-share). Run after `rewards.sql`. |
+| `scripts/lib/contribution.mjs` | Pure contribution scorer + largest-remainder pool allocator. |
+| `scripts/reward-season.mjs` | Ops CLI: open a season, score all saves, split the pool, credit everyone in one atomic call. |
+| `scripts/buyback.mjs` | Ops CLI: fund the treasury by swapping SOL → $SPROUT on Jupiter. |
 | `scripts/rewards-setup.mjs` | Devnet mint creation, treasury funding, and crediting test wallets. |
 
 Amounts are stored and transferred in **base units** (integer = whole tokens ×
@@ -79,8 +89,11 @@ Set these in the Vercel project (and locally for the script). They are **secrets
 | `SOLANA_RPC_URL` | `claim.ts`, script | required; use a paid RPC (Helius/QuickNode) on mainnet |
 | `REWARD_MINT` | `claim.ts`, script | the $SPROUT mint address |
 | `TREASURY_SECRET_KEY` | `claim.ts`, script | base58 64-byte secret key of the treasury wallet |
-| `REWARD_DECIMALS` | `rewards.ts`, script | display/units; default `6` (pump.fun standard) |
+| `REWARD_DECIMALS` | `rewards.ts`, scripts | display/units; default `6` (pump.fun standard) |
 | `REWARD_SYMBOL` | `rewards.ts` | default `$SPROUT` |
+| `JUPITER_API` | `buyback.mjs` | swap API base; default `https://quote-api.jup.ag/v6` |
+
+A `.env.example` at the repo root lists every variable.
 
 The live $SPROUT mint is in `app/src/ui/ContractAddress.tsx`
 (`3sPxGyKxwCrAebxZsFb56GsNd7mjK7jZAng5uJtPpump`). **Test on devnet first** with a
@@ -111,22 +124,62 @@ node scripts/rewards-setup.mjs balance   # sanity-check the treasury balance
 
 ---
 
+## Crediting rewards: seasons & contribution score
+
+Entitlements are credited per **season** using the capped-pool-by-share model: a
+season has a fixed $SPROUT pool, and it's split across wallets *proportionally to
+each wallet's contribution score*. No fixed "rate × coins" — your payout is your
+share of a fixed pot, so it can never exceed the pool and inflating one number
+can't game it.
+
+```bash
+# 1. Run supabase/seasons.sql in the SQL editor (after rewards.sql).
+
+# 2. Open a season with a pool (whole tokens). Prints the season id:
+node scripts/reward-season.mjs open 50000 "Season 1"
+
+# 3. Preview the split — scores every save, shows the table, credits NOTHING:
+node scripts/reward-season.mjs distribute 1 --dry-run
+
+# 4. Commit it — credits every wallet's claimable in one atomic RPC, closes
+#    the season (it can only ever be distributed once):
+node scripts/reward-season.mjs distribute 1
+
+node scripts/reward-season.mjs list   # see all seasons + status
+```
+
+**The score** (`scripts/lib/contribution.mjs`) weights discoveries/achievements
+highest (breadth of contribution, naturally bounded), with diminishing returns
+(`sqrt`/`log10`) and hard caps on grindable magnitudes (xp, harvested, earned) so
+raw grind — or a forged number — can't run away. Coins are ignored. Tune the
+weights/caps at the top of that file. For ad-hoc grants (e.g. bug bounties),
+`scripts/rewards-setup.mjs credit <wallet> <amount>` still credits one wallet
+directly.
+
+---
+
 ## Funding the treasury (the buyback bot)
 
-The payout loop above is complete. *Filling* the treasury from revenue is an
-off-chain job you run on a schedule — and it needs **no smart contract**:
+The payout loop is complete; *filling* the treasury from revenue is an off-chain
+job, no smart contract needed. `scripts/buyback.mjs` does the buy-back: the
+treasury wallet swaps its SOL → $SPROUT on **Jupiter**, so tokens land straight
+in the treasury's account, ready to claim.
 
-1. **Claim fees** — venue-specific. For a pump.fun launch, claim creator fees;
-   for an LP position, collect fees via the Raydium/Orca SDK; for a Token-2022
-   transfer-fee mint, withdraw withheld fees. (This is the only venue-specific
-   bit and the one piece to implement per how $SPROUT is launched.)
-2. **Buy back $SPROUT** — swap the claimed SOL/USDC → $SPROUT via the **Jupiter**
-   swap API, signed by the dev wallet.
-3. **Top up the treasury** — transfer the bought $SPROUT to the treasury ATA (or
-   just buy directly into it).
+```bash
+node scripts/buyback.mjs balance          # treasury SOL + $SPROUT
+node scripts/buyback.mjs quote 1.0        # dry-run: expected $SPROUT for 1 SOL
+node scripts/buyback.mjs run 1.0          # execute (keeps 0.05 SOL reserve)
+node scripts/buyback.mjs run 1.0 --slippage 150 --reserve 0.1
+```
 
-A keeper/cron (GitHub Action, Vercel cron, or a small server) runs steps 1–3 on
-an interval. Solana has no native cron, so "auto-claim" = this scheduled job.
+The one venue-specific step is getting SOL *into* the treasury — claiming
+**pump.fun creator fees** (via PumpPortal's `collectCreatorFee` / the pump SDK),
+LP fees (Raydium/Orca SDK), or Token-2022 withheld fees. `buyback.mjs claim-fees`
+documents this; implement it for your launch venue so it deposits SOL into the
+treasury wallet, then `run` swaps it. Drive the whole loop (claim → `run`, and
+`reward-season.mjs distribute` each season) from a keeper/cron — GitHub Actions,
+Vercel cron, or a small server. Solana has no native cron, so "auto" = a
+scheduled job.
 
 ---
 

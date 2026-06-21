@@ -67,7 +67,8 @@ app/
 │       └── rewards.ts · RewardsClaim.tsx  # claim real $SPROUT from the treasury
 docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
 programs/   # Anchor program (token/land/market) — planned, README only for now
-scripts/    # fetch-assets.mjs (downloads the licensed Sprout Lands art)
+scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · lib/contribution (reward ops — docs/REWARDS.md)
+supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql
 ```
 
 > Note: `docs/ARCHITECTURE.md`'s module map predates several systems (animals,
