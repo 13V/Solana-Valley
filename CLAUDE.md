@@ -14,6 +14,13 @@ milestone (see `docs/ROADMAP.md`).
 Start with `README.md` for the player-facing overview and `docs/ARCHITECTURE.md`
 for the design. This file is the orientation map for making changes.
 
+There is also a standalone browser **map editor** in `map-editor/` for painting
+maps from the Sprout Lands tilesets. To integrate a map a user built (a
+`sprout-valley-map` JSON) into the game, read **`MAP_INTEGRATION.md`** — it has
+the save format, tile-resolution rules, the collision convention, and a working
+reference scene (`app/src/game/scenes/MapScene.ts`, the in-game "Explore" mode).
+Saved maps live in `app/public/maps/`.
+
 ## Core principle: own on-chain, play off-chain
 
 Real-time gameplay (movement, tilling, watering, growth timers, rendering) stays
