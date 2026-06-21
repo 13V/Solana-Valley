@@ -609,6 +609,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buySeed', (id) => this.buySeed(id)),
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
+      bus.on('ui:redeemStack', ({ key, count }) => this.redeemStack(key, count)),
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:chooseUpgradeFork', ({ id, fork }) => this.chooseUpgradeFork(id, fork)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
@@ -1955,6 +1956,21 @@ export class FarmScene extends Phaser.Scene {
     this.checkAchievements();
     this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}`);
     this.emitState();
+  }
+
+  // Remove a redeemed stack from the bag. The real $SPROUT credit happens
+  // server-side (api/redeem.ts → rewards.claimable); this only consumes the item
+  // locally once that succeeded, so it's emitted by the UI AFTER the credit lands.
+  // No coins/XP are awarded — redemption converts the item into a claimable
+  // $SPROUT entitlement, not coins.
+  private redeemStack(key: string, count: number) {
+    const have = this.harvestInv[key] ?? 0;
+    const take = Math.min(have, Math.max(0, Math.floor(count)));
+    if (take <= 0) return;
+    if (take >= have) delete this.harvestInv[key];
+    else this.harvestInv[key] = have - take;
+    this.emitState();
+    this.saveState();
   }
 
   // Permanent Collection Bonus multiplier, derived live from cumulative

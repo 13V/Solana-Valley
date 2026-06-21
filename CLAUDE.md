@@ -49,7 +49,7 @@ app/
 ├── api/                 # Vercel serverless functions (Node) — wallet-auth'd cloud save + rewards
 │   ├── _auth.ts         #   ed25519 signature verification (service-role key, server-only)
 │   ├── join.ts · save.ts · load.ts
-│   ├── rewards.ts · claim.ts  # custodial $SPROUT reward payouts (treasury-signed) — docs/REWARDS.md
+│   ├── rewards.ts · claim.ts · redeem.ts  # custodial $SPROUT payouts + on-demand item redemption — docs/REWARDS.md
 ├── src/
 │   ├── game/            # Phaser game logic (authoritative state)
 │   │   ├── scenes/FarmScene.ts   # the big one: gameplay, growth, FX, save/load
@@ -64,12 +64,12 @@ app/
 │       ├── WalletProvider.tsx · useSolBalance.ts · walletAuth.ts
 │       ├── supabase.ts (public anon client, realtime) · multiplayer.ts
 │       ├── cloudSave.ts · CloudSaveSync.tsx · MultiplayerSync.tsx
-│       ├── rewards.ts · RewardsClaim.tsx  # claim real $SPROUT (custodial, Option A)
+│       ├── rewards.ts · RewardsClaim.tsx · redeem.ts  # claim $SPROUT (Option A) + on-demand item redeem (🌱 in BagPanel)
 │       └── merkleClaim.ts · MerkleClaim.tsx  # trustless on-chain self-claim (Option B)
 docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
 programs/   # Anchor programs (written, not built here): marketplace · reward-distributor (merkle claims)
 scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · merkle-season · lib/{contribution,merkle} (reward ops — docs/REWARDS.md)
-supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql · distributors.sql
+supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql · distributors.sql · redemption.sql
 ```
 
 > Note: `docs/ARCHITECTURE.md`'s module map predates several systems (animals,

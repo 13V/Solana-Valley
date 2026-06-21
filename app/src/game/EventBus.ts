@@ -16,6 +16,7 @@ export interface GameEvents {
   'ui:buySeed': string; // plant id
   'ui:sellStack': string; // harvest stack key
   'ui:sellAll': void;
+  'ui:redeemStack': { key: string; count: number }; // remove a redeemed stack (after the server credits $SPROUT)
   'ui:buyUpgrade': string; // upgrade id
   'ui:chooseUpgradeFork': { id: UpgradeId; fork: string }; // pick a maxed upgrade's 1-of-2 specialization
   'ui:buyAnimal': string; // animal id

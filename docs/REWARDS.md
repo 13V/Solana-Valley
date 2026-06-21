@@ -71,6 +71,9 @@ verbatim). See [Crediting rewards](#crediting-rewards-seasons--contribution-scor
 | `scripts/reward-season.mjs` | Ops CLI: open a season, score all saves, split the pool, credit everyone in one atomic call. |
 | `scripts/buyback.mjs` | Ops CLI: fund the treasury by swapping SOL → $SPROUT on Jupiter. |
 | `scripts/rewards-setup.mjs` | Devnet mint creation, treasury funding, and crediting test wallets. |
+| `supabase/redemption.sql` | On-demand item→$SPROUT pool: config + daily caps + atomic `redeem_items` RPC (credits `claimable`). |
+| `app/api/redeem.ts` | `POST /api/redeem` — wallet-signed; credits claimable from the capped pool. |
+| `app/src/chain/redeem.ts` + 🌱 button in `BagPanel.tsx` | Redeem a bag item for $SPROUT on demand. |
 
 Amounts are stored and transferred in **base units** (integer = whole tokens ×
 10^decimals) so a payout never has float rounding.
@@ -155,6 +158,43 @@ raw grind — or a forged number — can't run away. Coins are ignored. Tune the
 weights/caps at the top of that file. For ad-hoc grants (e.g. bug bounties),
 `scripts/rewards-setup.mjs credit <wallet> <amount>` still credits one wallet
 directly.
+
+---
+
+## Instant item redemption (capped pool)
+
+Players can also redeem a bag item for $SPROUT **on demand** — the 🌱 button in
+the Harvest panel — instead of waiting for a season. To keep "redeem whenever"
+from becoming an open tap that drains the treasury, payouts draw from a **capped
+daily pool** (`supabase/redemption.sql`):
+
+- **`daily_budget`** — total base units redeemable per UTC day (the hard cap).
+- **`wallet_daily_cap`** — most one wallet can redeem per day.
+- **floating rate** — the multiplier drops as the day's budget drains
+  (`remaining / daily_budget`, floored at `rate_floor_bps`), so it self-throttles
+  instead of emptying first-come-first-served.
+
+Flow: 🌱 → `POST /api/redeem` → `redeem_items` RPC converts the item's coin value
+to $SPROUT at the current rate, clamps to both caps, and credits the wallet's
+`claimable`. The item is removed from the bag, and the player withdraws the
+`claimable` via the same claim widget. It **reuses the whole claim rail** — no new
+payout path.
+
+> ⚠️ Items are client-authoritative (like coins), so the redeemed value is the
+> client's assertion. That's only acceptable because the **caps bound the
+> outflow** — a forged value just hits the per-wallet daily cap sooner, never more.
+> The real fix is on-chain items (roadmap M2/M3); until then keep the budget
+> modest. **Off by default** (`enabled = false`); enable + fund it via SQL:
+
+```sql
+update public.redemption_config set
+  base_rate        = 100,        -- $SPROUT base units per 1 coin of item value (tune!)
+  daily_budget     = 50000000000, -- 50,000 $SPROUT/day at 6 decimals
+  wallet_daily_cap = 1000000000,  -- 1,000 $SPROUT/wallet/day
+  rate_floor_bps   = 1000,        -- floor the rate at 10%
+  enabled          = true
+where id = 1;
+```
 
 ---
 

@@ -11,6 +11,11 @@ import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
 import { Tooltip, StackTipBody, makeStackStats } from './Tooltip';
+import { useCallback } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { getWalletAuth } from '../chain/walletAuth';
+import { redeemValue } from '../chain/redeem';
+import { formatAmount } from '../chain/rewards';
 
 // Quality stars rendered next to a crop's name (e.g. ★★ for gold). The glyph is
 // repeated `stars` times and tinted with the quality's colour. `none` shows
@@ -51,6 +56,48 @@ const mutationOf = (id: string) => MUTATION_BY_ID[id];
 
 export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest, progress } = useGameState();
+  const { publicKey, signMessage, connected } = useWallet();
+
+  // Redeem a bag stack for real $SPROUT (credited to claimable, withdrawn via the
+  // reward widget). `value` is the stack's COIN value; the server converts it at
+  // the capped pool rate. We only remove the item locally AFTER the credit lands.
+  const redeem = useCallback(
+    async (key: string, count: number, value: number, name: string) => {
+      if (!connected || !publicKey || !signMessage) {
+        bus.emit('toast', 'Connect your wallet to redeem for $SPROUT');
+        return;
+      }
+      if (
+        !window.confirm(
+          `Redeem ${count}× ${name} for $SPROUT?\n\nThis consumes the item and credits your claimable balance at the current pool rate. Withdraw it from the reward widget.`,
+        )
+      ) {
+        return;
+      }
+      const session = await getWalletAuth(publicKey, signMessage);
+      if (!session) {
+        bus.emit('toast', 'Wallet signature needed to redeem');
+        return;
+      }
+      bus.emit('toast', '🌱 Redeeming…');
+      const result = await redeemValue(session, value, `${count}× ${name}`);
+      if (!result) {
+        bus.emit('toast', 'Redeem failed — try again');
+        return;
+      }
+      if (!result.credited || result.credited === '0') {
+        bus.emit('toast', 'Redemption unavailable right now (daily cap reached or off)');
+        return;
+      }
+      bus.emit('ui:redeemStack', { key, count });
+      bus.emit(
+        'toast',
+        `✓ Redeemed for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
+      );
+    },
+    [connected, publicKey, signMessage],
+  );
+
   let total = 0;
   const rows: Array<CropRow | FishRow> = [];
   for (const k of Object.keys(harvest)) {
@@ -107,6 +154,15 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   <span className="row-meta">{row.unit.toLocaleString()}🪙 ea</span>
                   <span className="stock">×{row.count}</span>
                   <button className="btn sm" onClick={() => bus.emit('ui:sellStack', row.k)}>Sell</button>
+                  {connected && (
+                    <button
+                      className="btn sm"
+                      title="Redeem for real $SPROUT (capped daily pool)"
+                      onClick={() => redeem(row.k, row.count, row.unit * row.count, row.name)}
+                    >
+                      🌱
+                    </button>
+                  )}
                 </div>
               );
             }
@@ -138,6 +194,15 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                 </Tooltip>
                 <span className="stock">×{count}</span>
                 <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
+                {connected && (
+                  <button
+                    className="btn sm"
+                    title="Redeem for real $SPROUT (capped daily pool)"
+                    onClick={() => redeem(k, count, unit * count, plant.name)}
+                  >
+                    🌱
+                  </button>
+                )}
               </div>
             );
           })}
