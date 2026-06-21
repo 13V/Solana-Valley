@@ -1,8 +1,9 @@
 -- Shared per-island seed shop: authoritative "how many bought this window" state.
 --
 -- The shop POOL (what's in stock) is computed client-side: a deterministic
--- per-(island, win) roll scaled by the number of players online. This table only
--- tracks how many of each seed have been BOUGHT in a given window, and the
+-- per-(island, win) roll sized for a single player (it does NOT scale with the
+-- number of players online — one island shares one player's worth of stock). This
+-- table only tracks how many of each seed have been BOUGHT in a given window, and the
 -- buy_seed() RPC increments that atomically while it's below the pool cap — so
 -- the last unit can't be double-sold and late-joiners read the true remaining
 -- count. `win` = floor(epoch_ms / RESTOCK_MS) (the 2-minute restock window).

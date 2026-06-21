@@ -314,7 +314,6 @@ export class FarmScene extends Phaser.Scene {
   // drained by everyone's purchases. `shopBought` tracks units taken this window
   // (local + peers via mp:shopBought); remaining = pool − bought.
   private island = 0;
-  private onlineCount = 1;
   private shopEpoch = 0;
   private shopPool: Record<string, number> = {};
   private shopBought: Record<string, number> = {};
@@ -2107,11 +2106,11 @@ export class FarmScene extends Phaser.Scene {
     return Math.max(0, (this.shopPool[id] ?? 0) - (this.shopBought[id] ?? 0));
   }
 
-  // (Re)roll the shared pool for the current island/window/online-count, keeping
-  // this window's purchases. Called on join, on roster change (count changes the
-  // ×players multiplier), and at the start of each window.
+  // (Re)roll the shared pool for the current island/window, keeping this window's
+  // purchases. Called on join and at the start of each window. Stock is sized for
+  // a single player and no longer scales with the online headcount.
   private refreshShopPool() {
-    this.shopPool = rollShopAt(this.island, this.shopEpoch, this.onlineCount);
+    this.shopPool = rollShopAt(this.island, this.shopEpoch);
   }
 
   // Start a fresh restock window: reset purchases and re-roll the shared pool.
@@ -3430,15 +3429,6 @@ export class FarmScene extends Phaser.Scene {
         rp.name = p.name;
         rp.label.setText(p.name);
       }
-    }
-
-    // The shared shop pool scales with how many players are on the island, so
-    // re-roll (keeping this window's purchases) whenever the headcount changes.
-    const count = Math.max(1, players.length);
-    if (count !== this.onlineCount) {
-      this.onlineCount = count;
-      this.refreshShopPool();
-      this.emitState();
     }
 
     // Update each plot's holographic nameplate to whoever is on it (Available if

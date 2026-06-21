@@ -231,12 +231,12 @@ function mulberry32(seed: number): () => number {
 
 // Roll the SHARED island seed-shop stock for a given (island, restock window).
 // Deterministic (seeded PRNG, not Math.random) so every player on the island
-// sees identical stock, and each tier's quantity is multiplied by the number of
-// players online — the shared pool (10 players ⇒ 10× stock, drained by everyone
-// on the island). Purely RARITY-based with NO level gating: commons in bulk down
-// to the occasional lone Celestial; the seed PRICE is the only gate.
-export function rollShopAt(island: number, window: number, players = 1): Record<string, number> {
-  const count = Math.max(1, Math.floor(players));
+// sees identical stock. Stock is sized for a SINGLE player and does NOT scale
+// with how many players are online: the shared pool holds just one player's worth
+// of seeds per window, so everyone on the island competes over the same scarce
+// stock. Purely RARITY-based with NO level gating: commons in bulk down to the
+// occasional lone Celestial; the seed PRICE is the only gate.
+export function rollShopAt(island: number, window: number): Record<string, number> {
   const rand = mulberry32(((island | 0) * 0x9e3779b1) ^ ((window | 0) * 0x85ebca77));
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
@@ -245,7 +245,7 @@ export function rollShopAt(island: number, window: number, players = 1): Record<
     // stays aligned across clients regardless of outcomes.
     const present = rand() < r.present;
     const qty = r.qty[0] + Math.floor(rand() * (r.qty[1] - r.qty[0] + 1));
-    stock[p.id] = present ? qty * count : 0;
+    stock[p.id] = present ? qty : 0;
   }
   return stock;
 }
