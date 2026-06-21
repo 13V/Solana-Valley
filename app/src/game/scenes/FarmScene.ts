@@ -739,6 +739,10 @@ export class FarmScene extends Phaser.Scene {
     // Blue-tint grass fill (frame 12 is fully opaque) used as a base layer.
     const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
     const GRASS_BASE_FRAME = 12;
+    // Tilled-dirt fill (frame 12 is fully opaque) — the base under farm cells, whose
+    // authored autotile frames are up to 91% transparent.
+    const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
+    const DIRT_BASE_FRAME = 12;
 
     const ground = islandMap.layers.find((l) => l.name === 'Ground');
     const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
@@ -753,10 +757,11 @@ export class FarmScene extends Phaser.Scene {
         const cx = gx * TILE + TILE / 2;
         const cy = gy * TILE + TILE / 2;
         const cat = classify(key);
-        // Opaque grass base under non-water cells: the blue-tint grass autotile's
-        // edge/corner frames are 12–28% transparent, so without a base the teal sea
-        // backdrop shows through and the land edges look like water.
-        if (cat !== 'water') this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
+        // Opaque base under each cell so a tile's transparent autotile edges reveal
+        // matching ground, not the sea backdrop: farm → dirt fill (the dirt frames
+        // are 25–91% transparent), grass/flat → grass fill, water → none (shore).
+        if (cat === 'farm') this.add.image(cx, cy, DIRT_BASE_KEY, DIRT_BASE_FRAME).setScale(2).setDepth(-1);
+        else if (cat !== 'water') this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
         const img = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
         this.ground[gy][gx] = img;
         if (cat === 'water') {
@@ -786,7 +791,9 @@ export class FarmScene extends Phaser.Scene {
           this.addCollider(cx, cy, TILE, TILE);
           if (isBoatKey(key)) this.boatTiles.add(k);
         } else if (cat === 'farm') {
-          // Wide tilled-dirt laid as a top decal — tillable/plantable, not solid.
+          // Wide tilled-dirt: a solid dirt fill under it (the wide-dirt frames are
+          // partly transparent) so the plot reads as solid dirt, not grass.
+          this.add.image(cx, cy, DIRT_BASE_KEY, DIRT_BASE_FRAME).setScale(2).setDepth(0.5);
           this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
           this.farmTiles.add(k);
         } else {
