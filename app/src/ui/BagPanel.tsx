@@ -4,6 +4,7 @@ import {
   cropValue,
   PLANT_BY_ID,
   MUTATION_BY_ID,
+  isTokenTradeable,
   type Quality,
 } from '../game/economy';
 import { FISH_BY_ID, fishCss } from '../game/fishing';
@@ -154,15 +155,6 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   <span className="row-meta">{row.unit.toLocaleString()}🪙 ea</span>
                   <span className="stock">×{row.count}</span>
                   <button className="btn sm" onClick={() => bus.emit('ui:sellStack', row.k)}>Sell</button>
-                  {connected && (
-                    <button
-                      className="btn sm"
-                      title="Trade this for real $SPROUT"
-                      onClick={() => redeem(row.k, row.count, row.unit * row.count, row.name)}
-                    >
-                      🌱
-                    </button>
-                  )}
                 </div>
               );
             }
@@ -194,13 +186,13 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                 </Tooltip>
                 <span className="stock">×{count}</span>
                 <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
-                {connected && (
+                {connected && isTokenTradeable(plant) && (
                   <button
-                    className="btn sm"
-                    title="Redeem for real $SPROUT (capped daily pool)"
+                    className="btn sm gold"
+                    title={`Trade this ${plant.rarity} crop for real $SPROUT`}
                     onClick={() => redeem(k, count, unit * count, plant.name)}
                   >
-                    🌱
+                    🌱 $SPROUT
                   </button>
                 )}
               </div>

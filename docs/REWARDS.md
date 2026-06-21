@@ -163,10 +163,12 @@ directly.
 
 ## Instant item redemption (capped pool)
 
-Players can also redeem a bag item for $SPROUT **on demand** — the 🌱 button in
-the Harvest panel — instead of waiting for a season. To keep "redeem whenever"
-from becoming an open tap that drains the treasury, payouts draw from a **capped
-daily pool** (`supabase/redemption.sql`):
+Harvest a **top-tier crop**, and a 🌱 $SPROUT button appears on it in the Harvest
+panel — trade it for real $SPROUT on demand (no waiting for a season). Only
+top-tier crops qualify (`TRADEABLE_MIN_RARITY` in `economy.ts`, default
+**Legendary+**); commons/fish stay coins-only. To keep this from becoming an open
+tap that drains the treasury, payouts draw from a **capped daily pool**
+(`supabase/redemption.sql`):
 
 - **`daily_budget`** — how much $SPROUT you fund the pool with per UTC day; total
   payouts can never exceed it (the hard cap that protects the treasury).

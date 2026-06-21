@@ -94,6 +94,15 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
+// Only TOP-TIER crops can be traded for real $SPROUT — everything else stays
+// coins-only (sold at the shop). Change this one line to widen/narrow the cutoff
+// (e.g. 'Mythical' for stricter, 'Celestial' for apex-only). Default: Legendary+.
+export const TRADEABLE_MIN_RARITY: Rarity = 'Legendary';
+
+export function isTokenTradeable(plant: Plant): boolean {
+  return rarityRank(plant.rarity) >= rarityRank(TRADEABLE_MIN_RARITY);
+}
+
 // Player level at which each rarity tier becomes available in the shop. Re-tuned
 // to spread unlocks more evenly across the mid-game: the old curve front-loaded
 // the early tiers then left long dead zones (Legendary→Divine→Celestial spanned
