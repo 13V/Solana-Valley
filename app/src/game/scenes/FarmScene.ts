@@ -51,8 +51,6 @@ import {
   HOMESTEADS,
   SHORE,
   BEACH,
-  bandRect,
-  PLAZA,
   type Homestead,
   type Rect,
 } from '../plots';
@@ -127,7 +125,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 11; // bumped: Cozy Homestead plot layout relocated the farm
+const SAVE_VERSION = 12; // bumped: single cozy-island layout relocated everything
 
 // A gatherable forage node sitting on open grass.
 type ForageNode = {
@@ -255,10 +253,10 @@ export class FarmScene extends Phaser.Scene {
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
     this.buildWorld();
-    this.buildTerraces(); // raise the two plot bands into plateaus (cliffs + stairs)
-    this.buildPlaza(); // sunken valley floor: cobble paths, pond + bridge, markets
-    this.buildPlots(); // fenced homesteads; fences open toward the central plaza
-    this.placeDecorations(); // scatter nature across the remaining open grass
+    this.buildPlots(); // the open homestead: barn, sandy farm, animal areas, orchard
+    this.buildPond(); // a small pond tucked into the left-side open grass
+    this.buildDock(); // a rowboat docked at the south-east shore
+    this.placeDecorations(); // scatter nature + sea decor across the remaining open grass
 
     this.player = this.physics.add.sprite(
       (MY_PLOT.px + MY_PLOT.pw / 2) * TILE,
@@ -737,8 +735,6 @@ export class FarmScene extends Phaser.Scene {
   // Solid tilled-dirt tiles (premium Tilled_Dirt_v2 sheet, 11 cols) that tile
   // seamlessly into a filled plot; a few variants add subtle texture.
   private static TILLED_FRAMES = [55, 56, 57];
-  // stonepath.png frames that carry a nice pebble cluster (scattered on paths).
-  private static PEBBLES = [0, 4, 5, 8, 9, 12, 13, 14, 15];
   // grassv2 flat detail tiles (tufts/moss/flowers) — weighted to subtle tufts &
   // moss over flowers; their green matches the base grass exactly.
   private static GRASS_DETAIL = [55, 56, 57, 58, 59, 66, 67, 68, 69, 70, 60, 71];
@@ -773,6 +769,9 @@ export class FarmScene extends Phaser.Scene {
           if (d === SHORE - 1) this.addCollider(cx, cy, TILE, TILE);
         } else if (d < SHORE + BEACH) {
           this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
+        } else if (isInMyPlot(x, y)) {
+          // The farm plot reads as a sandy bed (not grass) per the island layout.
+          this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
         } else {
           this.ground[y][x] = this.grassTileAt(x, y, cx, cy);
         }
@@ -787,107 +786,6 @@ export class FarmScene extends Phaser.Scene {
 
   private solidTilledFrame(x: number, y: number): number {
     return FarmScene.TILLED_FRAMES[(x * 7 + y * 13) % 3];
-  }
-
-  // Raise each plot band into a grassy plateau (hills cliff autotile) so the two
-  // bands tower over the sunken central plaza — a terraced valley. hills.png (6×6)
-  // frames: TL1 T2 TR3 / L7 C8 R9 / BL12 cliff13·14 BR15.
-  private buildTerraces() {
-    const PAD = 1; // plateau reaches one tile past the fences
-    for (let row = 0; row < 2; row++) {
-      const b = bandRect(row);
-      const x0 = b.x0 - PAD, x1 = b.x1 + PAD, y0 = b.y0 - PAD, y1 = b.y1 + PAD;
-      const flip = row === 1; // bottom band: cliff faces UP toward the plaza
-      const cliffY = flip ? y0 : y1;
-      const put = (tx: number, ty: number, frame: number, fy = false) => {
-        if (!this.inBounds(tx, ty)) return;
-        this.add
-          .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hills', frame)
-          .setScale(2).setDepth(0.4).setFlipY(fy);
-      };
-      // plaza-facing cliff edge + its corners
-      put(x0, cliffY, 12, flip);
-      put(x1, cliffY, 15, flip);
-      for (let x = x0 + 1; x <= x1 - 1; x++) put(x, cliffY, 13 + (x % 2), flip);
-      // side edges running back from the cliff
-      const sY0 = flip ? y0 + 1 : y0;
-      const sY1 = flip ? y1 : y1 - 1;
-      for (let y = sY0; y <= sY1; y++) { put(x0, y, 7); put(x1, y, 9); }
-      // soft shadow cast onto the plaza floor just past the cliff (adds depth)
-      const shY = flip ? cliffY - 1 : cliffY + 1;
-      for (let x = x0; x <= x1; x++) {
-        if (this.inBounds(x, shY)) {
-          this.add.rectangle(x * TILE + TILE / 2, shY * TILE + TILE / 2, TILE, 10, 0x14361a, 0.16).setDepth(0.42);
-        }
-      }
-    }
-  }
-
-  private layPath(x: number, y: number) {
-    if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) return;
-    const k = this.key(x, y);
-    if (this.pondTiles.has(k) || this.pathTiles.has(k)) return;
-    const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
-    // Keep the grass and just scatter the pack's loose pebbles on top, so the
-    // route reads as a natural pebble trail rather than a hard dirt road.
-    const n = (Math.random() < 0.8 ? 1 : 0) + (Math.random() < 0.45 ? 1 : 0);
-    for (let i = 0; i < n; i++) {
-      const f = FarmScene.PEBBLES[Math.floor(Math.random() * FarmScene.PEBBLES.length)];
-      const ox = Phaser.Math.Between(-7, 7), oy = Phaser.Math.Between(-7, 7);
-      this.add.image(cx + ox, cy + oy, 'stonepath', f).setScale(2).setDepth(0.55).setFlipX(Math.random() < 0.5);
-    }
-    this.pathTiles.add(k);
-  }
-
-  // The sunken valley floor: a cobble avenue with lanes up to every gate, a pond
-  // crossed by a bridge, and a row of market stalls + cosy props.
-  private buildPlaza() {
-    const pz = PLAZA;
-    const avY = Math.floor((pz.y0 + pz.y1) / 2) - 1; // avenue spans avY..avY+1
-    const cx = Math.floor((pz.x0 + pz.x1) / 2);
-
-    // An organic pond tucked into the valley floor (built first so paths avoid it).
-    this.buildPond();
-
-    // Pebble avenue across the whole valley.
-    for (let y = avY; y <= avY + 1; y++)
-      for (let x = pz.x0; x <= pz.x1; x++) this.layPath(x, y);
-    // A lane from the player's gate to the avenue (neighbours open onto grass).
-    for (const h of HOMESTEADS) {
-      if (!h.mine) continue;
-      const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
-      const a = h.openSide === 'S' ? h.interior.y1 + 1 : h.interior.y0 - 1;
-      const lo = Math.min(a, avY), hi = Math.max(a, avY + 1);
-      for (let y = lo; y <= hi; y++) { this.layPath(gx, y); this.layPath(gx - 1, y); }
-    }
-
-    this.buildMarkets(avY, cx);
-  }
-
-  private buildMarkets(avY: number, cx: number) {
-    const prop = (tx: number, ty: number, key: string, frame?: number, scale = 2) => {
-      if (!this.inBounds(tx, ty)) return;
-      const px = tx * TILE + TILE / 2, py = ty * TILE + TILE;
-      const img = frame === undefined ? this.add.image(px, py, key) : this.add.image(px, py, key, frame);
-      img.setOrigin(0.5, 1).setScale(scale).setDepth(py);
-      this.addCollider(px, py - 10, TILE, 14);
-      return img;
-    };
-    // Well as a centrepiece beside the avenue.
-    prop(cx + 4, avY - 1, 'well');
-    // Market stalls: a counter flanked by a barrel + a crate, with a little sign.
-    for (const sx of [cx - 4, cx + 12, cx + 20]) {
-      prop(sx, avY - 1, 'furniture', 30); // table / counter
-      prop(sx - 1, avY - 1, 'furniture', 24); // barrel
-      prop(sx + 1, avY - 1, 'furniture', 25); // crate
-      this.add.image(sx * TILE + TILE / 2, (avY - 1) * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth((avY - 1) * TILE + 40);
-    }
-    // Cosy props below the avenue.
-    prop(cx - 16, avY + 4, 'workstation');
-    prop(cx + 16, avY + 5, 'chest', 0);
-    // A picnic blanket (flat on the ground) with a basket.
-    this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'picnic').setScale(2).setDepth((avY + 5) * TILE - 20);
-    this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'basket').setOrigin(0.5, 1).setScale(2).setDepth((avY + 5) * TILE + 10);
   }
 
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
@@ -917,31 +815,37 @@ export class FarmScene extends Phaser.Scene {
     // Flowers, bushes, sprouts & stumps from the biome sheet.
     const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
     let di = 0;
-    scatter(150, 3000, (tx, ty) =>
+    scatter(40, 800, (tx, ty) =>
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[di++ % decoFrames.length]).setScale(2).setDepth(2));
 
-    // Mushrooms, flowers & stones — a wide variety for a lush valley floor.
+    // Mushrooms, flowers & stones — a variety for a lush island edge.
     const mfsFrames = [0, 1, 2, 3, 4, 5, 6, 12, 13, 15, 24, 25, 36, 37, 38, 39, 40, 48, 49, 52];
     let mi = 0;
-    scatter(90, 2400, (tx, ty) =>
+    scatter(30, 800, (tx, ty) =>
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[mi++ % mfsFrames.length]).setScale(2).setDepth(3));
 
     // Berry bushes & shrubs (per-row depth so the player passes behind them).
     const bushFrames = [36, 37, 38, 39, 40, 48, 49, 50, 51];
     let bi = 0;
-    scatter(56, 1600, (tx, ty) =>
+    scatter(20, 600, (tx, ty) =>
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', bushFrames[bi++ % bushFrames.length]).setScale(2).setDepth(ty * TILE + TILE));
 
-    // Tree stumps & fallen logs for a foresty, lived-in feel.
+    // Tree stumps & fallen logs for a lived-in feel.
     const logFrames = [72, 73, 74, 75, 76, 77];
     let li = 0;
-    scatter(22, 900, (tx, ty) =>
+    scatter(8, 400, (tx, ty) =>
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', logFrames[li++ % logFrames.length]).setScale(2).setDepth(ty * TILE + TILE));
+
+    // Rocks dotted on the grassy edges (per-row depth so the player passes behind).
+    const rockFrames = ['rock_s', 'rock_l', 'rock_pile'];
+    let ri = 0;
+    scatter(10, 400, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', rockFrames[ri++ % rockFrames.length]).setScale(2).setDepth(ty * TILE + TILE));
 
     // Swaying shade trees dotted across the open grass.
     const treeFrames = ['tree', 'tree_apple'];
     let ti = 0;
-    scatter(30, 1600, (tx, ty) => {
+    scatter(12, 600, (tx, ty) => {
       const cx = tx * TILE + TILE / 2;
       const baseY = ty * TILE + TILE;
       const tree = this.add
@@ -955,6 +859,32 @@ export class FarmScene extends Phaser.Scene {
         yoyo: true, repeat: -1, ease: 'Sine.inOut',
       });
     });
+
+    // Sea decor: lily pads + small rocks floating on the surrounding ocean tiles.
+    // Purely cosmetic (ocean tiles are already non-walkable). Depth sits above the
+    // sea backdrop (-10000) but below all land.
+    const ocean = (tx: number, ty: number) =>
+      this.inBounds(tx, ty) && this.tileZone(tx, ty) === 'ocean';
+    const seaScatter = (n: number, tries: number, fn: (tx: number, ty: number) => void) => {
+      let placed = 0, guard = 0;
+      while (placed < n && guard++ < tries) {
+        const tx = Phaser.Math.Between(0, GRID_W - 1), ty = Phaser.Math.Between(0, GRID_H - 1);
+        if (!ocean(tx, ty)) continue;
+        fn(tx, ty);
+        placed++;
+      }
+    };
+    const padFrames = [8, 9, 10];
+    let pi = 0;
+    seaScatter(12, 600, (tx, ty) => {
+      const cyp = ty * TILE + TILE / 2;
+      const pad = this.add.image(tx * TILE + TILE / 2, cyp, 'waterobj', padFrames[pi++ % padFrames.length]).setScale(2).setDepth(-100);
+      this.tweens.add({ targets: pad, y: cyp + 2, duration: 1800 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    });
+    const seaRockFrames = ['rock_s', 'rock_pile'];
+    let sri = 0;
+    seaScatter(8, 400, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', seaRockFrames[sri++ % seaRockFrames.length]).setScale(2).setDepth(-100));
   }
 
   // True if a tile sits inside any homestead's fenced footprint (fence ring incl.).
@@ -970,44 +900,6 @@ export class FarmScene extends Phaser.Scene {
     box.setVisible(false).setDisplaySize(w, h).refreshBody();
   }
 
-  private encloseRegion(
-    tx0: number,
-    ty0: number,
-    tx1: number,
-    ty1: number,
-    opts: { top?: boolean; bottom?: boolean; left?: boolean; right?: boolean; gap?: [number, number] },
-  ) {
-    // Collect the perimeter tiles we actually want a fence on (skipping anything
-    // already occupied, e.g. a rock or the coop), then autotile each.
-    const want = new Set<string>();
-    const add = (x: number, y: number) => {
-      if (this.inBounds(x, y) && !this.tiles[y][x].obstacle) want.add(this.key(x, y));
-    };
-    if (opts.top) for (let x = tx0; x <= tx1; x++) add(x, ty0);
-    if (opts.bottom) for (let x = tx0; x <= tx1; x++) add(x, ty1);
-    if (opts.left) for (let y = ty0; y <= ty1; y++) add(tx0, y);
-    if (opts.right) for (let y = ty0; y <= ty1; y++) add(tx1, y);
-    if (opts.gap) want.delete(this.key(opts.gap[0], opts.gap[1]));
-
-    for (const k of want) {
-      const [x, y] = k.split(',').map(Number);
-      const has = (dx: number, dy: number) => want.has(this.key(x + dx, y + dy));
-      const u = has(0, -1);
-      const d = has(0, 1);
-      const l = has(-1, 0);
-      const r = has(1, 0);
-      // Sheet rows pick the vertical connection, columns the horizontal one.
-      const row = u && d ? 1 : d ? 0 : u ? 2 : 3;
-      const col = l && r ? 2 : r ? 1 : l ? 3 : 0;
-      const cx = x * TILE + TILE / 2;
-      const cy = y * TILE + TILE / 2;
-      this.add.image(cx, cy, 'fences', row * 4 + col).setScale(2).setDepth(cy + 6);
-      // Make the fence solid (gaps were excluded above, so gates stay walkable).
-      this.tiles[y][x].obstacle = true;
-      this.addCollider(cx, cy, TILE, TILE);
-    }
-  }
-
   // ---- homesteads ---------------------------------------------------------
 
   // Build all 10 fenced homesteads. Each has a house, a crop farm and an animal
@@ -1017,66 +909,18 @@ export class FarmScene extends Phaser.Scene {
     for (const h of HOMESTEADS) this.buildHomestead(h);
   }
 
-  // One self-contained homestead: an outer fence (with a front gate gap), a
-  // cottage top-left, a 7×7 crop farm on the left, and two separate animal areas
-  // on the right — a chicken pen (with coop) and a cow pasture — plus an orchard.
+  // The island homestead (open, no perimeter fence): a barn/house at the
+  // top-centre, a sandy crop farm, a chicken coop + cow area, and an orchard.
   private buildHomestead(h: Homestead) {
-    const it = h.interior;
-    const gateCx = Math.floor((it.x0 + it.x1) / 2);
-    const south = h.openSide === 'S';
-    const gateY = south ? it.y1 + 1 : it.y0 - 1; // fence row that opens to the plaza
-    const backY = south ? it.y0 - 1 : it.y1 + 1; // opposite fence row (name sign)
-    const fence = () => this.encloseRegion(it.x0 - 1, it.y0 - 1, it.x1 + 1, it.y1 + 1, {
-      top: true, bottom: true, left: true, right: true, gap: [gateCx, gateY],
-    });
+    if (!h.mine) return; // single-island: there are no neighbour plots.
 
-    if (!h.mine) {
-      // An empty, claimable plot for another player: fence (opening to the
-      // plaza), stairs, and an "Available" sign. Assigned to a wallet on join.
-      fence();
-      this.addPlotSign(h.signCx, backY, 'Available', false);
-      this.addSignpost(gateCx, gateY);
-      this.addGateStairs(gateCx, gateY, south);
-      return;
-    }
-
-    // The player's "Cozy Homestead": cottage centrepiece, big crop bed on the
-    // left, chicken house + cow pen on the right, orchard along the front.
-    // House FIRST so its footprint is flagged before the fence autotiles.
+    // Barn/house FIRST so its footprint is flagged before anything else lays out.
     this.placeCottage(h);
-    fence();
     this.buildChickenPen(h);
     this.buildCowPen(h);
     this.placeOrchard(h);
     this.markPlayerFarm(h.farm);
-    this.addPlotSign(h.signCx, backY, '★ Your Homestead', true);
-    this.addSignpost(gateCx, gateY);
-    this.addGateStairs(gateCx, gateY, south);
-
-    // Working front gate that swings open on approach.
-    const gx = gateCx * TILE + TILE / 2;
-    const gy = gateY * TILE + TILE / 2;
-    if (!this.anims.exists('gate-open')) {
-      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 9 }), frameRate: 24, repeat: 0 });
-      this.anims.create({ key: 'gate-close', frames: this.anims.generateFrameNumbers('gate', { start: 9, end: 0 }), frameRate: 24, repeat: 0 });
-    }
-    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
-  }
-
-  // A little staircase bridging the plateau cliff just outside a gate, so each
-  // homestead reads as stepping down into the plaza. hills stairs: 28/29 (top),
-  // 34/35 (bottom); flipped for the bottom band (stairs face up).
-  private addGateStairs(gateCx: number, gateY: number, south: boolean) {
-    const flip = !south;
-    const topY = south ? gateY + 1 : gateY - 2;
-    const put = (tx: number, ty: number, frame: number) => {
-      if (!this.inBounds(tx, ty)) return;
-      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hills', frame).setScale(2).setDepth(0.6).setFlipY(flip);
-    };
-    put(gateCx - 1, topY, flip ? 34 : 28);
-    put(gateCx, topY, flip ? 35 : 29);
-    put(gateCx - 1, topY + 1, flip ? 28 : 34);
-    put(gateCx, topY + 1, flip ? 29 : 35);
+    this.addPlotSign(h.signCx, h.interior.y0 - 1, '★ Your Island', true);
   }
 
   // A roofed cottage anchored at the homestead's house corner. Each homestead
@@ -1111,8 +955,7 @@ export class FarmScene extends Phaser.Scene {
       for (let ox = p.x0 + 1; ox <= p.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
     }
     this.addCollider(coopX, coopBase - 14, 92, 22);
-    // U-shaped fence; the coop crowns the open top.
-    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, { left: true, right: true, bottom: true });
+    // Open island: no pen fence — the coop sits on the grass with a hay dressing.
     this.add.image((p.x0 + 1) * TILE + 16, (p.y1 - 1) * TILE, 'hay', 6).setScale(2).setDepth((p.y1 - 1) * TILE);
     this.add.image((p.x1 - 1) * TILE, (p.y1 - 1) * TILE, 'hay', 7).setScale(2).setDepth((p.y1 - 1) * TILE);
   }
@@ -1121,10 +964,7 @@ export class FarmScene extends Phaser.Scene {
   // few hay bales. No building — cows graze in the open, distinct from the coop.
   private buildCowPen(h: Homestead) {
     const p = h.cowPen;
-    const gap = Math.round((p.x0 + p.x1) / 2);
-    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, {
-      top: true, left: true, right: true, bottom: true, gap: [gap, p.y1],
-    });
+    // Open island: cows graze in the open grass — no fence, just a few hay bales.
     this.add.image((p.x0 + 1) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 6).setScale(2).setDepth((p.y0 + 2) * TILE);
     this.add.image((p.x0 + 2) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 7).setScale(2).setDepth((p.y0 + 2) * TILE);
     this.add.image((p.x1 - 1) * TILE, (p.y1 - 2) * TILE, 'hay', 0).setScale(2).setDepth((p.y1 - 2) * TILE);
@@ -1150,11 +990,12 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // Player's crop bed: a soft checkerboard tint marks the plantable slots.
+  // Player's crop bed (now a sandy plot): a subtle warm-sand checker marks the
+  // plantable slots without tinting the ground green.
   private markPlayerFarm(f: Rect) {
     for (let y = f.y0; y <= f.y1; y++) {
       for (let x = f.x0; x <= f.x1; x++) {
-        this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xeaf7c4 : 0xcfe89c);
+        this.ground[y][x].setTint((x + y) % 2 === 0 ? 0xf7ead0 : 0xece0c4);
       }
     }
   }
@@ -1932,10 +1773,10 @@ export class FarmScene extends Phaser.Scene {
   // cattails, lily pads and a soft ground shadow. Water tiles are obstacles so
   // the player fishes from the bank.
   private buildPond() {
-    const pz = PLAZA;
-    const cx = Math.floor((pz.x0 + pz.x1) / 2) - 2; // a touch left of centre
-    const cyc = Math.floor((pz.y0 + pz.y1) / 2) + 4; // sits below the avenue
-    const rx = 6, ry = 3;
+    // Hand-placed in the island's left-side open grass.
+    const cx = 8;
+    const cyc = 19;
+    const rx = 2, ry = 2;
     this.pond = { x0: cx - rx, y0: cyc - ry, x1: cx + rx, y1: cyc + ry };
     const inPond = (x: number, y: number, s = 1) => {
       const dx = (x - cx) / (rx * s), dy = (y - cyc) / (ry * s);
@@ -1989,6 +1830,25 @@ export class FarmScene extends Phaser.Scene {
       if (!this.inBounds(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
     }
+  }
+
+  // A wooden rowboat docked at the south-east shore — a landmark for the
+  // (future) sail-to-marketplace trip, plus a little signpost just inland.
+  private buildDock() {
+    const bx = (GRID_W - SHORE - 2) * TILE;
+    const by = (GRID_H - SHORE - 2) * TILE;
+    if (this.textures.exists('boats')) {
+      const boat = this.add.image(bx, by, 'boats', 0).setOrigin(0.5, 0.6).setScale(2).setDepth(by);
+      this.tweens.add({
+        targets: boat, y: by + 4, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+      this.addCollider(bx, by, 40, 24);
+    }
+    // A small signpost beside the boat, one tile inland on the grass.
+    const sx = GRID_W - SHORE - 4;
+    const sy = GRID_H - SHORE - 4;
+    this.addSignpost(sx, sy);
+    this.addPlotSign(sx, sy, 'Marketplace ⛵', false);
   }
 
   private isPondTile(tx: number, ty: number): boolean {

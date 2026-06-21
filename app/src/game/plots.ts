@@ -1,9 +1,9 @@
-// Solana Valley world: a terraced valley. TWO raised plateau BANDS of fenced
-// homesteads — 10 across the top, 10 across the bottom — face each other across
-// a wide sunken central PLAZA (the valley floor) full of stone paths, a pond,
-// markets and decorations. Every homestead's fence opens toward the plaza.
-// You own homestead #0 (top-left, fully playable); the other 19 are decorative
-// neighbours so the valley reads as a living town.
+// Solana Valley world: ONE compact cozy ISLAND, ringed by ocean and a sand
+// beach. A single homestead fills the island — a barn/house at the top-centre, a
+// sandy farm plot, a chicken coop + cow area, an orchard, a small pond, and a
+// rowboat dock at the south-east shore. Flat and open (no raised plateaus, no
+// central plaza, no neighbour plots, no market stalls). You own and play the
+// whole island.
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number }; // tile coords, inclusive
 export type OpenSide = 'N' | 'S';
@@ -17,14 +17,14 @@ export const HS_IH = 16; // interior height
 export const HS_W = HS_IW + 2; // 21
 export const HS_H = HS_IH + 2; // 18
 
-// Grid arrangement: 10 columns × 2 bands.
-export const COLS = 10;
-export const ROWS = 2;
-export const MARGIN_X = 4; // tiles of grass left/right of the neighbourhood
-export const MARGIN_TOP = 3; // grass above the top band
-export const MARGIN_BOTTOM = 3; // grass below the bottom band
-export const GAP_X = 2; // grass/path gap between homestead columns
-export const GAP_Y = 16; // the central PLAZA between the two bands (valley floor)
+// Grid arrangement: a single island holds one homestead (1 column × 1 band).
+export const COLS = 1;
+export const ROWS = 1;
+export const MARGIN_X = 6; // tiles of grass left/right of the homestead
+export const MARGIN_TOP = 5; // grass above the homestead
+export const MARGIN_BOTTOM = 6; // grass below the homestead
+export const GAP_X = 2; // grass gap between homestead columns (unused at 1 col)
+export const GAP_Y = 16; // grass gap between homestead rows (unused at 1 row)
 
 // The land is an island: a ring of ocean (+ a sand beach just inside it) wraps
 // the whole grid. Homesteads sit on the grass well within the beach.
