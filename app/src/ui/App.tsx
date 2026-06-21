@@ -17,6 +17,7 @@ import { TutorialCoach } from './TutorialCoach';
 import { TouchControls } from './TouchControls';
 import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { MultiplayerSync } from '../chain/MultiplayerSync';
+import { RewardsClaim } from '../chain/RewardsClaim';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
 import { ContractAddress } from './ContractAddress';
@@ -84,6 +85,7 @@ export function App() {
           <TouchControls />
           {helpSeen && <TutorialCoach />}
           <Toasts />
+          <RewardsClaim />
           <ContractAddress />
           <Chat />
         </div>

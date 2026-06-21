@@ -46,9 +46,10 @@ fall through to the Phaser canvas.
 
 ```
 app/
-├── api/                 # Vercel serverless functions (Node) — wallet-auth'd cloud save
+├── api/                 # Vercel serverless functions (Node) — wallet-auth'd cloud save + rewards
 │   ├── _auth.ts         #   ed25519 signature verification (service-role key, server-only)
 │   ├── join.ts · save.ts · load.ts
+│   ├── rewards.ts · claim.ts  # custodial $SPROUT reward payouts (treasury-signed) — docs/REWARDS.md
 ├── src/
 │   ├── game/            # Phaser game logic (authoritative state)
 │   │   ├── scenes/FarmScene.ts   # the big one: gameplay, growth, FX, save/load
@@ -62,8 +63,9 @@ app/
 │   └── chain/           # Solana wallet + Supabase
 │       ├── WalletProvider.tsx · useSolBalance.ts · walletAuth.ts
 │       ├── supabase.ts (public anon client, realtime) · multiplayer.ts
-│       └── cloudSave.ts · CloudSaveSync.tsx · MultiplayerSync.tsx
-docs/   # ARCHITECTURE.md, ROADMAP.md
+│       ├── cloudSave.ts · CloudSaveSync.tsx · MultiplayerSync.tsx
+│       └── rewards.ts · RewardsClaim.tsx  # claim real $SPROUT from the treasury
+docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
 programs/   # Anchor program (token/land/market) — planned, README only for now
 scripts/    # fetch-assets.mjs (downloads the licensed Sprout Lands art)
 ```
@@ -117,6 +119,10 @@ Useful dev URL params (they disable autosave so they don't touch a real save):
 - Cloud save auth: the browser signs a message once per session with the Solana
   wallet; `api/_auth.ts` verifies that ed25519 signature server-side before
   reading/writing a save. Don't weaken this path.
+- **Treasury key (rewards):** `TREASURY_SECRET_KEY` signs real $SPROUT payouts in
+  `api/claim.ts` and is a **server-only secret** — never in client code or commits.
+  Reward *entitlements* must be credited from server-verified signals, never the
+  client coin balance (which `api/save.ts` stores verbatim). See `docs/REWARDS.md`.
 
 ## Licensing constraint (important for the roadmap)
 
