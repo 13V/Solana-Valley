@@ -742,7 +742,10 @@ export class FarmScene extends Phaser.Scene {
     // Tilled-dirt fill (frame 12 is fully opaque) — the base under farm cells, whose
     // authored autotile frames are up to 91% transparent.
     const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
-    const DIRT_BASE_FRAME = 12;
+    // Opaque dirt-field fill variants — randomised per tile (stable hash) so the
+    // farm has varied texture instead of one repeated pattern.
+    const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
+    const dirtFrame = (x: number, y: number) => DIRT_VARIANTS[((x * 73856 + y * 19349) >>> 0) % DIRT_VARIANTS.length];
 
     const ground = islandMap.layers.find((l) => l.name === 'Ground');
     const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
@@ -760,7 +763,7 @@ export class FarmScene extends Phaser.Scene {
         // Opaque base under each cell so a tile's transparent autotile edges reveal
         // matching ground, not the sea backdrop: farm → dirt fill (the dirt frames
         // are 25–91% transparent), grass/flat → grass fill, water → none (shore).
-        if (cat === 'farm') this.add.image(cx, cy, DIRT_BASE_KEY, DIRT_BASE_FRAME).setScale(2).setDepth(-1);
+        if (cat === 'farm') this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
         else if (cat !== 'water') this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
         const img = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
         this.ground[gy][gx] = img;
@@ -793,7 +796,7 @@ export class FarmScene extends Phaser.Scene {
         } else if (cat === 'farm') {
           // Wide tilled-dirt: a solid dirt fill under it (the wide-dirt frames are
           // partly transparent) so the plot reads as solid dirt, not grass.
-          this.add.image(cx, cy, DIRT_BASE_KEY, DIRT_BASE_FRAME).setScale(2).setDepth(0.5);
+          this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(lx, ly)).setScale(2).setDepth(0.5);
           this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
           this.farmTiles.add(k);
         } else {
@@ -857,20 +860,22 @@ export class FarmScene extends Phaser.Scene {
     const flowerFrames = ['flower_y', 'flower_p', 'flower_p2'];
     // Low bushes/sprouts that read as taller — per-row depth so they y-sort.
     const bushFrames = ['bush', 'bush2', 'sprout'];
-    const count = Math.min(40, candidates.length);
+    const count = Math.min(20, candidates.length);
     for (let i = 0; i < count; i++) {
       const [tx, ty] = candidates[i];
       const cx = tx * TILE + TILE / 2;
       const cy = ty * TILE + TILE / 2;
-      // ~75% small flat flowers, ~25% slightly taller bushes/sprouts.
-      if (i % 4 === 3) {
+      if (i % 3 === 2) {
+        // ~33% slightly taller bushes/sprouts (per-row depth so they y-sort).
         this.add
           .image(cx, ty * TILE + TILE, 'biome', bushFrames[i % bushFrames.length])
           .setOrigin(0.5, 1)
           .setScale(2)
           .setDepth(ty * TILE + TILE);
       } else {
-        this.add.image(cx, cy, 'biome', flowerFrames[i % flowerFrames.length]).setScale(2).setDepth(2);
+        // Flowers — mostly soft yellow blooms; the pink (mushroom-like) kept rare.
+        const fr = i % 5 === 1 ? flowerFrames[1 + (i % 2)] : flowerFrames[0];
+        this.add.image(cx, cy, 'biome', fr).setScale(2).setDepth(2);
       }
     }
   }
