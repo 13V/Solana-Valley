@@ -64,11 +64,12 @@ app/
 │       ├── WalletProvider.tsx · useSolBalance.ts · walletAuth.ts
 │       ├── supabase.ts (public anon client, realtime) · multiplayer.ts
 │       ├── cloudSave.ts · CloudSaveSync.tsx · MultiplayerSync.tsx
-│       └── rewards.ts · RewardsClaim.tsx  # claim real $SPROUT from the treasury
+│       ├── rewards.ts · RewardsClaim.tsx  # claim real $SPROUT (custodial, Option A)
+│       └── merkleClaim.ts · MerkleClaim.tsx  # trustless on-chain self-claim (Option B)
 docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
-programs/   # Anchor program (token/land/market) — planned, README only for now
-scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · lib/contribution (reward ops — docs/REWARDS.md)
-supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql
+programs/   # Anchor programs (written, not built here): marketplace · reward-distributor (merkle claims)
+scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · merkle-season · lib/{contribution,merkle} (reward ops — docs/REWARDS.md)
+supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql · distributors.sql
 ```
 
 > Note: `docs/ARCHITECTURE.md`'s module map predates several systems (animals,

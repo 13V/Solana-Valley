@@ -202,3 +202,92 @@ When real money is flowing at volume, migrate the claim step to a merkle
 distributor (fork an audited one — Jito/Jupiter/Saber). The ledger, crediting,
 and buyback bot here all carry over unchanged; only the payout swaps from a
 server-signed transfer to an on-chain self-claim.
+
+---
+
+## Trustless (merkle) distributor (Option B)
+
+The graduation path from the custodial backend above. Instead of our server
+holding a hot wallet and signing each payout, we publish a **merkle root** of the
+season's `(wallet → amount)` allocations on-chain, fund a vault PDA once, and
+**players claim themselves** against their proof. No server signs a transfer; the
+only signature is the player's own wallet on the `claim` transaction.
+
+> Status: **inert by default.** The client widget ships, but it renders nothing
+> until the `reward_distributor` program is deployed and
+> `VITE_REWARD_DISTRIBUTOR_PROGRAM` is set (see below). Until then the
+> **custodial path (Option A) above still works** and is the active payout route.
+
+### Why bother
+
+It removes the two sharpest edges of the custodial model (see *Known limits*):
+
+- **No hot wallet.** Rewards sit in an on-chain **vault PDA** that releases tokens
+  only against a valid proof of the published root. There's no server-held key
+  full of player funds to rotate or leak.
+- **No custodial double-pay window.** The `claim_status` PDA is created atomically
+  with the transfer, so a wallet can claim each leaf **exactly once** — the
+  reserve/confirm/finalize race in `api/claim.ts` simply doesn't exist here.
+
+The entitlement layer is unchanged: scores still come from
+`scripts/lib/contribution.mjs`, with the same caps + diminishing returns and the
+same "coin balance is ignored" rule. Only the *payout* mechanism differs.
+
+### The flow
+
+```
+ contribution score  (scripts/lib/contribution.mjs — same as Option A)
+        ▼
+ scripts/merkle-season.mjs build   →  computes leaves + merkle root,
+                                      publishes per-wallet proofs to Supabase
+        ▼
+ distributors row (root, mint, total)  +  distributor_claims rows (idx, amount, proof)
+        ▼
+ create the on-chain distributor   (programs/reward-distributor): init the
+   distributor account with the root, fund its vault PDA, set distributor_pubkey
+        ▼
+ player connects wallet  →  MerkleClaim widget fetches their proof  →  builds &
+   signs the `claim` tx themselves  →  vault → player ATA  ✅  (claim_status PDA
+   marks the leaf claimed)
+```
+
+A distributor is **live** once its `distributor_pubkey` is written to the row
+(i.e. the on-chain account exists and the vault is funded). The widget always
+targets the **latest live** distributor (`order by season_id desc`).
+
+### Data (public-read Supabase tables)
+
+| Table | Columns | Role |
+|---|---|---|
+| `distributors` | `season_id, label, mint, root, total, distributor_pubkey, tx` | One row per season. `distributor_pubkey` null ⇒ not yet deployed (widget ignores it). |
+| `distributor_claims` | `season_id, wallet, idx, amount, proof` | One row per wallet. `amount` is base units (string); `proof` is a JSONB array of 32-byte hashes as hex strings. |
+
+Both are read with the **public anon client** (`app/src/chain/supabase.ts`) —
+proofs and roots are public by design, so no wallet signature is needed to read
+them.
+
+### Client pieces
+
+| File | Role |
+|---|---|
+| `app/src/chain/merkleClaim.ts` | Framework-agnostic logic: `getProgramId()`, `fetchActiveClaim(wallet)`, `isAlreadyClaimed(...)`, `buildClaimTransaction(...)`. Hand-encodes the Anchor `claim` ix and derives the `claim_status` / `vault` PDAs + the claimant ATA. |
+| `app/src/chain/MerkleClaim.tsx` | The self-claim widget (separate from `RewardsClaim`). Uses the wallet adapter's `sendTransaction`; the player signs. Sits just above the custodial widget so the two don't overlap. |
+
+The `claim` instruction layout the client encodes (must match the program):
+discriminator `[62,198,214,193,213,159,108,210]` ++ `index` (u64 LE) ++ `amount`
+(u64 LE) ++ `proof` (`Vec<[u8;32]>` = u32 LE length ++ length×32 raw bytes).
+Accounts in order: `claimant` (signer, writable), `distributor` (writable),
+`claim_status` PDA `["claim_status", distributor, claimant]` (writable),
+`vault` PDA `["vault", distributor]` (writable), `claimant_token` ATA (writable),
+`token_program`, `system_program`. The ATA-creation ix is prepended on first
+claim (the claimant pays the rent).
+
+### Environment variable (client, public)
+
+| Var | Used by | Notes |
+|---|---|---|
+| `VITE_REWARD_DISTRIBUTOR_PROGRAM` | `merkleClaim.ts` / `MerkleClaim.tsx` | Base58 program id of the deployed `reward_distributor`. **Unset ⇒ the merkle widget is inert (renders nothing).** Unlike the `TREASURY_SECRET_KEY` etc. above, a program id is public — it ships in the client bundle (the `VITE_` prefix exposes it to the browser, as intended). |
+
+Set it in the Vercel project (and locally) once `programs/reward-distributor` is
+deployed; leave it unset to keep the merkle path dormant while the custodial
+backend handles payouts.

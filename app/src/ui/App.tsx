@@ -18,6 +18,7 @@ import { TouchControls } from './TouchControls';
 import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { MultiplayerSync } from '../chain/MultiplayerSync';
 import { RewardsClaim } from '../chain/RewardsClaim';
+import { MerkleClaim } from '../chain/MerkleClaim';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
 import { ContractAddress } from './ContractAddress';
@@ -86,6 +87,7 @@ export function App() {
           {helpSeen && <TutorialCoach />}
           <Toasts />
           <RewardsClaim />
+          <MerkleClaim />
           <ContractAddress />
           <Chat />
         </div>
