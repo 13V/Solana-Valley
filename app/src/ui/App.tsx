@@ -23,7 +23,7 @@ import { ContractAddress } from './ContractAddress';
 import { Chat } from './Chat';
 import './settings'; // self-applies saved accessibility/volume settings on load
 
-const HELP_SEEN_KEY = 'solana-valley:seen-help';
+const HELP_SEEN_KEY = 'farm-lands:seen-help';
 
 export function App() {
   const containerRef = useRef<HTMLDivElement>(null);

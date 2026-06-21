@@ -1,5 +1,5 @@
 /* ============================================================================
- * Sprout Valley — Map Editor
+ * Farm Lands — Map Editor
  * Plain ES, no modules, no libraries. Loaded via <script src="editor.js">.
  * Everything is wrapped in one IIFE that boots on DOMContentLoaded.
  * ==========================================================================*/

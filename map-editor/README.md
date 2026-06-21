@@ -1,4 +1,4 @@
-# Sprout Valley Map Editor
+# Farm Lands Map Editor
 
 A browser-based, Stardew-Valley-style tile map editor built around the
 **Sprout Lands** pixel-art tilesets by **Cup Nooble**. It runs entirely in the

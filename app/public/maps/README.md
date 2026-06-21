@@ -1,6 +1,6 @@
 # Saved maps
 
-Drop maps exported from the **Sprout Valley Map Editor** (`map-editor/`, click
+Drop maps exported from the **Farm Lands Map Editor** (`map-editor/`, click
 **Save** → `sprout-map.json`) into this folder, named `<name>-map.json`.
 
 - The game's **Explore mode** auto-loads `maps/<name>-map.json` when booted with

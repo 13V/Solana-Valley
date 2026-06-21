@@ -1,15 +1,15 @@
-# 🌱 Solana Valley
+# 🌱 Farm Lands
 
 A cozy farming game in the spirit of **Stardew Valley**, with a **"Grow a
 Garden"**-style rare-crop economy — built to run on the **Solana** blockchain.
 
 ## ▶️ Play
 
-- **Online:** https://13v.github.io/Solana-Valley/ (auto-deployed via GitHub Pages)
+- **Online:** https://13v.github.io/Farm-Lands/ (auto-deployed via GitHub Pages)
 - **Locally:**
   ```bash
-  git clone https://github.com/13V/Solana-Valley.git
-  cd Solana-Valley
+  git clone https://github.com/13V/Farm-Lands.git
+  cd Farm-Lands
   npm install
   npm run dev --workspace app   # then open the printed http://localhost:5173
   ```
@@ -156,7 +156,7 @@ don't touch your real farm):
 ## Project structure
 
 ```
-solana-valley/
+farm-lands/
 ├── app/                        # game client (Vite + React + Phaser)
 │   └── src/
 │       ├── game/

@@ -12,7 +12,7 @@ export const virtualMove: { x: number; y: number } = { x: 0, y: 0 };
 
 type KeyBinds = Record<MoveAction, string>;
 
-const STORAGE_KEY = 'solana-valley:keybinds';
+const STORAGE_KEY = 'farm-lands:keybinds';
 const DEFAULTS: KeyBinds = { up: 'W', down: 'S', left: 'A', right: 'D' };
 const ACTIONS: MoveAction[] = ['up', 'down', 'left', 'right'];
 

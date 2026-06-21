@@ -1,6 +1,6 @@
 # On-chain programs (planned)
 
-This directory will hold the **Anchor (Rust)** programs that back Solana Valley's
+This directory will hold the **Anchor (Rust)** programs that back Farm Lands's
 ownership and economy. Nothing here is implemented yet — M0 is client-only with
 wallet connect. This is the design we're building toward (see `docs/ROADMAP.md`).
 

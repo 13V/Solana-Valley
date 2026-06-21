@@ -3,7 +3,7 @@ import { TILE, PLAYER_SPEED } from '../constants';
 
 /**
  * MapScene — a standalone, walkable "Explore" mode that renders a map built in
- * the Sprout Valley Map Editor (a `sprout-valley-map` JSON document) and lets
+ * the Farm Lands Map Editor (a `sprout-valley-map` JSON document) and lets
  * the player walk around it. It is fully additive: it shares the boot-loaded
  * `pchar` sprite and the same movement/animation feel as the farm, but touches
  * none of FarmScene's state, world geometry, save format, or multiplayer.

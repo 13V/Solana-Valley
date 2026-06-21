@@ -5,10 +5,10 @@
 // missing or blocked AudioContext (older browsers, autoplay policies, private
 // mode) degrades silently rather than throwing.
 
-const MUTE_KEY = 'solana-valley:muted';
-const VOLUME_KEY = 'solana-valley:volume';
-const MUSIC_VOLUME_KEY = 'solana-valley:music-volume';
-const MUSIC_ON_KEY = 'solana-valley:music-on';
+const MUTE_KEY = 'farm-lands:muted';
+const VOLUME_KEY = 'farm-lands:volume';
+const MUSIC_VOLUME_KEY = 'farm-lands:music-volume';
+const MUSIC_ON_KEY = 'farm-lands:music-on';
 
 // Background-music tuning. The loop is a gentle 4-bar jazzy progression at a
 // slow tempo; everything is kept quiet so it sits under the SFX as ambience.

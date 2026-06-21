@@ -1,6 +1,6 @@
 # Map Integration Guide
 
-**Purpose:** hand a map built in the **Sprout Valley Map Editor** (`map-editor/`)
+**Purpose:** hand a map built in the **Farm Lands Map Editor** (`map-editor/`)
 to a Claude Code session (or any developer) so it can be integrated into the
 game. This file is the complete spec — a fresh session should need nothing else.
 
@@ -156,7 +156,7 @@ Higher effort and more coupling. The seam is **`FarmScene.buildWorld()`** (~line
   (derived from `plots.ts`, ~283×107) — a smaller editor map must be placed
   within it or the world size made dynamic; the save format, multiplayer
   "plots," and crop/farming systems all assume the homestead geometry. Don't
-  break `loadSave()`/`saveState()` (`solana-valley:save`).
+  break `loadSave()`/`saveState()` (`farm-lands:save`).
 
 For the rendering + collision recipe, copy from `MapScene.ts`.
 

@@ -4,7 +4,7 @@ Guidance for Claude (and other AI assistants) working in this repository.
 
 ## What this is
 
-**Solana Valley** — a cozy, Stardew-Valley-style farming game with a
+**Farm Lands** — a cozy, Stardew-Valley-style farming game with a
 "Grow a Garden"-style rare-crop economy, built to run in the browser with a
 Solana wallet/ownership layer. It is a single-player game today (fully playable)
 with devnet wallet connect, optional cloud saves, and lightweight realtime

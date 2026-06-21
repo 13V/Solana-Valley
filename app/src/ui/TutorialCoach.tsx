@@ -5,8 +5,8 @@ import type { UiState } from '../game/types';
 import './tutorial.css';
 
 // localStorage keys (namespaced like the rest of the app).
-const DONE_KEY = 'solana-valley:tutorial-done';
-const STEP_KEY = 'solana-valley:tutorial-step';
+const DONE_KEY = 'farm-lands:tutorial-done';
+const STEP_KEY = 'farm-lands:tutorial-step';
 
 // The five gameplay verbs the game emits over bus.on('action', ...).
 type Action = 'till' | 'plant' | 'water' | 'harvest' | 'sell';

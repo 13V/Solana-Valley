@@ -4,7 +4,7 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel help">
       <div className="panel-head">
-        <h3>🌱 Welcome to Sprout Valley</h3>
+        <h3>🌱 Welcome to Farm Lands</h3>
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div className="help-body">
