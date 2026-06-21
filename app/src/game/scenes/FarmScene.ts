@@ -741,7 +741,7 @@ export class FarmScene extends Phaser.Scene {
     const GRASS_BASE_FRAME = 12;
 
     const ground = islandMap.layers.find((l) => l.name === 'Ground');
-    const layer2 = islandMap.layers.find((l) => l.name === 'Layer 2');
+    const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
 
     // Ground layer first (depth 0) — also records the base category per cell so
     // the prettify pass can find plain-grass tiles with nothing on top.
@@ -752,13 +752,13 @@ export class FarmScene extends Phaser.Scene {
         if (!this.inBounds(gx, gy)) continue;
         const cx = gx * TILE + TILE / 2;
         const cy = gy * TILE + TILE / 2;
-        // Opaque grass base under every authored ground cell. The blue-tint grass
-        // autotile's edge/corner frames are 12–28% transparent, so without a base
-        // the teal sea backdrop shows through and the land edges look like water.
-        this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
+        const cat = classify(key);
+        // Opaque grass base under non-water cells: the blue-tint grass autotile's
+        // edge/corner frames are 12–28% transparent, so without a base the teal sea
+        // backdrop shows through and the land edges look like water.
+        if (cat !== 'water') this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
         const img = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
         this.ground[gy][gx] = img;
-        const cat = classify(key);
         if (cat === 'water') {
           this.tiles[gy][gx].obstacle = true;
           this.pondTiles.add(k); // fishable water
@@ -769,11 +769,12 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    // Layer 2: flat decals keep depth 1; tall objects get per-row depth (cy) so
-    // the player can pass behind them.
-    if (layer2?.visible !== false && layer2) {
-      for (const k in layer2.cells) {
-        const [key, frame] = layer2.cells[k];
+    // Overlay layers (Layer 2, Layer 3, …) in array order: flat decals keep depth
+    // 1; tall objects get per-row depth (cy) so the player can pass behind them.
+    for (const layer of overlays) {
+      if (layer.visible === false) continue;
+      for (const k in layer.cells) {
+        const [key, frame] = layer.cells[k];
         const [lx, ly] = k.split(',').map(Number);
         if (!this.inBounds(lx, ly)) continue;
         const cx = lx * TILE + TILE / 2;
