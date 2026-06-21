@@ -1,11 +1,9 @@
-import { WORLD_COLS, WORLD_ROWS } from './plots';
-
 export const TILE = 32;
-// World grid (bigger than the screen — the camera follows the player). Derived
-// from the 5×2 homestead neighbourhood geometry (see plots.ts) so the world is
-// always exactly big enough to hold every homestead plus its grass margin.
-export const GRID_W = WORLD_COLS;
-export const GRID_H = WORLD_ROWS;
+// World grid (bigger than the screen — the camera follows the player). Matches
+// the hand-authored startIsland.json map (40×30 tiles); the camera, world
+// bounds and the sea backdrop all derive their size from this.
+export const GRID_W = 40;
+export const GRID_H = 30;
 export const WORLD_WIDTH = TILE * GRID_W;
 export const WORLD_HEIGHT = TILE * GRID_H;
 // Camera viewport / canvas size (what's on screen at once).

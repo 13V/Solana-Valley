@@ -82,6 +82,32 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('hills', `${A}hills.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('bridge', `${A}bridge.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('stonepath', `${A}stonepath.png`, { frameWidth: 16, frameHeight: 16 });
+
+    // Hand-authored start-island map tilesets (startIsland.json). Each PNG in
+    // public/assets/tilesets/ is a 16×16 spritesheet keyed by its filename (sans
+    // .png); the map's frame indices already match these sheets. mapLoader.ts
+    // reads them by key — keep this list in sync with that directory.
+    const TS = 'assets/tilesets/';
+    const tilesetKeys = [
+      'premium_objects_boats',
+      'premium_objects_tree_animations_tree_apple_sprites',
+      'premium_tilesets_building_parts_animal_structures_chikcen_houses',
+      'premium_tilesets_building_parts_fences',
+      'premium_tilesets_building_parts_stone_path_2',
+      'premium_tilesets_building_parts_wooden_bridge_v2',
+      'premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2',
+      'premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2',
+      'premium_tilesets_ground_tiles_new_tiles_simpel_versions_grass_tiles_v2_simple_cutout_grass_tiles_v2_mid_moss2',
+      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt',
+      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2',
+      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide',
+      'premium_tilesets_ground_tiles_water',
+      'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers',
+      'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2',
+    ];
+    for (const key of tilesetKeys) {
+      this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
   }
 
   create() {
