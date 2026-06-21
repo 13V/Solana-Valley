@@ -929,8 +929,9 @@ export class FarmScene extends Phaser.Scene {
   private placeCottage(h: Homestead) {
     const cx = h.house.cx * TILE + TILE / 2;
     const base = (h.house.baseRow + 1) * TILE;
-    // A proper cottage (house.png) — visually distinct from the chicken house.
-    this.add.image(cx, base, 'house', 'cottage').setOrigin(0.5, 1).setScale(2).setDepth(base);
+    // The player's cozy home — Sprout Lands "Sorry Pack" Village house (frame 0 of
+    // the 3×3 colour grid), a detailed building in place of the old flat cottage.
+    this.add.image(cx, base, 'sprouthouse', 0).setOrigin(0.5, 1).setScale(2).setDepth(base);
     for (let ty = h.house.baseRow - 3; ty <= h.house.baseRow; ty++) {
       for (let dx = -1; dx <= 1; dx++) {
         const tx = h.house.cx + dx;

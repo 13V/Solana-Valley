@@ -15,6 +15,8 @@
   sprites: **Sprout Lands "Sorry Pack" — Ocean Pack** (Cup Nooble). Files:
   `fishing_{front,back,side}.png`, `fishing_splash.png`, `fish_shadow_*.png`, `fish.png`.
   Commercial use confirmed permitted by Cup Nooble (no redistribution of the pack itself; no NFTs).
+- Buildings — the player's cozy home: **Sprout Lands "Sorry Pack" — Village Pack**
+  (Cup Nooble). File: `sprout_house.png` (the pack's `small house` set, embedded in-game).
 
 These assets are included in this repository under the terms below. They live in
 `app/public/assets/sprout/` (base) and `app/public/assets/sprout-ui/` (premium UI).

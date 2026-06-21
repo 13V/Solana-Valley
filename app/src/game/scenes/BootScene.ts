@@ -62,6 +62,7 @@ export class BootScene extends Phaser.Scene {
     }
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
+    this.load.spritesheet('sprouthouse', `${A}sprout_house.png`, { frameWidth: 64, frameHeight: 64 }); // Sorry-pack Village home (3×3 colour variants)
     this.load.image('coop', `${A}coop.png`);
     this.load.image('well', `${A}well.png`);
     // Decorative props.
