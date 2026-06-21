@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
 import { buildSkinTextures } from '../skins';
+import { usedTilesetKeys } from '../mapLoader';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -85,27 +86,11 @@ export class BootScene extends Phaser.Scene {
 
     // Hand-authored start-island map tilesets (startIsland.json). Each PNG in
     // public/assets/tilesets/ is a 16×16 spritesheet keyed by its filename (sans
-    // .png); the map's frame indices already match these sheets. mapLoader.ts
-    // reads them by key — keep this list in sync with that directory.
+    // .png); the map's frame indices already match these sheets. The load list is
+    // auto-synced to whatever the map references (mapLoader.usedTilesetKeys), so a
+    // new map only needs its tileset PNGs dropped into that folder.
     const TS = 'assets/tilesets/';
-    const tilesetKeys = [
-      'premium_objects_boats',
-      'premium_objects_tree_animations_tree_apple_sprites',
-      'premium_tilesets_building_parts_animal_structures_chikcen_houses',
-      'premium_tilesets_building_parts_fences',
-      'premium_tilesets_building_parts_stone_path_2',
-      'premium_tilesets_building_parts_wooden_bridge_v2',
-      'premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2',
-      'premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2',
-      'premium_tilesets_ground_tiles_new_tiles_simpel_versions_grass_tiles_v2_simple_cutout_grass_tiles_v2_mid_moss2',
-      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt',
-      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2',
-      'premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide',
-      'premium_tilesets_ground_tiles_water',
-      'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers',
-      'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2',
-    ];
-    for (const key of tilesetKeys) {
+    for (const key of usedTilesetKeys) {
       this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
     }
   }
