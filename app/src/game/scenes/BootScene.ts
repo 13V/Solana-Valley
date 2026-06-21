@@ -90,7 +90,16 @@ export class BootScene extends Phaser.Scene {
     this.makeUtilTextures();
     this.makeFxTextures();
     this.defineAssetFrames();
-    this.scene.start('Farm');
+    // Optional ?map=<name|url> boots straight into the walkable map editor scene
+    // (e.g. ?map=sample → maps/sample-map.json). Otherwise start the farm.
+    const mapParam = new URLSearchParams(location.search).get('map');
+    if (mapParam !== null) {
+      const v = mapParam.trim();
+      const url = v && v !== '1' ? (v.endsWith('.json') ? v : `maps/${v}-map.json`) : undefined;
+      this.scene.start('Map', { url });
+    } else {
+      this.scene.start('Farm');
+    }
   }
 
   private gfx(): Phaser.GameObjects.Graphics {

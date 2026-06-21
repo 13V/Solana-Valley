@@ -539,6 +539,9 @@ export class FarmScene extends Phaser.Scene {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
     kb.on('keydown-FOUR', () => this.setTool('rod'));
+    // `M` opens the standalone walkable Map Editor scene (Explore mode). It only
+    // renders an editor-built map for walking around; it doesn't touch farm state.
+    kb.on('keydown-M', () => this.scene.start('Map', { url: 'maps/sample-map.json' }));
 
     // The rod/line/bobber cast choreography. Torn down on shutdown.
     this.fishingCast = new FishingCast(this);
