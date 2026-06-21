@@ -736,6 +736,10 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
+    // Blue-tint grass fill (frame 12 is fully opaque) used as a base layer.
+    const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
+    const GRASS_BASE_FRAME = 12;
+
     const ground = islandMap.layers.find((l) => l.name === 'Ground');
     const layer2 = islandMap.layers.find((l) => l.name === 'Layer 2');
 
@@ -748,6 +752,10 @@ export class FarmScene extends Phaser.Scene {
         if (!this.inBounds(gx, gy)) continue;
         const cx = gx * TILE + TILE / 2;
         const cy = gy * TILE + TILE / 2;
+        // Opaque grass base under every authored ground cell. The blue-tint grass
+        // autotile's edge/corner frames are 12–28% transparent, so without a base
+        // the teal sea backdrop shows through and the land edges look like water.
+        this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
         const img = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
         this.ground[gy][gx] = img;
         const cat = classify(key);
