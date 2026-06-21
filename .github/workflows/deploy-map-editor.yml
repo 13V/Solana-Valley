@@ -7,7 +7,13 @@ name: Deploy Map Editor to GitHub Pages
 
 on:
   push:
+    # NOTE: GitHub Pages deployments are gated by the `github-pages` environment,
+    # which by default only permits the repository's DEFAULT branch. The deploy
+    # job will only succeed when run from the default branch (currently
+    # `claude/loving-cannon-ayy18g`); runs from other branches fail instantly at
+    # the environment gate. List the default branch first so a merge auto-deploys.
     branches:
+      - claude/loving-cannon-ayy18g   # repo default branch — deploys succeed here
       - main
       - claude/trusting-faraday-zib5xc
     paths:
