@@ -204,7 +204,7 @@
     <header class="topbar">
       <button class="menu-toggle" aria-label="Menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
       <a class="brand" href="../">
-        <span class="leaf">🌱</span> Sprout&nbsp;Valley <span class="tick">docs</span>
+        <span class="leaf">🌱</span> Farm&nbsp;Lands <span class="tick">docs</span>
       </a>
       <span class="spacer"></span>
       <a class="nav hide-sm" href="#tokenomics">Tokenomics</a>
@@ -216,6 +216,9 @@
     <div class="layout">
       <!-- ===================== SIDEBAR ===================== -->
       <nav class="sidebar" id="sidebar">
+        <input id="docfilter" type="search" placeholder="Filter the docs…" aria-label="Filter docs"
+          oninput="filterDocs(this.value)"
+          style="width:100%;margin:0 0 10px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--bg-soft);color:var(--ink)" />
         <h5>Start here</h5>
         <a href="#overview">Overview</a>
         <a href="#quickstart">Quick start</a>
@@ -230,6 +233,9 @@
         <a href="#fishing">Fishing</a>
         <a href="#foraging">Foraging</a>
         <a href="#atmosphere">World &amp; atmosphere</a>
+        <h5>Create &amp; explore</h5>
+        <a href="#mapeditor">Map editor</a>
+        <a href="#explore">Explore mode</a>
         <h5>Economy &amp; $SPROUT</h5>
         <a href="#economy">Two-currency economy</a>
         <a href="#tokenomics">$SPROUT tokenomics</a>
@@ -243,6 +249,27 @@
         <a href="#faq">FAQ</a>
         <a href="#disclaimer">Disclaimer</a>
       </nav>
+      <script>
+        // Sidebar filter — type to narrow the wiki nav (hides non-matching
+        // links and any group heading left empty).
+        function filterDocs(q) {
+          q = (q || '').trim().toLowerCase();
+          var nav = document.getElementById('sidebar');
+          if (!nav) return;
+          var nodes = nav.children, header = null, shown = 0;
+          var finalize = function () { if (header) header.style.display = shown ? '' : 'none'; };
+          for (var i = 0; i < nodes.length; i++) {
+            var el = nodes[i];
+            if (el.tagName === 'H5') { finalize(); header = el; shown = 0; }
+            else if (el.tagName === 'A') {
+              var ok = !q || el.textContent.toLowerCase().indexOf(q) >= 0;
+              el.style.display = ok ? '' : 'none';
+              if (ok) shown++;
+            }
+          }
+          finalize();
+        }
+      </script>
 
       <!-- ===================== MAIN ===================== -->
       <main>
@@ -292,6 +319,7 @@
               <thead><tr><th>Action</th><th>Input</th></tr></thead>
               <tbody>
                 <tr><td>Move</td><td><code>WASD</code> or arrow keys (camera follows you)</td></tr>
+                <tr><td>Map / Explore mode</td><td><code>M</code> — walk a map you built in the editor (<code>Esc</code> to return)</td></tr>
                 <tr><td>Select tool</td><td><code>1</code> Hoe · <code>2</code> Watering Can · <code>3</code> Seeds (or click the hotbar)</td></tr>
                 <tr><td>Use tool on a tile</td><td>Click a tile within reach (cursor turns red if you can't farm there)</td></tr>
                 <tr><td>Harvest</td><td>Click a ripe crop</td></tr>
@@ -484,6 +512,33 @@
             <div class="card"><h4>💾 Autosave</h4><p>Your whole farm — coins, seeds, harvest, shop and time — persists locally across reloads.</p></div>
             <div class="card"><h4>🔊 Sound</h4><p>Synthesised WebAudio effects (no audio files), with a HUD mute toggle.</p></div>
           </div>
+        </section>
+
+        <!-- MAP EDITOR -->
+        <section id="mapeditor">
+          <h2>🗺️ Map editor <span class="badge live">Live</span></h2>
+          <p>A standalone, drag-and-drop <strong>tile map editor</strong> for building your own Farm Lands maps from the full <strong>Sprout Lands</strong> tileset — <strong>15,666 placeable 16×16 tiles</strong> across 233 sheets. It runs in the browser, no install.</p>
+          <div class="grid">
+            <div class="card"><h4>🎨 Every tile, on tap</h4><p>A searchable right-hand sidebar lists every tile, grouped by source sheet. Click to pick, or drag a tile straight onto the grid.</p></div>
+            <div class="card"><h4>🧱 Layers &amp; tools</h4><p>Paint, rectangle, bucket-fill, eyedropper, erase and multi-tile stamps — across as many layers as you like (ground, objects, decor…).</p></div>
+            <div class="card"><h4>💾 Save &amp; export</h4><p>Autosaves locally; save / load your project as JSON, or export the finished map as a PNG.</p></div>
+          </div>
+          <!-- Current Pages URL; GitHub auto-redirects to /Farm-Lands/ once the repo is renamed. -->
+          <p><a class="btn" href="https://13v.github.io/Solana-Valley/" rel="noopener">🗺️ Open the map editor</a></p>
+          <div class="callout info"><span class="ico">ℹ️</span><div>Maps save in a compact <code>sprout-valley-map</code> JSON that references tiles by id. To wire a saved map into the game, see <code>MAP_INTEGRATION.md</code> in the repo.</div></div>
+        </section>
+
+        <!-- EXPLORE MODE -->
+        <section id="explore">
+          <h2>🚶 Explore mode <span class="badge live">Live</span></h2>
+          <p>Maps you build can be <strong>walked around inside the game</strong>. Press <code>M</code> in the farm (or open the game with <code>?map=&lt;name&gt;</code>) to drop into a standalone, walkable view of an editor-built map.</p>
+          <ul>
+            <li><strong>Move</strong> with <code>WASD</code> / arrow keys; the camera follows and the world is bounded to your map.</li>
+            <li><strong>Collision is automatic:</strong> tiles on any layer above the ground layer (fences, water, buildings…) block you — so build <em>terrain on the bottom layer, obstacles on top</em>.</li>
+            <li><strong>Play your own:</strong> drag a <code>sprout-map.json</code> exported from the editor onto the window to load it instantly.</li>
+            <li>Press <code>Esc</code> (or <code>M</code> again) to return to the farm.</li>
+          </ul>
+          <div class="callout info"><span class="ico">🧭</span><div>Explore mode is fully separate from your farm — it never touches your save, crops or progress. It's a sandbox for showing maps off.</div></div>
         </section>
 
         <!-- ECONOMY -->
