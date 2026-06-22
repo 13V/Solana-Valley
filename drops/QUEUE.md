@@ -7,8 +7,8 @@ clean** (`npm run typecheck`) and is additive: no save migrations, no chain code
 
 ## What this queue delivers
 **196 plants · 15 mutations · 62 fish · 22 forageables · 34 achievements · 50-rung
-quest ladder · 280 item descriptions · 14 rotating festivals · Shop/Seeds filters
-· a Lv18 perk tier for all 5 skills.** Crops & mutations are art-free (existing
+quest ladder (with Divine+ seed milestones) · 280 item descriptions · 14 rotating
+festivals · Shop/Seeds filters · a Lv18 perk tier for all 5 skills.** Crops & mutations are art-free (existing
 sprite rows recolored via `cropTint`); no item was added without a real sprite.
 
 ---
@@ -37,7 +37,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 | 7 | **Grove & Frontiers** | `d171882` | 48 crops: citrus, nuts, heirloom veg, autumn, vines, cacti |
 | 8 | **Elements, Deep & Sweets** | `307e169` | 24 crops (aquatic, candy, volcanic) + 20 fish + 6 forage + 4 mutations (incl. **Abyssal 150×**) + 12 achievements |
 | 9 | **The Compendium** | `833069f` | **280 item flavor descriptions** (plant tooltips + Almanac Fish Bestiary & Forage Field Guide) + **rarity/search filters** on Shop & Seeds |
-| 10 | **Quests & Festivals** | `fc26433` | **Questline 18 → 50 goals** (early→endgame, escalating rewards) + **14 rotating seasonal festivals** (daily banner) |
+| 10 | **Quests & Festivals** | `ccb518d` | **Questline 18 → 50 goals** + **goal-set milestones** (every 10 goals cleared → a guaranteed Divine+ seed, up to Celestial) + **14 rotating seasonal festivals** (daily banner) |
 
 > Each SHA bundles several commits — that's what makes them "packed." Releasing in
 > order applies cleanly. Drops 1–6 are the collectible waves; 7–8 are the big
@@ -56,7 +56,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 7. **🍋 GROVE & FRONTIERS — 48 NEW CROPS!** Citrus, nuts, heirloom veg, autumn harvest, vine fruits & desert cacti.
 8. **🍬 ELEMENTS, DEEP & SWEETS!** Aquatic blooms, a candy garden, a volcanic chase line, 20 more fish, and the rarest mutation ever — **Abyssal 150×.** 💎
 9. **📖 THE COMPENDIUM!** Every one of the 280 crops, fish & forageables now has its own flavor description — explore the new Fish Bestiary & Field Guide. Plus rarity & search filters so the shop's a breeze. 
-10. **🎯 QUESTS & FESTIVALS!** A 50-rung quest ladder from first sprout to legend, and 14 rotating seasonal festivals lighting up the valley. The grand finale! 🎉
+10. **🎯 QUESTS & FESTIVALS!** A 50-rung quest ladder — and every 10 goals you clear now drops a guaranteed **Divine-or-better seed** (clear them all for a Celestial!). Plus 14 rotating seasonal festivals. The grand finale! 🎉
 
 ---
 
