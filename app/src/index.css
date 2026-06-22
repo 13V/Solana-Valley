@@ -1058,3 +1058,9 @@ body {
   vertical-align: -2px;
   margin-right: 2px;
 }
+
+/* One-tap "update ready" pill (ui/UpdatePill.tsx) — gentle pop on appear. */
+@keyframes valley-update-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
