@@ -72,11 +72,11 @@ const GOAL_LIST: Goal[] = [
   { id: 'q_disc3', label: 'Curious Gardener', test: (s) => s.plantsDiscovered >= 3, reward: { coins: 90, xp: 20, seed: { id: 'beet', count: 3 } } },
   { id: 'q_coin500', label: 'Valley Vendor', test: (s) => s.earned >= 500, reward: { coins: 150, xp: 25 } },
   { id: 'q_harvest50', label: 'Bountiful Season', test: (s) => s.harvested >= 50, reward: { coins: 300, xp: 40 } },
-  { id: 'q_coin1000', label: 'Golden Thumb', test: (s) => s.earned >= 1000, reward: { coins: 350, xp: 40, seed: { id: 'strawberry', count: 4 } } },
+  { id: 'q_coin1000', label: 'Golden Thumb', test: (s) => s.earned >= 1000, reward: { coins: 350, xp: 40, seed: { id: 'eggplant', count: 4 } } },
   { id: 'q_harvest100', label: 'Seasoned Hands', test: (s) => s.harvested >= 100, reward: { coins: 500, xp: 55, seed: { id: 'pumpkin', count: 2 } } },
   // --- Quest expansion: mid game ---
   { id: 'q_harvest_350', label: 'Field Hand', test: (s) => s.harvested >= 350, reward: { coins: 1200, xp: 120 } },
-  { id: 'q_earned_5k', label: 'Market Regular', test: (s) => s.earned >= 5000, reward: { coins: 1500, xp: 150, seed: { id: 'strawberry', count: 3 } } },
+  { id: 'q_earned_5k', label: 'Market Regular', test: (s) => s.earned >= 5000, reward: { coins: 1500, xp: 150, seed: { id: 'cauliflower', count: 3 } } },
   { id: 'q_level_12', label: 'Old Hand', test: (s) => s.level >= 12, reward: { coins: 2000, xp: 200 } },
   { id: 'q_disc_20', label: 'Green Thumb Gazette', test: (s) => s.plantsDiscovered >= 20, reward: { coins: 2500, xp: 180, seed: { id: 'corn', count: 2 } } },
   { id: 'q_harvest_500', label: 'Bumper Crop', test: (s) => s.harvested >= 500, reward: { coins: 3000, xp: 240 } },
@@ -124,7 +124,7 @@ export type GoalMilestone = {
 
 export const GOAL_MILESTONES: GoalMilestone[] = [
   { count: 10, label: 'Goal Set I — 10 goals', seed: { id: 'bluerose', count: 2 }, coins: 5000, xp: 300 },
-  { count: 20, label: 'Goal Set II — 20 goals', seed: { id: 'sunpetal', count: 2 }, coins: 15000, xp: 700 },
+  { count: 20, label: 'Goal Set II — 20 goals', seed: { id: 'frostpumpkin', count: 2 }, coins: 15000, xp: 700 },
   { count: 30, label: 'Goal Set III — 30 goals', seed: { id: 'starfruit', count: 2 }, coins: 40000, xp: 1500 },
   { count: 40, label: 'Goal Set IV — 40 goals', seed: { id: 'moonpetal', count: 1 }, coins: 100000, xp: 3000 },
   { count: 50, label: 'Goal Master — every goal', seed: { id: 'voidbloom', count: 1 }, coins: 300000, xp: 8000 },
