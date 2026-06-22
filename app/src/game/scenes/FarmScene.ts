@@ -969,6 +969,21 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // Turn the player to face the tile they're interacting with, so the directional
+  // tool swing (and the watering-can spray) aim the right way even when the tile
+  // is clicked without first walking toward it. Clicking your own tile keeps the
+  // current facing. update() never rewrites `facing` while standing still, so this
+  // sticks for the duration of the swing.
+  private faceToward(tx: number, ty: number) {
+    const px = Math.floor(this.player.x / TILE);
+    const py = Math.floor(this.player.y / TILE);
+    const dx = tx - px;
+    const dy = ty - py;
+    if (dx === 0 && dy === 0) return;
+    if (Math.abs(dx) >= Math.abs(dy)) this.facing = dx < 0 ? 'left' : 'right';
+    else this.facing = dy < 0 ? 'up' : 'down';
+  }
+
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
     this.player.anims.play(`act-${tool}-${this.facing}`, true);
@@ -1644,6 +1659,7 @@ export class FarmScene extends Phaser.Scene {
 
   private useToolAt(tx: number, ty: number) {
     if (!this.inBounds(tx, ty) || !this.inRange(tx, ty)) return;
+    this.faceToward(tx, ty); // turn to the clicked tile so the swing + spray aim right
     const crop = this.crops.get(this.key(tx, ty));
     if (crop && crop.mature) {
       this.harvest(tx, ty);
