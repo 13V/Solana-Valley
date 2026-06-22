@@ -83,9 +83,11 @@ export const PLANTS: Plant[] = [
   // Divine
   { id: 'bluerose', name: 'Blue Rose', rarity: 'Divine', seedCost: 675, baseValue: 2600, growthSeconds: 205, cropRow: 6, color: 0x5aa0e0 },
   { id: 'frostpumpkin', name: 'Frost Pumpkin', rarity: 'Divine', seedCost: 1050, baseValue: 4100, growthSeconds: 230, cropRow: 9, color: 0x9fd6ff, cropTint: 0x8fd0ff },
+  { id: 'sunpetal', name: 'Sunpetal', rarity: 'Divine', seedCost: 800, baseValue: 3200, growthSeconds: 215, cropRow: 6, color: 0xffc24a, cropTint: 0xffcf5a },
   // Prismatic
   { id: 'starfruit', name: 'Star Fruit', rarity: 'Prismatic', seedCost: 1900, baseValue: 8250, growthSeconds: 255, cropRow: 13, color: 0x6ad0e0 },
   { id: 'moonpetal', name: 'Moonpetal', rarity: 'Prismatic', seedCost: 3200, baseValue: 15000, growthSeconds: 285, cropRow: 6, color: 0xfff0c0, cropTint: 0xf3e9c8 },
+  { id: 'nebula', name: 'Nebula Bloom', rarity: 'Prismatic', seedCost: 2400, baseValue: 11000, growthSeconds: 270, cropRow: 13, color: 0x9a6aff, cropTint: 0xa97aff },
   // Celestial
   { id: 'galaxyfruit', name: 'Galaxy Fruit', rarity: 'Celestial', seedCost: 6500, baseValue: 32000, growthSeconds: 330, cropRow: 13, color: 0xb98aff, cropTint: 0xc6a3ff },
   { id: 'voidbloom', name: 'Voidbloom', rarity: 'Celestial', seedCost: 13000, baseValue: 72500, growthSeconds: 400, cropRow: 11, color: 0x8a4fd0, cropTint: 0x9a6ad0 },
