@@ -36,6 +36,9 @@ export class BootScene extends Phaser.Scene {
     }
     this.load.spritesheet('fishing_splash', `${A}fishing_splash.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('fish_shadow_md', `${A}fish_shadow_md.png`, { frameWidth: 16, frameHeight: 16 });
+    // Watering-can water spray (premium pack): 9 frames of a pour arc per row
+    // (3 identical rows). Overlaid on the player while watering.
+    this.load.spritesheet('watering_spray', `${A}watering_spray.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
     // Chickens (16px) and cows (32px) come in several palette swaps; one is
     // picked per animal for variety.

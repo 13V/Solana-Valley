@@ -830,8 +830,10 @@ export class FarmScene extends Phaser.Scene {
     }
 
     // Fishing cast animations from the Ocean Pack character sheets (the same cat
-    // as pchar). left/right share the side sheet (right = flipX). Frame rows:
-    // cast 32–38, wait 64–80, reel 96–106, hook 128–135, catch (front) 160–191.
+    // as pchar). left/right share the side sheet (right = flipX). Each sheet has
+    // the same six rows — cast 32–38, wait 64–80, reel 96–106, hook 128–135 and
+    // the 32-frame "show off the catch" celebration 160–191 — so we build every
+    // clip per-direction (the catch used to exist front-only and went unused).
     const fishSheet: Record<Dir, string> = {
       down: 'pfish_front', up: 'pfish_back', left: 'pfish_side', right: 'pfish_side',
     };
@@ -848,13 +850,7 @@ export class FarmScene extends Phaser.Scene {
       mk('wait', 64, 80, 8, -1);
       mk('reel', 96, 106, 14, 0);
       mk('hook', 128, 135, 14, 0);
-    }
-    if (this.textures.exists('pfish_front') && !this.anims.exists('pfish-catch')) {
-      this.anims.create({
-        key: 'pfish-catch',
-        frames: this.anims.generateFrameNumbers('pfish_front', { start: 160, end: 191 }),
-        frameRate: 14, repeat: 0,
-      });
+      mk('catch', 160, 191, 20, 0);
     }
 
     // Bobber + water-splash (Ocean Pack `fishing_splash`, 48px) and the underwater
@@ -880,6 +876,14 @@ export class FarmScene extends Phaser.Scene {
       this.anims.create({
         key: 'shadow_swim', frameRate: 10, repeat: -1,
         frames: this.anims.generateFrameNumbers('fish_shadow_md', { start: 0, end: 14 }),
+      });
+    }
+    // Watering-can water spray (premium pack): a one-shot 9-frame pour arc,
+    // overlaid on the player while watering. Row 0 of the 3 identical rows.
+    if (this.textures.exists('watering_spray') && !this.anims.exists('watercan_spray')) {
+      this.anims.create({
+        key: 'watercan_spray', frameRate: 18, repeat: 0,
+        frames: this.anims.generateFrameNumbers('watering_spray', { start: 0, end: 8 }),
       });
     }
     // Animations are keyed by sheet so every palette swap gets its own pair.
@@ -909,6 +913,29 @@ export class FarmScene extends Phaser.Scene {
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
     this.player.anims.play(`act-${tool}-${this.facing}`, true);
+  }
+
+  // Overlay the premium "water out of the can" spray on the player for one swing.
+  // The spray sheet shares the 48px character grid, so it lines up with the can
+  // when drawn at the player's transform; it's purely cosmetic and self-cleans.
+  private waterSpray() {
+    if (!this.anims.exists('watercan_spray')) return;
+    const spray = this.add
+      .sprite(this.player.x, this.player.y, 'watering_spray')
+      .setOrigin(this.player.originX, this.player.originY)
+      .setScale(this.player.scaleX, this.player.scaleY)
+      .setFlipX(this.facing === 'left')
+      .setDepth(this.player.depth + (this.facing === 'up' ? -1 : 1));
+    spray.play('watercan_spray');
+    spray.once('animationcomplete', () => spray.destroy());
+  }
+
+  // Drop the player out of a cast/celebration pose back to the resting idle.
+  private resetPlayerPose() {
+    this.actingUntil = 0;
+    this.player.setFlipX(false);
+    this.player.setTexture('pchar', 0);
+    this.player.anims.play(`idle-${this.facing}`, true);
   }
 
   private grassFrame(x: number, y: number): number {
@@ -1452,6 +1479,7 @@ export class FarmScene extends Phaser.Scene {
       });
       if (watered > 0) {
         this.playAction('water');
+        this.waterSpray(); // pack's water-from-the-can spray arc
         sfx.play('water'); // once per click, not per watered tile
         bus.emit('action', 'water');
         // A tiny global-XP trickle for tending crops: +1 per newly-watered tile,
@@ -2703,18 +2731,31 @@ export class FarmScene extends Phaser.Scene {
       target: { x: cx, y: cy },
       onPhase: (phase) => this.playCastAnim(phase),
       onResolve: (o) => {
+        this.casting = false;
         if (o.hooked) {
           this.landCatch(o.at.x, o.at.y, ocean);
+          // Celebrate with the pack's 32-frame "show off the catch" clip, then
+          // settle back to idle. actingUntil stops update()'s idle from cutting
+          // it short; the per-clip complete event restores the resting pose.
+          const dir = this.facing;
+          const catchKey = `pfish-catch-${dir}`;
+          if (this.anims.exists(catchKey)) {
+            this.player.setFlipX(dir === 'right');
+            this.player.anims.play(catchKey, true);
+            this.actingUntil = this.time.now + 1800;
+            this.player.once(`animationcomplete-${catchKey}`, () => {
+              if (!this.casting) this.resetPlayerPose(); // don't stomp a fresh cast
+            });
+            this.emitState();
+            return;
+          }
         } else if (o.reason === 'early') {
           this.toast('🎣 Reeled in early — nothing was biting yet.');
         } else {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
-        this.casting = false;
-        // Return the player from the cast pose to the normal idle.
-        this.player.setFlipX(false);
-        this.player.setTexture('pchar', 0);
-        this.player.anims.play(`idle-${this.facing}`, true);
+        // A miss (or the catch art is missing): straight back to idle.
+        this.resetPlayerPose();
         this.emitState();
       },
     });
@@ -4042,17 +4083,24 @@ export class FarmScene extends Phaser.Scene {
       if (vy === 0) vy = pad.y;
     }
     const len = Math.hypot(vx, vy) || 1;
-    this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
-    if (vx !== 0 || vy !== 0) {
-      this.actingUntil = 0; // moving cancels the tool pose
-      if (vx < 0) this.facing = 'left';
-      else if (vx > 0) this.facing = 'right';
-      else this.facing = vy < 0 ? 'up' : 'down';
-      this.player.anims.play(`walk-${this.facing}`, true);
-    } else if (time < this.actingUntil) {
-      // let the tool-use animation play out
+    if (this.casting) {
+      // A live fishing cast owns the player's pose (driven by playCastAnim) and
+      // pins them in place — otherwise the idle fallback below would stomp the
+      // cast/wait/reel/catch frames every tick and you'd never see them.
+      this.player.setVelocity(0, 0);
     } else {
-      this.player.anims.play(`idle-${this.facing}`, true);
+      this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
+      if (vx !== 0 || vy !== 0) {
+        this.actingUntil = 0; // moving cancels the tool pose
+        if (vx < 0) this.facing = 'left';
+        else if (vx > 0) this.facing = 'right';
+        else this.facing = vy < 0 ? 'up' : 'down';
+        this.player.anims.play(`walk-${this.facing}`, true);
+      } else if (time < this.actingUntil) {
+        // let the tool-use animation play out
+      } else {
+        this.player.anims.play(`idle-${this.facing}`, true);
+      }
     }
     this.player.setDepth(this.player.y + 18);
 
