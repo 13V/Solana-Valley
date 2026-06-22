@@ -1,17 +1,15 @@
 # 🌱 Launch-Night Content Drop Queue — 10 Packed Drops
 
-Ten big, themed content updates to release **one per hour** during launch. Each
-drop is a **checkpoint** that bundles a batch of additive commits — releasing one
-is a single fast-forward of your deploy branch to that drop's SHA, in order
-(1 → 10). Everything **typechecks clean** (`npm run typecheck`) and is purely
-additive: no save migrations, no chain/token code.
+Ten big, themed updates to release **one per hour**. Each drop is a **checkpoint**
+bundling a batch of additive commits — releasing one is a single fast-forward of
+your deploy branch to that drop's SHA, in order (1 → 10). Everything **typechecks
+clean** (`npm run typecheck`) and is additive: no save migrations, no chain code.
 
-## Grand total this queue adds
-19 → **196 plants** · 5 → **15 mutations** · 20 → **62 fish** · 6 → **22
-forageables** · 10 → **34 achievements** · plus a new **Lv18 perk tier** for all
-5 skills. All of it auto-flows into the shop, seed picker, Almanac, collection
-bonus, and Master Gardener % completion. Crops/mutations are **art-free**
-(existing sprite rows recolored via `cropTint`).
+## What this queue delivers
+**196 plants · 15 mutations · 62 fish · 22 forageables · 34 achievements · 50-rung
+quest ladder · 280 item descriptions · 14 rotating festivals · Shop/Seeds filters
+· a Lv18 perk tier for all 5 skills.** Crops & mutations are art-free (existing
+sprite rows recolored via `cropTint`); no item was added without a real sprite.
 
 ---
 
@@ -23,8 +21,6 @@ bonus, and Master Gardener % completion. Crops/mutations are **art-free**
 ```bash
 git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 ```
-If your deploy branch diverges, cherry-pick the range instead. After each
-release, post the matching announcement copy below.
 
 ---
 
@@ -33,64 +29,53 @@ release, post the matching announcement copy below.
 | Hr | Drop | Deploy SHA | What lands |
 |----|------|-----------|-----------|
 | 1 | **Launch Core** | `1f926fd` | 7 crops · 2 mutations (Aurora, Celestial) · 4 fish · 2 forage · 4 achievements |
-| 2 | **Orchard & Veggie Patch** | `78d77bd` | 42 crops: apples, peaches, cherries, roots, greens, herbs, grains |
-| 3 | **Summer & Tropics** | `6bb9099` | 35 crops: berries, melons, peppers, tropical fruits, flowers |
+| 2 | **Orchard & Veggie Patch** | `78d77bd` | 42 crops: fruits, roots, greens, herbs, grains |
+| 3 | **Summer & Tropics** | `6bb9099` | 35 crops: berries, melons, peppers, tropical, flowers |
 | 4 | **Mythic & Cosmic** | `9bd5ee8` | 21 crops: mandrake, gemfruit, meteor melon, solar lotus… |
 | 5 | **Seas & Wilds** | `9b6be6c` | 18 fish + 8 forageables |
-| 6 | **Mutations & Mastery** | `f4bbc16` | 4 mutations · 8 achievements · **Lv18 perks ×5 skills** · collection tune |
-| 7 | **Grove Expansion** | `54cabdb` | 24 crops: citrus, nuts & cacao, heirloom veg |
-| 8 | **Wild Frontiers** | `d171882` | 24 crops: autumn harvest, vine fruits, cacti & succulents |
-| 9 | **Elements & Sweets** | `4becb3e` | 24 crops: aquatic plants, candy-confection garden, volcanic chase line |
-| 10 | **The Deep & Beyond** | `307e169` | 20 fish + 6 forage + 4 mutations (incl. **Abyssal 150×** apex) + 12 achievements |
+| 6 | **Mutations & Mastery** | `f4bbc16` | 4 mutations · 8 achievements · **Lv18 perks ×5 skills** · balance tune |
+| 7 | **Grove & Frontiers** | `d171882` | 48 crops: citrus, nuts, heirloom veg, autumn, vines, cacti |
+| 8 | **Elements, Deep & Sweets** | `307e169` | 24 crops (aquatic, candy, volcanic) + 20 fish + 6 forage + 4 mutations (incl. **Abyssal 150×**) + 12 achievements |
+| 9 | **The Compendium** | `833069f` | **280 item flavor descriptions** (plant tooltips + Almanac Fish Bestiary & Forage Field Guide) + **rarity/search filters** on Shop & Seeds |
+| 10 | **Quests & Festivals** | `fc26433` | **Questline 18 → 50 goals** (early→endgame, escalating rewards) + **14 rotating seasonal festivals** (daily banner) |
 
-> Each drop's SHA bundles several underlying commits — that's what makes them
-> "packed." Releasing in order applies cleanly every time. Drop 6 includes the
-> collection-bonus rebalance, which is why it ships right after the big crop
-> waves and before the wave-2 expansions.
+> Each SHA bundles several commits — that's what makes them "packed." Releasing in
+> order applies cleanly. Drops 1–6 are the collectible waves; 7–8 are the big
+> expansion; 9–10 are the depth layer (lore, filters, quests, events).
 
 ---
 
 ## Ready-to-paste announcements
 
-1. **🌱 SOLANA VALLEY IS LIVE!** Launch update drops two mutations (Aurora 6× & the legendary Celestial 50×), fresh crops, new fish & achievements. Go plant something. 🌾
-2. **🍎 ORCHARD & VEGGIE PATCH — 42 NEW CROPS!** Apples, peaches, cherries, roots, leafy greens, herbs & grains. The farm just exploded.
-3. **🫐 SUMMER & TROPICS — 35 NEW CROPS!** Berries (they regrow!), melons, fiery peppers, mango, papaya, orchids & lotuses. 🌶️🥭
-4. **🌌 MYTHIC & COSMIC — 21 NEW CROPS!** Mandrake, gemfruit, meteor melon, solar lotus, void fig. The chase tier has arrived.
-5. **🎣 SEAS & WILDS!** 18 new fish from the depths + 8 new forageables out in the world. Grab a rod and go exploring.
-6. **🧬 MUTATIONS & MASTERY!** 4 new mutations, 8 new achievements, and a brand-new **Lv18 perk** for every skill. Push past your limits.
-7. **🍋 GROVE EXPANSION — 24 NEW CROPS!** A full citrus grove, nut trees & cacao, plus rare heirloom veg.
-8. **🌵 WILD FRONTIERS — 24 NEW CROPS!** Autumn harvest, lush vine fruits & desert cacti. Something for every season.
-9. **🍬 ELEMENTS & SWEETS — 24 NEW CROPS!** Aquatic blooms, a whimsical candy garden, and a blazing volcanic line topped by Sunforge Bloom. 🔥
-10. **🌑 THE DEEP & BEYOND!** 20 more fish, 6 forageables, 12 achievements, AND the rarest mutation ever — **Abyssal, 150×.** The finale. 196 crops, 62 fish, 15 mutations. GG. 💎
+1. **🌱 SOLANA VALLEY IS LIVE!** Two mutations (Aurora 6× & legendary Celestial 50×), fresh crops, fish & achievements. Go plant something. 🌾
+2. **🍎 ORCHARD & VEGGIE PATCH — 42 NEW CROPS!** Fruits, roots, leafy greens, herbs & grains.
+3. **🫐 SUMMER & TROPICS — 35 NEW CROPS!** Berries (they regrow!), melons, peppers, mango, orchids. 🌶️🥭
+4. **🌌 MYTHIC & COSMIC — 21 NEW CROPS!** Mandrake, gemfruit, meteor melon, solar lotus. The chase tier is here.
+5. **🎣 SEAS & WILDS!** 18 new fish from the depths + 8 new forageables. Grab a rod.
+6. **🧬 MUTATIONS & MASTERY!** 4 new mutations, 8 achievements, and a new **Lv18 perk** for every skill.
+7. **🍋 GROVE & FRONTIERS — 48 NEW CROPS!** Citrus, nuts, heirloom veg, autumn harvest, vine fruits & desert cacti.
+8. **🍬 ELEMENTS, DEEP & SWEETS!** Aquatic blooms, a candy garden, a volcanic chase line, 20 more fish, and the rarest mutation ever — **Abyssal 150×.** 💎
+9. **📖 THE COMPENDIUM!** Every one of the 280 crops, fish & forageables now has its own flavor description — explore the new Fish Bestiary & Field Guide. Plus rarity & search filters so the shop's a breeze. 
+10. **🎯 QUESTS & FESTIVALS!** A 50-rung quest ladder from first sprout to legend, and 14 rotating seasonal festivals lighting up the valley. The grand finale! 🎉
 
 ---
 
 ## Pre-release checks
 
-- All drops pass `npm run typecheck`. Re-run on the deploy branch after a
-  cherry-pick to be safe.
-- **Sprite-frame caveat (the fish & forage in drops 1, 5, 10):** frames come from
-  each sheet's unused pool. Worth a quick `npm run preview` glance (cast at the
-  pond/sea; wander the grass). Any odd sprite is a one-number `frame:` change —
-  cosmetic, can't break the build. Crops & mutations are art-safe (recolored rows).
-- Crops were generated by two agent fleets and integrated/validated by hand
-  (rarities, value bands, numeric hex, regrow types, no dup ids, no black/white
-  tints). Spot-check a few tints in preview if you want them pixel-perfect.
+- All drops pass `npm run typecheck`. Re-run on the deploy branch after a cherry-pick.
+- **Sprite-frame caveat (fish & forage in drops 1, 5, 8):** frames come from each
+  sheet's unused pool — worth a `npm run preview` glance; any odd one is a
+  one-number `frame:` swap (cosmetic, can't break the build). Crops & mutations
+  are art-safe.
+- **New UI to eyeball in preview:** the Almanac (Fish Bestiary / Field Guide), the
+  Shop/Seeds filter bar, the Goals HUD (now shows the next 6 rungs + "more"), and
+  the top-center festival banner. All typecheck-clean; a quick visual pass is nice
+  to confirm placement on your target screen size.
 
-## Heads-up: the shop & Almanac are now BIG
+## Still in the tank (optional follow-ups)
 
-196 plants makes the seed shop and Almanac long to scroll. If it feels
-overwhelming, the cleanest fix is a **rarity/category filter or search** on the
-Shop and Seeds panels (UI-only, ~30 min). Say the word and I'll add it.
-
-## Highest-leverage next add (not built yet)
-
-An in-game **"What's New" banner / toast** fired on load so each hourly drop
-*announces itself* to players — `EventBus` already has the `toast` channel
-(`app/src/ui/Toasts.tsx`). ~20 min, and it makes every drop land louder.
-
-## Still in the tank
-
-- A third content wave (the generator fleets can be re-run anytime).
-- New animals (needs spritesheets — art-dependent).
-- Daily-quest panel / limited-time "festival" double-value hour (UI + FarmScene).
+- Wire festival *effects* (events.ts exposes `eventForDay` / the active id — e.g. a
+  double-value or triple-mutation day) instead of flavor-only banners.
+- In-game **"What's New" toast** on load so each hourly drop announces itself.
+- A third collectible wave is **not** recommended — fish/forage frames are
+  exhausted and 196 crops already fills the catalog; depth (above) is the better lever.
