@@ -1,0 +1,64 @@
+/* ===================================================================== */
+/* "Choose your name" prompt — a centered modal shown once per wallet     */
+/* after connect. Reuses the shared .panel / .btn chrome; only the        */
+/* backdrop + body layout are scoped here.                                */
+/* ===================================================================== */
+
+/* Full-screen dimming backdrop. It is a direct child of .overlay
+   (pointer-events: none), but `.overlay > *` flips children back to auto,
+   so the backdrop captures clicks and centers the card. */
+.username-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40; /* above HUD/hotbar (z ~5) and the tutorial coach (z ~30) */
+}
+
+/* Override the default .panel top/transform anchoring so flexbox centers it. */
+.username-backdrop .username-panel {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: 360px;
+}
+
+.username-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.username-body .muted {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+.username-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border, #6c4a2b);
+  border-radius: 8px;
+  outline: none;
+}
+
+.username-input:focus {
+  border-color: var(--accent, #7bd66a);
+}
+
+.username-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

@@ -48,6 +48,181 @@ body {
   pointer-events: none;
 }
 
+/* Island chat (bottom-left, above the minimap). */
+.chat-toggle {
+  position: absolute;
+  left: 10px;
+  bottom: 90px;
+  z-index: 8;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(12, 20, 14, 0.82);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-toggle:hover {
+  border-color: var(--accent);
+}
+.chat-unread {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #e6433a;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-weight: 700;
+  border: 2px solid #fff3d8;
+  box-sizing: border-box;
+}
+.chat-panel {
+  position: absolute;
+  left: 10px;
+  bottom: 90px;
+  z-index: 8;
+  width: 300px;
+  max-width: 80vw;
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(12, 20, 14, 0.9);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--panel-border);
+}
+.chat-x {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.7;
+}
+.chat-x:hover {
+  opacity: 1;
+}
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.chat-empty {
+  opacity: 0.6;
+  font-size: 12px;
+  text-align: center;
+  margin: auto 0;
+}
+.chat-msg {
+  word-break: break-word;
+}
+.chat-name {
+  font-weight: 700;
+  color: var(--accent);
+}
+.chat-msg.is-self .chat-name {
+  color: var(--gold);
+}
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+}
+.chat-input:focus {
+  border-color: var(--accent);
+}
+.chat-send {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.chat-send:hover {
+  border-color: var(--accent);
+}
+/* On touch the bottom-left is the joystick — lift chat above it. */
+@media (pointer: coarse) {
+  .chat-toggle,
+  .chat-panel {
+    bottom: 214px;
+  }
+}
+
+/* Contract-address pill, pinned bottom-right (copy on click). */
+.ca-pill {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(12, 20, 14, 0.82);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ca-pill:hover {
+  border-color: var(--accent);
+}
+.ca-label {
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+.ca-addr {
+  opacity: 0.92;
+}
+.ca-copy {
+  opacity: 0.7;
+}
+
 .overlay > * {
   pointer-events: auto;
 }
@@ -60,7 +235,9 @@ body {
   right: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  /* Top-align the side clusters so the wallet/island sit at the very top-right
+     instead of being vertically centered against the tall day/night widget. */
+  align-items: flex-start;
   gap: 8px;
   padding: 8px;
 }
@@ -70,6 +247,23 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* The top-right HUD: a vertical stack hugging the right edge — wallet controls
+   on top, then the multiplayer island indicator + Invite tucked underneath.
+   Right-aligned so every row hugs the screen edge. */
+.hud-right {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Multiplayer island indicator + Invite button cluster (in the right group). */
+.island-group,
+.wallet-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Day/night widget cluster: the framed sun/moon scene on top, coin + level
@@ -362,6 +556,23 @@ body {
   color: #7fb8ff;
 }
 
+/* "Wilted" tag for crops that withered (left ripe too long) — muted/brown. */
+.mut.wilted {
+  color: #a9743f;
+}
+.ui-skin .mut.wilted {
+  color: #8a5a2e;
+}
+
+/* Quality stars beside a harvested crop's name; tinted via inline color. */
+.qstars {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
 .empty {
   padding: 28px 24px;
   text-align: center;
@@ -532,6 +743,25 @@ body {
   text-transform: uppercase;
 }
 
+/* "Multi-harvest" tag on Almanac cells for crops that regrow. */
+.alm-regrow {
+  font-size: 8px;
+  font-weight: 700;
+  color: #5fd35f;
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+.ui-skin .alm-regrow {
+  color: #2f7d2e;
+}
+
+/* Small explainer line under the Almanac "Plants" header. */
+.alm-note {
+  margin: -2px 0 6px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
 .alm-tags {
   display: flex;
   flex-wrap: wrap;
@@ -544,6 +774,32 @@ body {
   border: 1px solid;
   border-radius: 999px;
   padding: 3px 9px;
+}
+
+/* Collection Bonus block + per-tier completion readout */
+.alm-collection {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a3140;
+}
+
+.alm-tier-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.alm-tier {
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 8px;
+  opacity: 0.65;
+}
+
+.alm-tier.done {
+  opacity: 1;
 }
 
 /* Toasts */
@@ -651,6 +907,25 @@ body {
 .ui-skin .empty,
 .ui-skin .rarity {
   color: var(--ink-soft);
+}
+
+/* Legibility on the parchment panels: lift the dimmed sub-text to near-full
+   opacity, bump weight, and recolour the green "next level" preview to a dark
+   green that actually reads on tan (the light --accent green did not). */
+.ui-skin .row-sub,
+.ui-skin .row-meta,
+.ui-skin .muted,
+.ui-skin .panel-head .muted {
+  opacity: 0.95;
+  font-weight: 600;
+}
+.ui-skin .row-sub .next {
+  color: #2f7d2e;
+  font-weight: 700;
+}
+.ui-skin .lvltag {
+  opacity: 0.95;
+  color: var(--ink);
 }
 
 .ui-skin .x {

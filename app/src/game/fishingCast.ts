@@ -42,10 +42,6 @@ export interface CastConfig {
   onPhase?: (phase: CastPhase) => void;
   /** Called once when the cast finishes (hooked or not). */
   onResolve: (outcome: CastOutcome) => void;
-  /** Scales the wait-for-bite delay (<1 = bites sooner). Default 1. */
-  biteDelayMult?: number;
-  /** Scales the click-to-hook reaction window (>1 = easier). Default 1. */
-  hookWindowMult?: number;
 }
 
 const DEPTH_LINE = 99975;
@@ -190,10 +186,8 @@ export class FishingCast {
       }),
     );
 
-    // A bite lands somewhere in this window; the wait is the suspense. Quick Bite
-    // (Angler's Tree) shortens it.
-    const biteMult = Math.max(0.2, this.cfg.biteDelayMult ?? 1);
-    this.after(Phaser.Math.Between(1400, 3600) * biteMult, () => this.ready());
+    // A bite lands somewhere in this window; the wait is the suspense.
+    this.after(Phaser.Math.Between(1400, 3600), () => this.ready());
   }
 
   // "A fish is interested" — bubbles rise to the surface as the tell.
@@ -238,9 +232,8 @@ export class FishingCast {
       this.scene.tweens.add({ targets: this.prompt, scale: { from: 0.6, to: 1.2 }, duration: 180, ease: 'Back.out' }),
     );
 
-    // Miss it and it gets away. Steady Hands (Angler's Tree) widens the window.
-    const winMult = Math.max(0.5, this.cfg?.hookWindowMult ?? 1);
-    this.after(900 * winMult, () => {
+    // Miss it and it gets away.
+    this.after(900, () => {
       if (this.phase === 'bite') this.finish({ hooked: false, reason: 'late', at: this.bobberPos() });
     });
   }

@@ -1,30 +1,30 @@
-// Solana Valley world: ONE compact cozy ISLAND, ringed by ocean and a sand
-// beach. A single homestead fills the island — a barn/house at the top-centre, a
-// sandy farm plot, a chicken coop + cow area, an orchard, a small pond, and a
-// rowboat dock at the south-east shore. Flat and open (no raised plateaus, no
-// central plaza, no neighbour plots, no market stalls). You own and play the
-// whole island.
+// Solana Valley world: a terraced valley. TWO raised plateau BANDS of fenced
+// homesteads — 10 across the top, 10 across the bottom — face each other across
+// a wide sunken central PLAZA (the valley floor) full of stone paths, a pond,
+// markets and decorations. Every homestead's fence opens toward the plaza.
+// You own homestead #0 (top-left, fully playable); the other 19 are decorative
+// neighbours so the valley reads as a living town.
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number }; // tile coords, inclusive
 export type OpenSide = 'N' | 'S';
 
 // ---- homestead geometry (tiles) -----------------------------------------
 // Interior of one homestead (inside the fence). Sub-areas are placed relative
-// to this interior's top-left corner. Big enough for a 7×7 farm plus two pens.
+// to this interior's top-left corner. Big enough for a 7×10 crop bed plus two pens.
 export const HS_IW = 19; // interior width
 export const HS_IH = 16; // interior height
 // Footprint incl. the 1-tile fence ring on every side.
 export const HS_W = HS_IW + 2; // 21
 export const HS_H = HS_IH + 2; // 18
 
-// Grid arrangement: a single island holds one homestead (1 column × 1 band).
-export const COLS = 1;
-export const ROWS = 1;
-export const MARGIN_X = 6; // tiles of grass left/right of the homestead
-export const MARGIN_TOP = 5; // grass above the homestead
-export const MARGIN_BOTTOM = 6; // grass below the homestead
-export const GAP_X = 2; // grass gap between homestead columns (unused at 1 col)
-export const GAP_Y = 16; // grass gap between homestead rows (unused at 1 row)
+// Grid arrangement: 10 columns × 2 bands.
+export const COLS = 10;
+export const ROWS = 2;
+export const MARGIN_X = 4; // tiles of grass left/right of the neighbourhood
+export const MARGIN_TOP = 3; // grass above the top band
+export const MARGIN_BOTTOM = 3; // grass below the bottom band
+export const GAP_X = 2; // grass/path gap between homestead columns
+export const GAP_Y = 16; // the central PLAZA between the two bands (valley floor)
 
 // The land is an island: a ring of ocean (+ a sand beach just inside it) wraps
 // the whole grid. Homesteads sit on the grass well within the beach.
@@ -37,12 +37,30 @@ export const ISLAND_BORDER = SHORE + BEACH; // grass starts this many tiles in
 // left, chicken house + cow pen on the right, an orchard row along the front.
 export const SUB = {
   house: { cx: 9, baseRow: 3 }, // cottage centre col + base row (top-centre)
-  farm: { x: 1, y: 5, w: 7, h: 8 }, // 7×8 = 56-tile crop bed (left)
+  farm: { x: 1, y: 5, w: 7, h: 10 }, // 7×10 = 70-tile crop bed (left, full height)
   chickenPen: { x: 11, y: 1, w: 7, h: 6 }, // chicken house + run (right-top)
   cowPen: { x: 11, y: 8, w: 7, h: 7 }, // cow pasture (right-bottom)
-  orchard: { x: 1, y: 13, w: 7, h: 1 }, // fruit-tree row along the front
+  orchard: { x: 1, y: 1, w: 7, h: 2 }, // fruit-tree slots tucked top-left (bought trees)
   signCx: 9, // name sign column
 };
+
+// ---- purchasable crop-bed expansion -------------------------------------
+// The base bed is SUB.farm (cols x:1–7). The interior band x:8–10 between the
+// bed and the pens (chickenPen/cowPen both start at x:11) is genuinely-free
+// grass — no obstacles, pens, orchard or fence sit there. A purchased
+// expansion grows the FARMABLE area one column at a time into that band, across
+// the bed's own row range. Capped at 3 columns (x:8,9,10) so it never reaches
+// the pens at x:11. (orchard/house/sign all live elsewhere, so these columns
+// are safe for tilling.)
+export const MAX_PLOT_EXPANSION = 3;
+
+// Coin cost of the NEXT expansion column given how many are already bought.
+// A gentle geometric curve (base × 1.7^level) so each extra column is a
+// meaningful, escalating coin sink without being absurd: 500 → 850 → 1445.
+export const PLOT_EXPANSION_BASE_COST = 500;
+export function plotExpansionCost(level: number): number {
+  return Math.round(PLOT_EXPANSION_BASE_COST * Math.pow(1.7, level));
+}
 
 export type Homestead = {
   index: number;
@@ -51,7 +69,7 @@ export type Homestead = {
   ix: number; iy: number; // interior top-left (tile)
   interior: Rect; // full interior rect (inside the fence)
   house: { cx: number; baseRow: number };
-  farm: Rect; // 7×7 crop bed (inclusive tile rect)
+  farm: Rect; // 7×10 crop bed (inclusive tile rect)
   chickenPen: Rect; // chicken pen (inclusive tile rect)
   cowPen: Rect; // cow pasture (inclusive tile rect)
   orchard: Rect; // tree slots (inclusive tile rect)
@@ -134,6 +152,47 @@ export const MY_PLOT = HOME.plot;
 
 export function isInMyPlot(tx: number, ty: number): boolean {
   return tx >= MY_PLOT.px && tx < MY_PLOT.px + MY_PLOT.pw && ty >= MY_PLOT.py && ty < MY_PLOT.py + MY_PLOT.ph;
+}
+
+// ---- multiplayer helpers (dynamic owned plot) ----------------------------
+// A homestead's crop bed expressed the same way HOME.plot is (origin + size in
+// tiles) so the same "is this my farm" maths works for ANY assigned plot index.
+export type PlotRect = { px: number; py: number; pw: number; ph: number };
+
+// Clamp an out-of-range index to a valid homestead so a bad assignment never
+// throws (defaults to the player's home plot #0).
+function safeIndex(index: number): number {
+  return Number.isInteger(index) && index >= 0 && index < HOMESTEADS.length ? index : 0;
+}
+
+// The crop-bed rect (origin + size, tiles) for a given homestead index.
+export function homesteadPlot(index: number): PlotRect {
+  const f = HOMESTEADS[safeIndex(index)].farm;
+  return { px: f.x0, py: f.y0, pw: f.x1 - f.x0 + 1, ph: f.y1 - f.y0 + 1 };
+}
+
+// True if (tx,ty) sits inside the given crop-bed rect.
+export function isInPlot(rect: PlotRect, tx: number, ty: number): boolean {
+  return tx >= rect.px && tx < rect.px + rect.pw && ty >= rect.py && ty < rect.py + rect.ph;
+}
+
+// The walkable gate tile (the fence gap that opens onto the plaza) for a
+// homestead. Mirrors buildHomestead's gate maths: gate column is the interior
+// centre; the gate row is one tile outside the plaza-facing fence.
+export function homesteadGateTile(index: number): { tx: number; ty: number } {
+  const h = HOMESTEADS[safeIndex(index)];
+  const it = h.interior;
+  const gateCx = Math.floor((it.x0 + it.x1) / 2);
+  const gateY = h.openSide === 'S' ? it.y1 + 1 : it.y0 - 1;
+  return { tx: gateCx, ty: gateY };
+}
+
+// The centre tile of the sunken central plaza (the multiplayer spawn point).
+export function plazaCenterTile(): { tx: number; ty: number } {
+  return {
+    tx: Math.floor((PLAZA.x0 + PLAZA.x1) / 2),
+    ty: Math.floor((PLAZA.y0 + PLAZA.y1) / 2),
+  };
 }
 
 // ---- neighbours (kept for back-compat with code that scans plot interiors) -

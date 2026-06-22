@@ -9,24 +9,22 @@
 /* ---------------------------------------------------------------------
    1) PIXEL FONT  (Pixelify Sans, OFL — from fontsource via jsDelivr)
    --------------------------------------------------------------------- */
+/* The classic Minecraft pixel font — far more legible than the old face. One
+   weight covers 100–900 so "bold" text stays crisp instead of faux-bolding. */
+/* Single-weight face declared at `normal` ONLY, so the browser synthesizes a
+   real (faux) bold when we ask for 700 below. If we claimed `100 900` here the
+   browser would think this one file already covers bold and never thicken it. */
 @font-face {
-  font-family: 'Pixelify Sans';
+  font-family: 'Minecraft';
   font-style: normal;
-  font-weight: 400;
+  font-weight: normal;
   font-display: swap;
-  src: url('/assets/fonts/pixelify-sans-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Pixelify Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/assets/fonts/pixelify-sans-700.woff2') format('woff2');
+  src: url('/assets/fonts/minecraft.ttf') format('truetype');
 }
 
 :root {
   /* Reusable font stack: pixel face first, readable fallbacks after. */
-  --pixel-font: 'Pixelify Sans', ui-monospace, 'Segoe UI', system-ui, sans-serif;
+  --pixel-font: 'Minecraft', ui-monospace, 'Segoe UI', system-ui, sans-serif;
   /* Wood / parchment tones used by the toast + scrollbar theming. */
   --wood-dark: #6e4a2b;
   --wood-mid: #8a5a32;
@@ -70,6 +68,7 @@ button,
 h3,
 h4 {
   font-family: var(--pixel-font);
+  font-weight: 700; /* bold the whole pixel UI for a chunkier, more legible look */
   letter-spacing: 0.02em;
 }
 

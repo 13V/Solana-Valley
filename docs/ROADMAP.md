@@ -33,9 +33,6 @@ The single-player game is feature-complete and polished:
   harvest minting can be verified — closes the "client mints free produce" hole.
 - _Outcome:_ players own their land; harvests are trustworthy.
 
-> 🛡️ Full design: [`ANTI-CHEAT.md`](ANTI-CHEAT.md). 🪙 The revenue-funded player
-> rewards this unlocks are designed in [`TOKENOMICS.md`](TOKENOMICS.md).
-
 ## M3 — Items & inventory on-chain
 
 - Harvested produce (and its rarity/mutation) as SPL tokens / NFTs.
@@ -53,9 +50,6 @@ The single-player game is feature-complete and polished:
 - More plants/tiers, fruit trees, animals, fishing, crafting.
 - Energy/stamina, tool upgrades, expanding the farm.
 - NPCs, quests, multiplayer/social.
-
-> 💡 The full backlog of gameplay/content/social/token ideas (with a prioritized
-> shortlist and research notes) lives in [`IDEAS.md`](IDEAS.md).
 
 ## M6 — Polish & launch
 

@@ -27,6 +27,24 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 (included under license — see [CREDITS](CREDITS.md)); crops and all effects
 (particles, glow, day/night, sound) are generated procedurally in code.
 
+## 🗺️ Map Editor
+
+A standalone, drag-and-drop tile **map editor** lives under
+[`map-editor/`](map-editor/) for building Stardew-style maps from the **Sprout
+Lands** tilesets (233 tile sheets, ~15,666 placeable 16×16 tiles).
+
+- **No build** — it's a plain static site (HTML/CSS/JS). Serve the folder over
+  http and open it:
+  ```bash
+  cd map-editor && python3 -m http.server   # then open http://localhost:8000
+  ```
+  It must be served over **http**, not opened as a `file://` — it fetches a tile
+  manifest at startup.
+- **Auto-deploys** to GitHub Pages via the `deploy-map-editor.yml` workflow.
+- See [`map-editor/README.md`](map-editor/README.md) for details.
+- Tiles are **Sprout Lands** by Cup Nooble (https://cupnooble.itch.io/) — see
+  [CREDITS](CREDITS.md).
+
 ---
 
 ## Features
@@ -82,7 +100,7 @@ Visuals use the cozy **Sprout Lands** pixel-art + UI packs by Cup Nooble
 - **Synthesized sound effects** (WebAudio, no audio files) with a HUD mute toggle.
 
 **Solana**
-- Connect Phantom/Solflare (devnet); see your address and live SOL balance.
+- Connect Phantom/Solflare (mainnet-beta); see your address and live SOL balance.
 - In-game coins are an off-chain placeholder for the planned `$VALLEY` SPL token.
 
 ## Controls
@@ -116,9 +134,10 @@ npm run preview    # serve the production build
 npm run typecheck  # tsc --noEmit
 ```
 
-To use wallet features, install [Phantom](https://phantom.app/), switch it to
-**Devnet**, then click **Select Wallet**. Grab free devnet SOL from the
-[faucet](https://faucet.solana.com/).
+To use wallet features, install [Phantom](https://phantom.app/) (on
+**Mainnet**), then click **Select Wallet**. Wallet connect is used only to read
+your balance and to sign a one-off auth message for cloud save + multiplayer —
+the game has no on-chain transactions yet, so connecting touches no real funds.
 
 ### Dev / debug URL params
 
@@ -150,7 +169,7 @@ solana-valley/
 │       ├── ui/                  # React overlay: HUD, hotbar, shop/seeds/bag/help
 │       └── chain/               # Solana wallet provider + hooks
 ├── programs/                    # Anchor program (token/land/market) — planned
-└── docs/                        # ARCHITECTURE · ROADMAP · IDEAS · TOKENOMICS · ANTI-CHEAT
+└── docs/                        # ARCHITECTURE.md, ROADMAP.md
 ```
 
 ## How the blockchain fits in
@@ -161,10 +180,8 @@ land, items, the `$VALLEY` currency, and the marketplace — go on Solana. The
 game already routes economy actions through a typed event bus, so the on-chain
 transaction handlers can drop in without restructuring gameplay. Details in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); build order in
-[`docs/ROADMAP.md`](docs/ROADMAP.md); the wider idea/content backlog in
-[`docs/IDEAS.md`](docs/IDEAS.md); the player-rewards / token design in
-[`docs/TOKENOMICS.md`](docs/TOKENOMICS.md) (and its prerequisite
-[`docs/ANTI-CHEAT.md`](docs/ANTI-CHEAT.md)); the Anchor plan in
+[`docs/ROADMAP.md`](docs/ROADMAP.md); the Anchor plan in
 [`programs/README.md`](programs/README.md).
 
-> Devnet only for now — nothing here touches real funds.
+> No on-chain transactions yet — wallet connect only reads your balance and
+> signs an auth message, so nothing here moves real funds.

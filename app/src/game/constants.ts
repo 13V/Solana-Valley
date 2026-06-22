@@ -1,9 +1,11 @@
+import { WORLD_COLS, WORLD_ROWS } from './plots';
+
 export const TILE = 32;
-// World grid (bigger than the screen — the camera follows the player). Matches
-// the hand-authored startIsland.json map (40×30 tiles); the camera, world
-// bounds and the sea backdrop all derive their size from this.
-export const GRID_W = 40;
-export const GRID_H = 30;
+// World grid (bigger than the screen — the camera follows the player). Derived
+// from the 5×2 homestead neighbourhood geometry (see plots.ts) so the world is
+// always exactly big enough to hold every homestead plus its grass margin.
+export const GRID_W = WORLD_COLS;
+export const GRID_H = WORLD_ROWS;
 export const WORLD_WIDTH = TILE * GRID_W;
 export const WORLD_HEIGHT = TILE * GRID_H;
 // Camera viewport / canvas size (what's on screen at once).
@@ -19,6 +21,10 @@ export const STAGES = 4; // crop visual stages (0..3)
 export const WET_MS = 45_000; // how long soil stays watered (2x growth while wet)
 export const DAY_LENGTH_MS = 8 * 60_000; // full day/night cycle
 export const RESTOCK_MS = 120_000; // seed shop restock interval
+// Global multiplier on every crop's grow time — a single economy-pacing knob.
+// >1 slows the whole farming loop down (income is gated by how fast crops ripen).
+// Applied wherever a crop's grow duration is computed (cropGrowMs + liveStats).
+export const GROWTH_TIME_SCALE = 2.6;
 
 export const COLORS = {
   grass: 0x5fa64d,
@@ -33,9 +39,10 @@ export const COLORS = {
   waterDark: 0x2c66a0,
 };
 
-export type Tool = { id: 'hoe' | 'can' | 'seed'; label: string };
+export type Tool = { id: 'hoe' | 'can' | 'seed' | 'rod'; label: string };
 export const TOOLS: Tool[] = [
   { id: 'hoe', label: 'Hoe' },
   { id: 'can', label: 'Watering Can' },
   { id: 'seed', label: 'Seeds' },
+  { id: 'rod', label: 'Fishing Rod' },
 ];

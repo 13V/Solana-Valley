@@ -9,11 +9,19 @@ import { BagPanel } from './BagPanel';
 import { AnimalsPanel } from './AnimalsPanel';
 import { UpgradesPanel } from './UpgradesPanel';
 import { SkillsPanel } from './SkillsPanel';
-import { FishTreePanel } from './FishTreePanel';
 import { AlmanacPanel } from './AlmanacPanel';
-import { WardrobePanel } from './WardrobePanel';
 import { HelpPanel } from './HelpPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { GoalsHud } from './GoalsHud';
+import { TutorialCoach } from './TutorialCoach';
+import { TouchControls } from './TouchControls';
+import { CloudSaveSync } from '../chain/CloudSaveSync';
+import { MultiplayerSync } from '../chain/MultiplayerSync';
+import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
+import { ContractAddress } from './ContractAddress';
+import { Chat } from './Chat';
+import './settings'; // self-applies saved accessibility/volume settings on load
 
 const HELP_SEEN_KEY = 'solana-valley:seen-help';
 
@@ -24,6 +32,9 @@ export function App() {
   const [panel, setPanel] = useState<Panel>(() =>
     localStorage.getItem(HELP_SEEN_KEY) ? null : 'help',
   );
+  // Hold back the goals HUD + tutorial coach until the first-run Help panel is
+  // dismissed, so a new player isn't hit with three overlays stacked at once.
+  const [helpSeen, setHelpSeen] = useState(() => !!localStorage.getItem(HELP_SEEN_KEY));
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -46,6 +57,7 @@ export function App() {
   const close = () => setPanel(null);
   const closeHelp = () => {
     localStorage.setItem(HELP_SEEN_KEY, '1');
+    setHelpSeen(true);
     setPanel(null);
   };
 
@@ -54,6 +66,9 @@ export function App() {
       <div className="app">
         <div ref={containerRef} className="game-root" />
         <div className="overlay">
+          <CloudSaveSync />
+          <MultiplayerSync />
+          <UsernamePrompt />
           <Hud panel={panel} onToggle={toggle} />
           {panel === 'shop' && <Shop onClose={close} />}
           {panel === 'seeds' && <SeedsPanel onClose={close} />}
@@ -61,12 +76,16 @@ export function App() {
           {panel === 'animals' && <AnimalsPanel onClose={close} />}
           {panel === 'upgrades' && <UpgradesPanel onClose={close} />}
           {panel === 'skills' && <SkillsPanel onClose={close} />}
-          {panel === 'fishtree' && <FishTreePanel onClose={close} />}
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
-          {panel === 'wardrobe' && <WardrobePanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
+          {panel === 'settings' && <SettingsPanel onClose={close} />}
+          {helpSeen && <GoalsHud />}
           <Hotbar />
+          <TouchControls />
+          {helpSeen && <TutorialCoach />}
           <Toasts />
+          <ContractAddress />
+          <Chat />
         </div>
       </div>
     </WalletProvider>

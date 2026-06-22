@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprout Valley · Map Editor</title>
+  <meta name="description" content="Drag-and-drop tile map editor built with the Sprout Lands tilesets by Cup Nooble." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%237cb342'/%3E%3Crect x='4' y='4' width='8' height='8' fill='%23c8e6a0'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- ============================ TOP BAR ============================ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">Sprout Valley <b>Map Editor</b></span>
+    </div>
+
+    <div class="toolgroup" role="toolbar" aria-label="Tools">
+      <button class="tool" data-tool="paint"     title="Paint (B)"        aria-label="Paint">✏️</button>
+      <button class="tool" data-tool="rect"      title="Rectangle (R)"    aria-label="Rectangle">▭</button>
+      <button class="tool" data-tool="fill"      title="Bucket fill (G)"  aria-label="Fill">🪣</button>
+      <button class="tool" data-tool="eyedropper" title="Eyedropper (I)"  aria-label="Eyedropper">💧</button>
+      <button class="tool" data-tool="erase"     title="Erase (E)"        aria-label="Erase">🧽</button>
+      <button class="tool" data-tool="pan"       title="Pan (Space-drag)" aria-label="Pan">✋</button>
+    </div>
+
+    <div class="toolgroup">
+      <button id="undo" class="btn" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="redo" class="btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+    </div>
+
+    <div class="toolgroup">
+      <button id="zoomOut" class="btn" title="Zoom out ([)">−</button>
+      <span id="zoomLabel" class="zoom-label" title="Zoom">100%</span>
+      <button id="zoomIn" class="btn" title="Zoom in (])">+</button>
+      <button id="zoomFit" class="btn" title="Fit map to view">Fit</button>
+      <button id="toggleGrid" class="btn toggle is-on" title="Toggle grid lines">#</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="toolgroup">
+      <button id="newMap"    class="btn">New</button>
+      <button id="resizeMap" class="btn">Resize</button>
+      <button id="saveProj"  class="btn">Save</button>
+      <button id="loadProj"  class="btn">Load</button>
+      <button id="exportPng" class="btn btn-primary">Export PNG</button>
+      <input id="fileInput" type="file" accept="application/json,.json" hidden />
+    </div>
+  </header>
+
+  <!-- ============================ BODY ============================ -->
+  <main class="layout">
+    <!-- LEFT RAIL: layers + map settings + brush preview -->
+    <aside class="rail">
+      <section class="panel">
+        <header class="panel-head">
+          <h2>Layers</h2>
+          <button id="addLayer" class="mini" title="Add layer">＋</button>
+        </header>
+        <ul id="layerList" class="layer-list"></ul>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head"><h2>Brush</h2></header>
+        <div class="brush-preview">
+          <canvas id="brushPreview" width="96" height="96"></canvas>
+          <div class="brush-meta">
+            <div id="brushName" class="brush-name">No tile selected</div>
+            <div id="brushSize" class="brush-sub">Pick a tile from the right →</div>
+            <button id="clearBrush" class="mini-text" hidden>clear</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head"><h2>Map</h2></header>
+        <div class="field-row">
+          <label>Cols <input id="mapW" type="number" min="1" max="400" value="40" /></label>
+          <label>Rows <input id="mapH" type="number" min="1" max="400" value="30" /></label>
+        </div>
+        <label class="check"><input id="bgCheck" type="checkbox" checked /> Checkerboard background</label>
+        <div id="statusLine" class="status-line">—</div>
+      </section>
+    </aside>
+
+    <!-- CENTER: the grid canvas -->
+    <section class="stage" id="stage">
+      <canvas id="grid"></canvas>
+      <div id="loader" class="loader"><div class="spinner"></div><span>Loading 15,666 tiles…</span></div>
+      <div class="stage-coords" id="coords"></div>
+    </section>
+
+    <!-- RIGHT SIDEBAR: ALL the tiles -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <input id="tileSearch" type="search" placeholder="Search tiles…  (e.g. grass, fence, water)" autocomplete="off" />
+        <div class="sidebar-sub">
+          <span id="tileCount">—</span>
+          <button id="collapseAll" class="mini-text">collapse all</button>
+        </div>
+      </div>
+      <div id="tileList" class="tilelist"></div>
+    </aside>
+  </main>
+
+  <!-- ============================ SHEET / STAMP MODAL ============================ -->
+  <div id="sheetModal" class="modal" hidden>
+    <div class="modal-card">
+      <header class="modal-head">
+        <h3 id="sheetTitle">Sheet</h3>
+        <button id="sheetClose" class="btn" title="Close">✕</button>
+      </header>
+      <div class="modal-hint">Drag a rectangle to select a multi-tile stamp, or click a single tile.</div>
+      <div class="sheet-scroll">
+        <div class="sheet-wrap">
+          <canvas id="sheetCanvas"></canvas>
+          <canvas id="sheetOverlay"></canvas>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <span id="sheetSel" class="modal-sel">No selection</span>
+        <span class="spacer"></span>
+        <button id="sheetUse" class="btn btn-primary" disabled>Use as brush</button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="editor.js"></script>
+</body>
+</html>

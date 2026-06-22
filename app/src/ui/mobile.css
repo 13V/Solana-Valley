@@ -1,0 +1,146 @@
+/* =====================================================================
+   MOBILE / SMALL-SCREEN LAYOUT
+   ---------------------------------------------------------------------
+   The HUD chrome is sized for desktop widths. On phones the centered
+   10-icon toolbar and the top-right wallet/island cluster overflow the
+   viewport (see the toolbar getting clipped at both edges and the
+   "Connect wallet…" hint running off the right). This sheet fluidly
+   shrinks the chrome so everything fits from ~320px up.
+
+   Imported LAST (see main.tsx) so these win over index.css / icons.css /
+   the per-component sheets without needing !important on every rule.
+   Media queries don't change specificity, so selectors here mirror the
+   base ones and rely on load order to break ties.
+   ===================================================================== */
+
+/* Responsive text helpers: swap a long label for a short one on phones.
+   Default (wide / desktop) shows the full text; the mobile block below flips
+   them. Used by the wallet-connect hint, which otherwise overflows top-right. */
+.only-narrow {
+  display: none;
+}
+
+/* Compact mobile-only day/time pill (the big day/night widget is hidden on
+   phones). Hidden on desktop. */
+.daynight-mini {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .only-wide {
+    display: none;
+  }
+  .only-narrow {
+    display: inline;
+  }
+
+  /* Tighter screen-edge padding to reclaim width for the HUD rows. The toolbar
+     is a full-width centered row on phones, so the left (stats) and right
+     (wallet) clusters are pushed BELOW it (margin-top) instead of sharing its
+     band — otherwise they slide underneath and overlap. */
+  .hud {
+    padding: 4px;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  .hud-left,
+  .hud-right {
+    margin-top: 58px; /* clear the absolutely-positioned toolbar row above */
+  }
+
+  /* --- Top toolbar: all 10 icon buttons must stay on one row ---------
+     Size each button fluidly from the viewport width so the row always
+     fits: (100vw − side margins − gaps − tray border) / 10 buttons,
+     capped at the desktop 44px. */
+  .hud-buttons {
+    top: 4px;
+    gap: 2px;
+  }
+  .iconbtn {
+    width: clamp(26px, calc((100vw - 48px) / 10), 40px);
+    height: clamp(26px, calc((100vw - 48px) / 10), 40px);
+    font-size: 15px;
+  }
+  /* Icon scales with its (now fluid) button instead of a fixed 24px. */
+  .iconbtn .btn-ico {
+    width: 64%;
+    height: 64%;
+  }
+  /* Thin the wooden tray's border/padding so it doesn't eat the row, and keep
+     its overall height predictable (≤~54px) so the clusters below clear it. */
+  .ui-skin .hud-buttons {
+    border-width: 5px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  /* --- Top-left day/night + stats stack -----------------------------
+     Drop the big decorative weather widget on phones to free vertical space;
+     show the compact day/time pill instead. */
+  .daynight {
+    display: none;
+  }
+  .daynight-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* --- Top-right wallet / island cluster ----------------------------
+     Cap the cluster width so the long "Connect wallet for multiplayer"
+     hint wraps instead of running off-screen, and shrink the chrome. */
+  .hud-right {
+    max-width: 56vw;
+    gap: 5px 6px;
+  }
+  .hud-right .badge {
+    white-space: normal;
+    font-size: 11px;
+    padding: 4px 7px;
+    line-height: 1.25;
+  }
+  .hud-right .btn.sm {
+    font-size: 11px;
+  }
+  .wallet-adapter-button {
+    height: 30px !important;
+    font-size: 11px !important;
+    padding: 0 8px !important;
+  }
+
+  /* --- Goals checklist ----------------------------------------------
+     Sits below the left cluster (day pill + coins/level), which itself starts
+     ~58px down to clear the toolbar — so anchor goals just beneath that stack.
+     Starts collapsed on first run on mobile (see GoalsHud) so it's a compact,
+     tappable pill. */
+  .goals-hud {
+    top: 118px;
+    width: 174px;
+    font-size: 11px;
+  }
+  .goals-head,
+  .goals-master,
+  .goals-label {
+    font-size: 11px;
+  }
+
+  /* --- Hotbar: keep all three tool slots on one row on narrow phones - */
+  .hotbar {
+    gap: 5px;
+  }
+  .slot {
+    width: clamp(74px, calc((100vw - 28px) / 3 - 6px), 104px);
+  }
+}
+
+/* On touch devices the bottom-left thumb joystick (≈120px tall, bottom:80) and
+   the bottom-center onboarding coach card overlapped. Lift the card well above
+   the joystick zone so the first-run tutorial never sits on top of the stick. */
+@media (pointer: coarse) {
+  .tut-card {
+    bottom: 224px;
+    width: 300px;
+  }
+}

@@ -1,4 +1,5 @@
 import type { Skills, ChosenPerks } from './skills';
+import type { UpgradeForks } from './progression';
 
 // A seed offer in the shop's current stock.
 export type ShopEntry = { plantId: string; stock: number };
@@ -15,6 +16,11 @@ export type Progress = {
   discoveredPlants: string[];
   discoveredMutations: string[];
   achievements: string[]; // unlocked ids
+  // Purchasable crop-bed expansion: how many extra columns have been bought,
+  // the cap, and the coin cost of the next one (0 once fully expanded).
+  plotExpansion: number;
+  plotExpansionMax: number;
+  plotExpansionCost: number;
 };
 
 // State the Phaser game pushes up to the React UI on change.
@@ -29,9 +35,9 @@ export type UiState = {
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
   perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
-  fishTree: { unlocked: string[]; pts: number }; // Angler's Tree: unlocked node ids + lifetime points earned
-  skin: string; // worn outfit id
-  ownedSkins: string[]; // unlocked outfit ids
+  respecs: number; // how many perk respecs have been done (drives next respec cost)
+  upgradeForks: UpgradeForks; // chosen maxed-upgrade specializations, upgrade id -> fork id
+  goalsClaimed: string[]; // rewarded goal-ladder ids already paid out (see game/goals.ts)
 };
 
 // Lightweight time/restock state, emitted about once per second.

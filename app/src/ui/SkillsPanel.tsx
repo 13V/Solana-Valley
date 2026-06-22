@@ -1,4 +1,4 @@
-import { SKILLS, skillInfo, skillLevel, MAX_SKILL_LEVEL, type Perk } from '../game/skills';
+import { SKILLS, skillInfo, skillLevel, MAX_SKILL_LEVEL, respecCost, type Perk } from '../game/skills';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 
@@ -6,7 +6,13 @@ import { bus } from '../game/EventBus';
 // (Lv 5/10/15, pick 1 of 2) and a Lv20 capstone. XP is earned by doing the
 // matching activity; the chosen perks feed FarmScene's modifier aggregator.
 export function SkillsPanel({ onClose }: { onClose: () => void }) {
-  const { skills, perks } = useGameState();
+  const { skills, perks, respecs, coins } = useGameState();
+
+  // Respec wipes every chosen perk so each milestone can be re-picked. First is
+  // free, then escalates; disabled when the player can't cover the next cost.
+  const nextRespecCost = respecCost(respecs);
+  const hasPerks = Object.keys(perks).length > 0;
+  const canRespec = hasPerks && coins >= nextRespecCost;
 
   return (
     <div className="panel">
@@ -14,6 +20,17 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
         <h3>🎯 Skills</h3>
         <span className="muted">level up by playing · choose a perk at Lv 5/10/15</span>
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 4px', justifyContent: 'flex-end' }}>
+        <span className="muted" style={{ fontSize: 12 }}>Changed your mind about a perk?</span>
+        <button
+          className="btn sm"
+          disabled={!canRespec}
+          title={!hasPerks ? 'No perks chosen yet' : undefined}
+          onClick={() => bus.emit('ui:respecPerks', undefined)}
+        >
+          ↺ Respec perks {nextRespecCost === 0 ? '(Free)' : `(${nextRespecCost.toLocaleString()}🪙)`}
+        </button>
       </div>
       <div className="rows">
         {SKILLS.map((s) => {
@@ -51,13 +68,13 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
                     ) : chosen ? (
                       <span
                         className="row-sub"
-                        style={{ display: 'block', color: '#bff58a', borderLeft: '3px solid #7bd66a', paddingLeft: 6 }}
+                        style={{ display: 'block', color: '#2f7d2e', fontWeight: 700, borderLeft: '3px solid #2f7d2e', paddingLeft: 6 }}
                       >
                         ✓ <b>{chosen.name}</b> — {chosen.desc}
                       </span>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span className="row-sub" style={{ color: '#ffe27a' }}>★ Lv {ms.level} — choose a perk:</span>
+                        <span className="row-sub" style={{ color: '#9a6a10', fontWeight: 700 }}>★ Lv {ms.level} — choose a perk:</span>
                         {[ms.a, ms.b].map((p) => (
                           <button
                             key={p.id}
@@ -78,7 +95,7 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
               <div style={{ marginTop: 6 }}>
                 <span
                   className="row-sub"
-                  style={{ display: 'block', opacity: maxed ? 1 : 0.5, color: maxed ? '#ffd21a' : undefined }}
+                  style={{ display: 'block', opacity: maxed ? 1 : 0.72, color: maxed ? '#b5820e' : undefined }}
                 >
                   {maxed ? '🌟' : '🔒'} <b>{s.capstone.name}</b> (Lv 20) — {s.capstone.desc}
                 </span>

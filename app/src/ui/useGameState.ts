@@ -22,12 +22,15 @@ const initialState: UiState = {
     discoveredPlants: [],
     discoveredMutations: [],
     achievements: [],
+    plotExpansion: 0,
+    plotExpansionMax: 0,
+    plotExpansionCost: 0,
   },
   skills: { ...EMPTY_SKILLS },
   perks: {},
-  fishTree: { unlocked: [], pts: 0 },
-  skin: 'classic',
-  ownedSkins: ['classic'],
+  respecs: 0,
+  upgradeForks: {},
+  goalsClaimed: [],
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };

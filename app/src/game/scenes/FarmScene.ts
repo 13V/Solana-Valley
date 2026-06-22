@@ -12,42 +12,64 @@ import {
   WET_MS,
   DAY_LENGTH_MS,
   RESTOCK_MS,
+  GROWTH_TIME_SCALE,
 } from '../constants';
 import {
   PLANTS,
   PLANT_BY_ID,
   RARITY,
-  RARITY_UNLOCK,
   rarityRank,
   pickMutation,
   cropValue,
   stackKey,
-  rollShop,
+  rollShopAt,
+  rollQuality,
+  QUALITY,
   MUTATION_BY_ID,
   type Plant,
   type Mutation,
+  type Quality,
 } from '../economy';
 import {
   ACHIEVEMENTS,
   EMPTY_UPGRADES,
+  EMPTY_UPGRADE_FORKS,
   UPGRADE_BY_ID,
   fortuneLuck,
   growthFactor,
   harvestXp,
   levelInfo,
   marketBonus,
-  restockReductionMs,
+  MAX_GROWTH_MULT,
+  seedDiscount,
   sprinklerIntervalMs,
   toolRadius,
+  upgradeUnlocked,
+  upgradeForkAvailable,
+  forkEffect,
   type UpgradeId,
   type Upgrades,
+  type UpgradeForks,
 } from '../progression';
+import { collectionBonus } from '../collection';
+import { GOALS, rewardLabel, type GoalStats } from '../goals';
+import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
-import { SKINS, SKIN_BY_ID, DEFAULT_SKIN, skinTextureKey } from '../skins';
 import {
+  HOMESTEADS,
   SHORE,
   BEACH,
+  bandRect,
+  PLAZA,
+  homesteadPlot,
+  isInPlot,
+  homesteadGateTile,
+  plazaCenterTile,
+  MAX_PLOT_EXPANSION,
+  plotExpansionCost,
+  type Homestead,
   type Rect,
+  type PlotRect,
 } from '../plots';
 import {
   EMPTY_SKILLS,
@@ -56,6 +78,7 @@ import {
   activeModifiers,
   PERK_LEVELS,
   MAX_SKILL_LEVEL,
+  respecCost,
   type SkillId,
   type Skills,
   type ChosenPerks,
@@ -68,21 +91,16 @@ import {
   fishColor,
   fishCss,
   FISH_SHEET,
+  FISH_BY_ID,
   TREASURE_FRAMES,
   type WaterKind,
+  type Fish,
 } from '../fishing';
 import { FishingCast, type CastPhase } from '../fishingCast';
-import {
-  applyFishTree,
-  fishPointsForCatch,
-  spentPoints,
-  prereqMet,
-  FISH_NODE_BY_ID,
-} from '../fishingTree';
 import { pickForage, forageXp, type Forage } from '../forage';
-import { bus } from '../EventBus';
+import { bus, type GameEvents } from '../EventBus';
 import { sfx } from '../audio';
-import { map as islandMap, classify, isBoatKey } from '../mapLoader';
+import { virtualMove, getKeyBinds, onKeyBindsChange, type MoveAction } from '../input';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
 type Crop = {
@@ -94,20 +112,89 @@ type Crop = {
   mature: boolean;
   mutation: Mutation | null;
   wetAtMature: boolean;
+  quality: Quality;
+  matureAt: number; // this.time.now (ms) when the crop became ripe
+  withered: boolean;
+  // ms this cycle takes to ripen. Defaults to plant.growthSeconds*1000; after a
+  // regrow harvest it becomes plant.regrow*1000 so the next cycle is shorter.
+  growMs?: number;
   sprite: Phaser.GameObjects.Image;
   glow?: Phaser.GameObjects.Image;
   sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
+  star?: Phaser.GameObjects.Text; // quality star marker on high-quality ripe crops
 };
 type Dir = 'down' | 'up' | 'left' | 'right';
 
-// The player's two animal pens + orchard in *pixel* coords. The procedural
-// homestead is gone (the world is now the hand-authored startIsland.json map),
-// so producers roam default open-grass rectangles near the island centre.
-// Chickens roam the chicken area, cows the cow area, fruit trees the orchard.
+// A remote player's avatar: the shared 'pchar' sprite (animated exactly like the
+// local player), a floating name label, and the target pose we lerp toward each
+// frame as `mp:move` updates stream in.
+type RemotePlayer = {
+  sprite: Phaser.GameObjects.Sprite;
+  label: Phaser.GameObjects.Text;
+  targetX: number;
+  targetY: number;
+  facing: Dir;
+  name: string;
+};
+
+// A single remote crop drawn in another player's plot. Visual only — it reuses
+// the same 'cropsheet' texture/frames + mutation glow/sparkle as a local crop,
+// but never touches this.crops / this.tiles. `key` is its plot-relative "dx,dy".
+//
+// Growth is SIMULATED locally for smoothness: each snapshot carries the crop's
+// authoritative grownMs/growMs, and between snapshots we advance grownMs at the
+// base rate (a safe LOWER bound — real growth is ≥1×, so we never overshoot)
+// and only re-render when the visual stage actually changes.
+type RemoteCropSprite = {
+  sprite: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+  sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
+  plant: Plant;
+  tx: number; ty: number; // world tile (drives glow/sparkle placement)
+  mutId: string;
+  grownMs: number; // simulated growth so far (corrected on each snapshot)
+  growMs: number; // total grow duration for the current cycle (0 = unknown)
+  mature: boolean;
+  stage: number; // last-rendered visual stage (0..STAGES-1)
+};
+
+// One remote player's whole farm: which plot they're on + their crop sprites and
+// tilled-soil images, both keyed by plot-relative "dx,dy" so snapshots can be
+// diffed in place. `tilled` images are pure visuals (they mirror local soil
+// overlays) drawn below the crop sprites; they never touch this.tiles.
+type RemoteFarm = {
+  plot: number;
+  sprites: Map<string, RemoteCropSprite>;
+  tilled: Map<string, Phaser.GameObjects.Image>;
+};
+
+// Convert an inclusive tile Rect to pixel bounds. Animal pens/orchard are derived
+// from the player's CURRENT homestead at spawn time (see producerArea) so animals
+// appear on the plot you actually own — not a fixed one.
 const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
-const CHICKEN_PEN = px({ x0: 14, y0: 9, x1: 19, y1: 13 });
-const COW_PEN = px({ x0: 27, y0: 9, x1: 33, y1: 14 });
-const ORCHARD = px({ x0: 14, y0: 4, x1: 20, y1: 6 });
+
+// Hard cap on how many of each producer (chickens / cows / each tree type) a
+// player may own, via buying or breeding.
+const MAX_PRODUCERS = 50;
+
+// Translate a stored bind (a raw keyboard event.key, e.g. 'W', 'ArrowUp', ' ')
+// into a name Phaser's keyboard.addKey() understands. Single letters/digits and
+// Phaser-style names pass through; a few common event.key values are remapped.
+const KEY_NAME_ALIASES: Record<string, string> = {
+  ARROWUP: 'UP',
+  ARROWDOWN: 'DOWN',
+  ARROWLEFT: 'LEFT',
+  ARROWRIGHT: 'RIGHT',
+  ' ': 'SPACE',
+  SPACEBAR: 'SPACE',
+  ESC: 'ESC',
+  ESCAPE: 'ESC',
+};
+function mapKeyName(key: string): string | null {
+  if (!key) return null;
+  const upper = key.toUpperCase();
+  return KEY_NAME_ALIASES[upper] ?? upper;
+}
 
 type Animal = {
   sprite: Phaser.GameObjects.Sprite;
@@ -122,10 +209,15 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-// 13: world is now the hand-authored startIsland.json map (data-driven loader);
-// farm/water tiles come from the map, so older saves' tiles no longer line up
-// and reset cleanly.
-const SAVE_VERSION = 13;
+const SAVE_VERSION = 16; // bumped: added claimedGoals (rewarded goal-ladder); defaults preserve older saves (legacy saves retro-claim satisfied goals without payout)
+
+// Max global XP a single watering action can grant (1 per newly-wet tile), so a
+// large watering/sprinkler radius can't be spammed into a big XP payout.
+const WATER_XP_CAP = 5;
+
+// Extra mutation-luck multiplier applied at maturity when the tile is wet — a
+// small nudge on top of the Fortune upgrade + Farming skill luck.
+const WET_MUTATION_LUCK = 1.12;
 
 // A gatherable forage node sitting on open grass.
 type ForageNode = {
@@ -137,32 +229,46 @@ type ForageNode = {
 
 type SaveData = {
   v: number;
+  // When truthy, tiles[]/crops[] coords are stored RELATIVE to the owned
+  // farm-bed origin (top-left tile) rather than as absolute world tiles, so the
+  // farm renders correctly on whichever plot the player is assigned (multiplayer
+  // plot recycling). Absent/falsy ⇒ legacy absolute save (migrated on load).
+  rel?: number;
   coins: number;
   selected: string;
   selectedSeed: string | null;
   seeds: Record<string, number>;
   harvest: Record<string, number>;
-  shopStock: Record<string, number>;
+  // shopStock/restockMs removed in v16+: the shop is now a shared, deterministic
+  // per-(island, wall-clock window) roll, so there's nothing per-player to save.
   timeMs: number;
-  restockMs: number;
   tiles: Array<[number, number, number]>; // x, y, wetRemainingMs (tilled implied)
-  crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean }>;
+  // q/ma/wth/rg are optional so old v11 saves (without crop-depth fields) still
+  // load. rg = regrow-cycle growth duration (ms) when the crop is mid-regrow.
+  crops: Array<{ x: number; y: number; p: string; g: number; m: boolean; mut: string | null; wet: boolean; q?: Quality; ma?: number; wth?: boolean; rg?: number }>;
   // progression
   xp: number;
   upgrades: Upgrades;
+  upgradeForks?: UpgradeForks; // v13+: chosen maxed-upgrade forks. Optional so older saves still load.
   earned: number;
   harvested: number;
   mutationsFound: number;
   discPlants: string[];
   discMutations: string[];
   achievements: string[];
+  claimedGoals?: string[]; // v16+: rewarded goal-ladder ids already paid out. Optional so older saves migrate.
   animals: Record<string, number>;
   skills: Skills;
   perks: ChosenPerks;
-  fishNodes?: string[]; // Angler's Tree: unlocked node ids (optional — old saves predate it)
-  fishPts?: number; // lifetime fishing points earned
-  skin: string; // worn outfit id
-  ownedSkins: string[]; // unlocked outfit ids
+  respecs?: number; // v12+: perk respecs done. Optional so older saves still load.
+  plotExpansion?: number; // v14+: purchased crop-bed expansion columns. Optional so older saves default to 0.
+  // v15+: where the player was standing (rounded world pixels) and which homestead
+  // they owned, so a refresh/reconnect restores position + plot instead of yanking
+  // them to the create() spawn. Optional so older saves default cleanly.
+  px?: number;
+  py?: number;
+  plotIndex?: number;
+  island?: number; // multiplayer island we were on, so a return can prefer the same seat
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -175,10 +281,12 @@ export class FarmScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
   private player!: Phaser.Physics.Arcade.Sprite;
-  private skin = DEFAULT_SKIN; // active outfit skin id
-  private ownedSkins = new Set<string>([DEFAULT_SKIN]); // unlocked outfits
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
+  // Remappable movement keys, rebuilt from getKeyBinds() whenever binds change.
+  private moveKeys: Partial<Record<MoveAction, Phaser.Input.Keyboard.Key>> = {};
+  // Gamepad face/dpad button states from the previous frame (edge detection so a
+  // held button fires its action once, not every frame).
+  private padPrev: Record<number, boolean> = {};
   private highlight!: Phaser.GameObjects.Image;
   private ambient!: Phaser.GameObjects.Rectangle;
   private fireflies!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -200,17 +308,40 @@ export class FarmScene extends Phaser.Scene {
   private selectedSeed: string | null = 'carrot';
   private seeds: Record<string, number> = { carrot: 5 };
   private harvestInv: Record<string, number> = {};
-  private shopStock: Record<string, number> = {};
+  // ---- shared island seed shop -------------------------------------------
+  // The stock is shared by everyone on the island: a deterministic per-(island,
+  // window) roll (identical for all peers) scaled by the online player count,
+  // drained by everyone's purchases. `shopBought` tracks units taken this window
+  // (local + peers via mp:shopBought); remaining = pool − bought.
+  private island = 0;
+  private onlineCount = 1;
+  private shopEpoch = 0;
+  private shopPool: Record<string, number> = {};
+  private shopBought: Record<string, number> = {};
+  private shopSyncMs = 0; // accumulator for the periodic authoritative DB reconcile
+  // Plots (other players') we've tinted as cultivated, so we can un-tint them when
+  // that player leaves. Our own plot is handled separately by markPlayerFarm.
+  private remotePlotTints = new Set<number>();
+  // Floating holographic nameplate per plot (plot index -> text), updated from the
+  // roster to show whose plot each one is.
+  private plotLabels = new Map<number, Phaser.GameObjects.Text>();
+  private lastReverifyAt = 0; // throttle for the same-plot conflict re-verify
+  private minimap!: Phaser.GameObjects.Graphics; // fixed-to-camera island minimap
+  private minimapCoarse = false; // touch device -> draw on the right (clear of joystick)
 
   // progression
   private xp = 0;
   private upgrades: Upgrades = { ...EMPTY_UPGRADES };
+  // Chosen maxed-upgrade specializations (upgrade id -> fork id). See progression.ts.
+  private upgradeForks: UpgradeForks = { ...EMPTY_UPGRADE_FORKS };
   private earned = 0;
   private harvested = 0;
   private mutationsFound = 0;
   private discoveredPlants = new Set<string>();
   private discoveredMutations = new Set<string>();
   private achievements = new Set<string>();
+  // Rewarded goal-ladder ids already paid out (see game/goals.ts). One-time.
+  private claimedGoals = new Set<string>();
   private animals: Animal[] = [];
   private gate?: Phaser.GameObjects.Sprite;
   private gateOpen = false;
@@ -219,31 +350,62 @@ export class FarmScene extends Phaser.Scene {
   // skill progression (xp per skill) + chosen milestone perks
   private skills: Skills = { ...EMPTY_SKILLS };
   private perks: ChosenPerks = { ...EMPTY_PERKS };
-  // Angler's Tree: unlocked node ids + lifetime fishing points earned.
-  private fishNodes = new Set<string>();
-  private fishPts = 0;
-  // Aggregated multipliers/flags from skills + perks + the Angler's Tree;
-  // recomputed on any change.
-  private modCache: Modifiers = applyFishTree(activeModifiers(this.skills, this.perks), this.fishNodes);
+  private respecs = 0; // number of perk respecs done (drives the escalating respec cost)
+  // Purchased crop-bed expansion: how many extra columns (0..MAX_PLOT_EXPANSION)
+  // have been bought. These widen the farmable area to the RIGHT of the base bed
+  // into the free interior band (see plots.ts). Expressed relative to
+  // myFarmRect() so it follows a multiplayer plot re-assignment.
+  private plotExpansion = 0;
+  // Aggregated multipliers/flags from skills + perks; recomputed on any change.
+  private modCache: Modifiers = activeModifiers(this.skills, this.perks);
 
   // fishing
   private pond!: Rect; // pond rect in tile coords (inclusive)
-  private pondTiles = new Set<string>(); // fast "is this a (fishable) water tile" lookup
-  private pathTiles = new Set<string>(); // path/bridge flat tiles (kept clear of scatter)
-  private farmTiles = new Set<string>(); // tillable/plantable tiles from the map's dirt cells
-  private boatTiles = new Set<string>(); // rowboat tiles (future marketplace hub portal)
-  private boatToastShown = false; // one-time "coming soon" hint near the boat
+  private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
+  private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
   private casting = false; // only one cast at a time
   private fishingCast!: FishingCast; // rod/line/bobber cast choreography
   // foraging
   private forageNodes: ForageNode[] = [];
 
   private timeMs = DAY_LENGTH_MS * 0.34; // start mid-morning
-  private restockMs = RESTOCK_MS;
   private growthMult = 1;
   private forcedMutation: Mutation | null = null;
   private persist = true;
   private unsubs: Array<() => void> = [];
+
+  // ---- multiplayer ----------------------------------------------------------
+  // Which homestead the local player owns/farms. Defaults to #0 (single-player);
+  // a `mp:assigned` event re-points it to the server-assigned plot.
+  private myPlotIndex = 0;
+  // Our own wallet id once assigned, so the presence roster can exclude us when
+  // spawning remote avatars (the roster includes ourselves).
+  private myMpId: string | null = null;
+  // id -> remote avatar. Visual only (no collision); spawned from the presence
+  // roster and updated on `mp:move`.
+  private remotePlayers = new Map<string, RemotePlayer>();
+  // id -> remote player's farm (their crops, drawn in their own plot). Visual
+  // only; upserted on `mp:remoteFarm`, diffed in place, cleaned up on leave.
+  private remoteFarms = new Map<string, RemoteFarm>();
+  // True once the server has assigned us a plot (we're in a live session). Gates
+  // the local-crop snapshot broadcast so single-player never emits.
+  private mpConnected = false;
+  // Throttle for the periodic local-crop snapshot heartbeat (see update()).
+  private lastFarmEmit = 0;
+  // Set when a change (plant/harvest) wants the next heartbeat to fire ASAP, so
+  // edits feel responsive without rebuilding the snapshot every frame.
+  private farmDirty = false;
+  // Last pose we broadcast, so `mp:self` only fires on change + throttled.
+  private lastSelfPose = { x: 0, y: 0, facing: 'down' as Dir };
+  private lastSelfEmit = 0;
+  // The Roblox-style "go to your plot" guide: dashed ground markers + a bouncing
+  // arrow over the player. Null when not connected / already arrived.
+  private guide: {
+    markers: Phaser.GameObjects.Image[];
+    arrow: Phaser.GameObjects.Text;
+    gx: number; // gate pixel target
+    gy: number;
+  } | null = null;
 
   constructor() {
     super('Farm');
@@ -255,12 +417,16 @@ export class FarmScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
-    this.buildFromMap(); // render the hand-authored start island (startIsland.json)
-    this.prettifyGrass(); // scatter a few soft flowers on the plain grass
+    this.buildWorld();
+    this.buildTerraces(); // raise the two plot bands into plateaus (cliffs + stairs)
+    this.buildPlaza(); // sunken valley floor: cobble paths, pond + bridge, markets
+    this.buildPlots(); // fenced homesteads; fences open toward the central plaza
+    this.placeDecorations(); // scatter nature across the remaining open grass
 
+    const spawn = this.myFarmRect();
     this.player = this.physics.add.sprite(
-      FarmScene.SPAWN.x * TILE + TILE / 2,
-      FarmScene.SPAWN.y * TILE + TILE / 2,
+      (spawn.px + spawn.pw / 2) * TILE,
+      (spawn.py + spawn.ph - 1) * TILE,
       'pchar',
       0,
     );
@@ -357,26 +523,65 @@ export class FarmScene extends Phaser.Scene {
 
     this.highlight = this.add.image(0, 0, 'highlight').setVisible(false).setDepth(100000);
 
+    // Minimap: fixed to the camera, drawn each frame in drawMinimap(). On touch
+    // devices it sits bottom-right to clear the bottom-left joystick.
+    this.minimapCoarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    this.minimap = this.add.graphics().setScrollFactor(0).setDepth(99000);
+
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.wasd = {
-      up: kb.addKey('W'),
-      down: kb.addKey('S'),
-      left: kb.addKey('A'),
-      right: kb.addKey('D'),
-    };
+    // Build the remappable movement keys now, and rebuild them live whenever the
+    // bindings change (arrow keys via this.cursors always work in addition).
+    this.buildMoveKeys();
+    const unsubBinds = onKeyBindsChange(() => this.buildMoveKeys());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubBinds);
     ['ONE', 'TWO', 'THREE'].forEach((key, i) => {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
+    kb.on('keydown-FOUR', () => this.setTool('rod'));
 
+    // The rod/line/bobber cast choreography. Torn down on shutdown.
     this.fishingCast = new FishingCast(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.fishingCast.destroy());
+
+    // While a DOM text field is focused (e.g. the username prompt), hand the
+    // keyboard to the browser: disable the game's key handling AND release its key
+    // captures, so WASD / arrows / space type into the field instead of moving the
+    // character. Restored on blur.
+    const isEditable = (el: EventTarget | null): boolean => {
+      const n = el as HTMLElement | null;
+      if (!n || !n.tagName) return false;
+      return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable;
+    };
+    let savedCaptures: number[] = [];
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isEditable(e.target)) return;
+      savedCaptures = kb.getCaptures();
+      kb.clearCaptures();
+      kb.resetKeys(); // drop any keys held when focus moved into the field
+      kb.enabled = false;
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (!isEditable(e.target)) return;
+      kb.enabled = true;
+      if (savedCaptures.length) {
+        kb.addCapture(savedCaptures);
+        savedCaptures = [];
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    });
 
     // Browsers suspend audio until a user gesture; resume on first input.
     this.input.once('pointerdown', () => sfx.resume());
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       // While a cast is live, every click is a fishing input (hook the bite or
       // reel in early) — it must never fall through to a tool/plant action.
-      if (this.casting) {
+      if (this.fishingCast.active) {
         this.fishingCast.onPointer();
         return;
       }
@@ -392,7 +597,7 @@ export class FarmScene extends Phaser.Scene {
     this.input.on('pointermove', () => (this.pointerInside = true));
     this.input.on('gameout', () => (this.pointerInside = false));
 
-    this.shopStock = rollShop(levelInfo(this.xp).level);
+    this.rollShopWindow(this.currentEpoch());
     if (this.persist) this.loadSave();
 
     // Scatter forage nodes across the open world (after any save load so they
@@ -406,16 +611,31 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
+      bus.on('ui:chooseUpgradeFork', ({ id, fork }) => this.chooseUpgradeFork(id, fork)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
+      bus.on('ui:buyExpansion', () => this.buyExpansion()),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
-      bus.on('ui:unlockFishNode', (id) => this.unlockFishNode(id)),
-      bus.on('ui:selectSkin', (id) => this.selectSkin(id)),
+      bus.on('ui:respecPerks', () => this.respecPerks()),
+      // ---- multiplayer (no-ops in single-player: these never fire) ----------
+      bus.on('mp:assigned', ({ id, island, plot }) => { this.myMpId = id; this.island = island; this.onAssigned(plot); this.rollShopWindow(this.currentEpoch()); }),
+      bus.on('mp:roster', (players) => this.onRoster(players)),
+      bus.on('mp:move', (m) => this.onRemoteMove(m)),
+      bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
+      bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
+      bus.on('mp:shopBought', ({ plantId }) => this.onRemoteShopBuy(plantId)),
+      bus.on('mp:remoteCatch', (c) => this.onRemoteCatch(c)),
     );
-    this.applySkin(this.skin); // wear the saved outfit (or classic) now the player exists
+    // Tear down every remote avatar + remote farm + the ground guide on shutdown.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
+      this.remotePlayers.clear();
+      this.remoteFarms.forEach((_, id) => this.removeRemoteFarm(id));
+      this.remoteFarms.clear();
+      this.clearGuide();
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubs.forEach((u) => u());
       this.unsubs = [];
-      this.fishingCast.destroy();
     });
 
     if (this.persist) {
@@ -435,8 +655,8 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
     this.emitClock();
 
-    // A little welcome moment pointing the player at the tilled-dirt patches.
-    this.time.delayedCall(700, () => this.toast('🌱 Welcome to your island! Hoe the dirt patches and plant your seeds.'));
+    // A little welcome moment pointing the player at their plot.
+    this.time.delayedCall(700, () => this.toast('🌱 Welcome! This is ★ Your Plot — hoe the soil and plant your seeds.'));
 
     // Expose for debugging / e2e screenshots when a dev param is present.
     if (location.search.length > 1) {
@@ -451,7 +671,42 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private recomputeMods() {
-    this.modCache = applyFishTree(activeModifiers(this.skills, this.perks), this.fishNodes);
+    this.modCache = activeModifiers(this.skills, this.perks);
+  }
+
+  // Active fork-effect bag for a maxed upgrade (neutral defaults if unchosen/no
+  // fork). Effect sites read named fields off this (see progression.forkEffect).
+  private fork(id: UpgradeId) {
+    return forkEffect(id, this.upgradeForks);
+  }
+
+  // ---- owned-plot geometry (driven by myPlotIndex) ------------------------
+  // The player's current crop-bed rect (origin + size in tiles). Everything that
+  // used the old MY_PLOT constant reads this so it follows a multiplayer
+  // assignment. Defaults to homestead #0 in single-player.
+  private myFarmRect(): PlotRect {
+    return homesteadPlot(this.myPlotIndex);
+  }
+
+  // The full farmable crop-bed rect: the base bed widened by however many
+  // expansion columns have been purchased. Expansion grows to the RIGHT (into
+  // the free interior band between the bed and the pens), so only `pw` changes.
+  // Everything farm-related (tilling, overlays, persistence) reads THIS so the
+  // expansion is automatically relative to whichever plot we own (multiplayer).
+  private expandedFarmRect(): PlotRect {
+    const f = this.myFarmRect();
+    const extra = Math.max(0, Math.min(MAX_PLOT_EXPANSION, this.plotExpansion));
+    return { px: f.px, py: f.py, pw: f.pw + extra, ph: f.ph };
+  }
+
+  // True for any farmable tile (base bed OR a purchased expansion column).
+  private isInMyFarm(tx: number, ty: number): boolean {
+    return isInPlot(this.expandedFarmRect(), tx, ty);
+  }
+
+  // The walkable gate tile of the player's current homestead.
+  private myGateTile(): { tx: number; ty: number } {
+    return homesteadGateTile(this.myPlotIndex);
   }
 
   // Debug snapshot used by the screenshot harness.
@@ -517,10 +772,10 @@ export class FarmScene extends Phaser.Scene {
   }
 
   // Premium character sheet (8 frames/row). Rows 0–3 = idle, 4–7 = walk, each
-  // ordered down/up/left/right. First frame of each idle row doubles as the
-  // standing pose.
-  private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 16, right: 24 };
-  private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 48, right: 56 };
+  // ordered down/up/RIGHT/LEFT in the sheet (same order as the tool rows below).
+  // First frame of each idle row doubles as the standing pose.
+  private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 24, right: 16 };
+  private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 56, right: 48 };
   // Tool swings: rows 12–15 (hoe) and 20–23 (watering can), each 8 frames,
   // ordered down/up/right/left in the sheet.
   private static TOOL_ROW: Record<'hoe' | 'water', Record<Dir, number>> = {
@@ -529,46 +784,48 @@ export class FarmScene extends Phaser.Scene {
   };
 
   private createAnims() {
-    // Player locomotion + tool swings — one namespaced set per outfit skin, so a
-    // recoloured sheet animates exactly like the base (mirrors the animal swaps).
-    for (const skin of SKINS) {
-      const sheet = skinTextureKey(skin.id);
-      if (!this.textures.exists(sheet)) continue; // skip skins whose texture failed to build
-      for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
-        const walk = `${sheet}-walk-${dir}`;
-        if (!this.anims.exists(walk)) {
-          const start = FarmScene.WALK_ROW[dir];
-          this.anims.create({
-            key: walk,
-            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
-            frameRate: 12,
-            repeat: -1,
-          });
-        }
-        const idle = `${sheet}-idle-${dir}`;
-        if (!this.anims.exists(idle)) {
-          const start = FarmScene.IDLE_ROW[dir];
-          this.anims.create({
-            key: idle,
-            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
-            frameRate: 6,
-            repeat: -1,
-          });
-        }
+    for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+      const walk = `walk-${dir}`;
+      if (!this.anims.exists(walk)) {
+        const start = FarmScene.WALK_ROW[dir];
+        this.anims.create({
+          key: walk,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 12,
+          repeat: -1,
+        });
       }
-      // Directional tool swings from the premium sheet (rows 12–23, 8 frames each).
-      for (const tool of ['hoe', 'water'] as const) {
-        for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
-          const key = `${sheet}-act-${tool}-${dir}`;
-          if (this.anims.exists(key)) continue;
-          const start = FarmScene.TOOL_ROW[tool][dir];
-          this.anims.create({
-            key,
-            frames: this.anims.generateFrameNumbers(sheet, { start, end: start + 7 }),
-            frameRate: 18,
-            repeat: 0,
-          });
-        }
+      const idle = `idle-${dir}`;
+      if (!this.anims.exists(idle)) {
+        const start = FarmScene.IDLE_ROW[dir];
+        this.anims.create({
+          key: idle,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 6,
+          repeat: -1,
+        });
+      }
+    }
+    if (!this.anims.exists('water-anim')) {
+      this.anims.create({
+        key: 'water-anim',
+        frames: this.anims.generateFrameNumbers('water', { start: 0, end: 3 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+    // Directional tool swings from the premium sheet (rows 12–23, 8 frames each).
+    for (const tool of ['hoe', 'water'] as const) {
+      for (const dir of ['down', 'up', 'left', 'right'] as Dir[]) {
+        const key = `act-${tool}-${dir}`;
+        if (this.anims.exists(key)) continue;
+        const start = FarmScene.TOOL_ROW[tool][dir];
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers('pchar', { start, end: start + 7 }),
+          frameRate: 18,
+          repeat: 0,
+        });
       }
     }
 
@@ -625,15 +882,6 @@ export class FarmScene extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers('fish_shadow_md', { start: 0, end: 14 }),
       });
     }
-
-    if (!this.anims.exists('water-anim')) {
-      this.anims.create({
-        key: 'water-anim',
-        frames: this.anims.generateFrameNumbers('water', { start: 0, end: 3 }),
-        frameRate: 6,
-        repeat: -1,
-      });
-    }
     // Animations are keyed by sheet so every palette swap gets its own pair.
     for (const a of ANIMALS) {
       for (const sheet of a.colorways ?? [a.sheet]) {
@@ -658,57 +906,58 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // The texture key for the player's current outfit (falls back to the base
-  // sheet if the active skin's texture is somehow missing).
-  private playerSheet(): string {
-    const key = skinTextureKey(this.skin);
-    return this.textures.exists(key) ? key : skinTextureKey(DEFAULT_SKIN);
-  }
-
-  // Wear an (already-owned) outfit: swap the sprite texture and replay the
-  // current idle so the change shows instantly.
-  private applySkin(id: string) {
-    this.skin = SKIN_BY_ID[id] ? id : DEFAULT_SKIN;
-    const sheet = this.playerSheet();
-    this.player.setTexture(sheet, 0);
-    this.player.anims.play(`${sheet}-idle-${this.facing}`, true);
-  }
-
-  // UI intent: buy (if needed & affordable) and wear an outfit.
-  private selectSkin(id: string) {
-    const skin = SKIN_BY_ID[id];
-    if (!skin) return;
-    if (!this.ownedSkins.has(id)) {
-      if (this.coins < skin.cost) {
-        bus.emit('toast', `Need ${skin.cost.toLocaleString()}🪙 for the ${skin.name} coat`);
-        return;
-      }
-      this.coins -= skin.cost;
-      this.ownedSkins.add(id);
-      sfx.play('buy');
-      bus.emit('toast', `Unlocked the ${skin.name} coat! 🐾`);
-    }
-    this.applySkin(id);
-    this.saveState();
-    this.emitState();
-  }
-
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
-    this.player.anims.play(`${this.playerSheet()}-act-${tool}-${this.facing}`, true);
+    this.player.anims.play(`act-${tool}-${this.facing}`, true);
+  }
+
+  private grassFrame(x: number, y: number): number {
+    return (x * 7 + y * 13) % 3; // clean full-grass tiles 0..2
+  }
+
+  // Smooth low-frequency field (≈0..1) carving organic grass zones across the map.
+  private grassZone(x: number, y: number): number {
+    const n =
+      Math.sin(x * 0.16 + y * 0.06) * 0.5 +
+      Math.sin(x * 0.05 - y * 0.12) * 0.3 +
+      Math.sin((x + y) * 0.1 + 1.7) * 0.2;
+    return (n + 1) / 2;
+  }
+
+  // Pick the ground tile for an open grass cell: cooler sage patches in the
+  // "low" zones (shaded areas), lush tuft-heavy meadow in the "high" zones, and
+  // mostly-plain grass with the odd v2 detail tile everywhere else.
+  private grassTileAt(x: number, y: number, cx: number, cy: number): Phaser.GameObjects.Image {
+    const h = (x * 73856 + y * 19349) >>> 0;
+    const v = this.grassZone(x, y);
+    let key = 'grass';
+    let frame: number = this.grassFrame(x, y);
+    if (v < 0.32 || (v < 0.37 && h % 2 === 0)) {
+      key = 'grassdark'; // sage shaded patch (dithered edge)
+      frame = FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length];
+    } else if (v > 0.7 && h % 100 < 50) {
+      key = 'grasslayer'; // lush meadow tuft patch
+      frame = FarmScene.GRASS_TUFTS[h % FarmScene.GRASS_TUFTS.length];
+    } else if (h % 100 < 12) {
+      key = 'grassv2'; // odd detail tile in plain grass
+      frame = FarmScene.GRASS_DETAIL[h % FarmScene.GRASS_DETAIL.length];
+    }
+    return this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
   }
 
   // Solid tilled-dirt tiles (premium Tilled_Dirt_v2 sheet, 11 cols) that tile
   // seamlessly into a filled plot; a few variants add subtle texture.
   private static TILLED_FRAMES = [55, 56, 57];
+  // stonepath.png frames that carry a nice pebble cluster (scattered on paths).
+  private static PEBBLES = [0, 4, 5, 8, 9, 12, 13, 14, 15];
+  // grassv2 flat detail tiles (tufts/moss/flowers) — weighted to subtle tufts &
+  // moss over flowers; their green matches the base grass exactly.
+  private static GRASS_DETAIL = [55, 56, 57, 58, 59, 66, 67, 68, 69, 70, 60, 71];
+  // Just the leafy tuft frames (for lush "meadow" patches).
+  private static GRASS_TUFTS = [55, 56, 57, 66, 67, 68];
 
-  // Where the player starts: a plain grass tile near the island's centre (the
-  // authored cells occupy roughly x[12..36] y[1..19]).
-  private static SPAWN = { x: 24, y: 12 };
-
-  // Island layout helper kept for the open-sea fishing fallback: tiles near the
-  // grid edge (outside the authored map) are open ocean over the sea backdrop.
-  // The map's own water cells are the primary fishing surface (see pondTiles).
+  // Island layout: a tile is ocean near the very edge, then a sand beach, then
+  // the playable grassy land where the homesteads sit.
   private tileZone(x: number, y: number): 'ocean' | 'beach' | 'land' {
     const d = Math.min(x, y, GRID_W - 1 - x, GRID_H - 1 - y);
     if (d < SHORE) return 'ocean';
@@ -716,166 +965,33 @@ export class FarmScene extends Phaser.Scene {
     return 'land';
   }
 
-  // ---- data-driven map ----------------------------------------------------
-
-  // Build the world from the hand-authored startIsland.json map. The Ground
-  // layer paints the base terrain (depth 0); Layer 2 paints flat decals
-  // (path/bridge/dirt — depth 1) and tall objects (fences/trees/boats/coops —
-  // per-row depth so they y-sort with the player). Cells are classified into
-  // behaviour sets: water (solid + fishable), solidObj (solid), farm
-  // (tillable/plantable) and walkable grass/flat.
-  private buildFromMap() {
-    // Dense tile grid so the rest of the scene (farming, collisions, saves) can
-    // index [y][x] freely; everything off the authored map is plain walkable.
+  private buildWorld() {
     for (let y = 0; y < GRID_H; y++) {
       this.tiles[y] = [];
       this.ground[y] = [];
       this.overlay[y] = [];
       for (let x = 0; x < GRID_W; x++) {
         this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
-      }
-    }
-
-    // Blue-tint grass fill (frame 12 is fully opaque) used as a base layer.
-    const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
-    const GRASS_BASE_FRAME = 12;
-    // Tilled-dirt fill (frame 12 is fully opaque) — the base under farm cells, whose
-    // authored autotile frames are up to 91% transparent.
-    const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
-    // Opaque dirt-field fill variants — randomised per tile (stable hash) so the
-    // farm has varied texture instead of one repeated pattern.
-    const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
-    const dirtFrame = (x: number, y: number) => DIRT_VARIANTS[((x * 73856 + y * 19349) >>> 0) % DIRT_VARIANTS.length];
-
-    const ground = islandMap.layers.find((l) => l.name === 'Ground');
-    const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
-
-    // Ground layer first (depth 0) — also records the base category per cell so
-    // the prettify pass can find plain-grass tiles with nothing on top.
-    if (ground?.visible !== false && ground) {
-      for (const k in ground.cells) {
-        const [key, frame] = ground.cells[k];
-        const [gx, gy] = k.split(',').map(Number);
-        if (!this.inBounds(gx, gy)) continue;
-        const cx = gx * TILE + TILE / 2;
-        const cy = gy * TILE + TILE / 2;
-        const cat = classify(key);
-        // Opaque base under each cell so a tile's transparent autotile edges reveal
-        // matching ground, not the sea backdrop: farm → dirt fill (the dirt frames
-        // are 25–91% transparent), grass/flat → grass fill, water → none (shore).
-        if (cat === 'farm') this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
-        else if (cat !== 'water') this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
-        const img = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
-        this.ground[gy][gx] = img;
-        if (cat === 'water') {
-          this.tiles[gy][gx].obstacle = true;
-          this.pondTiles.add(k); // fishable water
-          this.addCollider(cx, cy, TILE, TILE);
-        } else if (cat === 'farm') {
-          this.farmTiles.add(k); // tillable/plantable
-        }
-      }
-    }
-
-    // Overlay layers (Layer 2, Layer 3, …) in array order: flat decals keep depth
-    // 1; tall objects get per-row depth (cy) so the player can pass behind them.
-    for (const layer of overlays) {
-      if (layer.visible === false) continue;
-      for (const k in layer.cells) {
-        const [key, frame] = layer.cells[k];
-        const [lx, ly] = k.split(',').map(Number);
-        if (!this.inBounds(lx, ly)) continue;
-        const cx = lx * TILE + TILE / 2;
-        const cy = ly * TILE + TILE / 2;
-        const cat = classify(key);
-        if (cat === 'solidObj') {
-          this.add.image(cx, cy, key, frame).setScale(2).setDepth(cy);
-          this.tiles[ly][lx].obstacle = true;
-          this.addCollider(cx, cy, TILE, TILE);
-          if (isBoatKey(key)) this.boatTiles.add(k);
-        } else if (cat === 'farm') {
-          // Wide tilled-dirt: a solid dirt fill under it (the wide-dirt frames are
-          // partly transparent) so the plot reads as solid dirt, not grass.
-          this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(lx, ly)).setScale(2).setDepth(0.5);
-          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
-          this.farmTiles.add(k);
+        const cx = x * TILE + TILE / 2;
+        const cy = y * TILE + TILE / 2;
+        const d = Math.min(x, y, GRID_W - 1 - x, GRID_H - 1 - y);
+        if (d < SHORE) {
+          // Surrounding sea: draw nothing here so the animated water backdrop
+          // shows through (one big living ocean). A wall along the inner shore
+          // keeps the player on the island. (Invisible slot keeps the array dense.)
+          this.ground[y][x] = this.add.image(cx, cy, 'pixel').setVisible(false);
+          this.tiles[y][x].obstacle = true;
+          if (d === SHORE - 1) this.addCollider(cx, cy, TILE, TILE);
+        } else if (d < SHORE + BEACH) {
+          this.ground[y][x] = this.add.image(cx, cy, 'sand').setScale(2).setDepth(0);
         } else {
-          // flat (path/bridge) or stray grass decal — walkable, sits above ground.
-          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
-          if (cat === 'flat') this.pathTiles.add(k);
+          this.ground[y][x] = this.grassTileAt(x, y, cx, cy);
         }
+        // Tilled-soil overlay only where the player can till (their own farm) —
+      // avoids tens of thousands of invisible objects on the big valley map.
+      if (this.isInMyFarm(x, y)) {
+        this.overlay[y][x] = this.ensureOverlay(x, y);
       }
-    }
-
-    // A tilled-soil overlay sprite for every farm tile (hidden until hoed). The
-    // existing autotile/wet logic in setGroundTexture drives these.
-    for (const k of this.farmTiles) {
-      const [fx, fy] = k.split(',').map(Number);
-      this.overlay[fy][fx] = this.add
-        .image(fx * TILE + TILE / 2, fy * TILE + TILE / 2, 'tilled', 42)
-        .setScale(2)
-        .setDepth(1)
-        .setVisible(false);
-    }
-
-    // The fishing code reads a `pond` rect for its debug dump; derive a bounding
-    // box over the authored water cells (purely informational).
-    this.pond = this.waterBounds();
-  }
-
-  // Bounding rect (inclusive tile coords) over all fishable water cells.
-  private waterBounds(): Rect {
-    let x0 = GRID_W, y0 = GRID_H, x1 = 0, y1 = 0;
-    for (const k of this.pondTiles) {
-      const [x, y] = k.split(',').map(Number);
-      x0 = Math.min(x0, x); y0 = Math.min(y0, y);
-      x1 = Math.max(x1, x); y1 = Math.max(y1, y);
-    }
-    if (this.pondTiles.size === 0) return { x0: 0, y0: 0, x1: 0, y1: 0 };
-    return { x0, y0, x1, y1 };
-  }
-
-  // Scatter a few soft, color-matched flowers/decorations on PLAIN grass only:
-  // a grass-category Ground cell with no Layer-2 object, not farm/water/path,
-  // and clear of the player's immediate spawn. Light density; taller bushes get
-  // per-row depth so the player passes behind them.
-  private prettifyGrass() {
-    // Plain-grass candidates: Ground grass cell with nothing layered on top.
-    const ground = islandMap.layers.find((l) => l.name === 'Ground');
-    if (!ground) return;
-    const candidates: Array<[number, number]> = [];
-    for (const k in ground.cells) {
-      if (classify(ground.cells[k][0]) !== 'grass') continue;
-      const [gx, gy] = k.split(',').map(Number);
-      if (!this.inBounds(gx, gy)) continue;
-      if (this.tiles[gy][gx].obstacle) continue;
-      if (this.farmTiles.has(k) || this.pondTiles.has(k) || this.pathTiles.has(k)) continue;
-      // Keep the spawn tile and its ring clear so the player never starts buried.
-      if (Math.abs(gx - FarmScene.SPAWN.x) <= 1 && Math.abs(gy - FarmScene.SPAWN.y) <= 1) continue;
-      candidates.push([gx, gy]);
-    }
-    Phaser.Utils.Array.Shuffle(candidates);
-
-    // Small ground flowers (flat, depth 2) — soft blooms matched to the grass.
-    const flowerFrames = ['flower_y', 'flower_p', 'flower_p2'];
-    // Low bushes/sprouts that read as taller — per-row depth so they y-sort.
-    const bushFrames = ['bush', 'bush2', 'sprout'];
-    const count = Math.min(20, candidates.length);
-    for (let i = 0; i < count; i++) {
-      const [tx, ty] = candidates[i];
-      const cx = tx * TILE + TILE / 2;
-      const cy = ty * TILE + TILE / 2;
-      if (i % 3 === 2) {
-        // ~33% slightly taller bushes/sprouts (per-row depth so they y-sort).
-        this.add
-          .image(cx, ty * TILE + TILE, 'biome', bushFrames[i % bushFrames.length])
-          .setOrigin(0.5, 1)
-          .setScale(2)
-          .setDepth(ty * TILE + TILE);
-      } else {
-        // Flowers — mostly soft yellow blooms; the pink (mushroom-like) kept rare.
-        const fr = i % 5 === 1 ? flowerFrames[1 + (i % 2)] : flowerFrames[0];
-        this.add.image(cx, cy, 'biome', fr).setScale(2).setDepth(2);
       }
     }
   }
@@ -884,15 +1000,382 @@ export class FarmScene extends Phaser.Scene {
     return FarmScene.TILLED_FRAMES[(x * 7 + y * 13) % 3];
   }
 
+  // Raise each plot band into a grassy plateau using the premium "New tiles"
+  // Grass_Hill_Tiles_v2 autotile (key 'hillv2', 11×7). We only draw the BORDER
+  // ring — the raised grass exactly matches the base grass, so the interior stays
+  // as-is. 9-slice: TL0 T1 TR2 / L11 C12 R13 / BL22 B23 BR24. The tall front cliff
+  // lives on the band's BOTTOM edge; for the bottom band we mirror it (setFlipY)
+  // so the cliff faces UP toward the sunken central plaza.
+  private buildTerraces() {
+    const PAD = 1; // plateau reaches one tile past the fences
+    for (let row = 0; row < 2; row++) {
+      const b = bandRect(row);
+      const x0 = b.x0 - PAD, x1 = b.x1 + PAD, y0 = b.y0 - PAD, y1 = b.y1 + PAD;
+      const fy = row === 1; // bottom band: mirror so the cliff faces UP
+      const put = (tx: number, ty: number, frame: number) => {
+        if (!this.inBounds(tx, ty)) return;
+        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hillv2', frame)
+          .setScale(2).setDepth(0.4).setFlipY(fy);
+      };
+      // When mirrored, the cliff edge (frames 22/23/24) belongs on the TOP row and
+      // the soft back rim (0/1/2) on the bottom row.
+      const topL = fy ? 22 : 0, topM = fy ? 23 : 1, topR = fy ? 24 : 2;
+      const botL = fy ? 0 : 22, botM = fy ? 1 : 23, botR = fy ? 2 : 24;
+      put(x0, y0, topL); put(x1, y0, topR);
+      put(x0, y1, botL); put(x1, y1, botR);
+      for (let x = x0 + 1; x <= x1 - 1; x++) { put(x, y0, topM); put(x, y1, botM); }
+      for (let y = y0 + 1; y <= y1 - 1; y++) { put(x0, y, 11); put(x1, y, 13); }
+      // a soft drop shadow on the plaza floor just past the plaza-facing cliff.
+      const shY = fy ? y0 - 1 : y1 + 1;
+      for (let x = x0; x <= x1; x++) {
+        if (this.inBounds(x, shY)) {
+          this.add.rectangle(x * TILE + TILE / 2, shY * TILE + TILE / 2, TILE, 8, 0x123018, 0.13).setDepth(0.42);
+        }
+      }
+    }
+  }
+
+  private layPath(x: number, y: number) {
+    if (!this.inBounds(x, y) || this.tiles[y][x].obstacle) return;
+    const k = this.key(x, y);
+    if (this.pondTiles.has(k) || this.pathTiles.has(k)) return;
+    const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
+    // Keep the grass and just scatter the pack's loose pebbles on top, so the
+    // route reads as a natural pebble trail rather than a hard dirt road.
+    const n = (Math.random() < 0.8 ? 1 : 0) + (Math.random() < 0.45 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const f = FarmScene.PEBBLES[Math.floor(Math.random() * FarmScene.PEBBLES.length)];
+      const ox = Phaser.Math.Between(-7, 7), oy = Phaser.Math.Between(-7, 7);
+      this.add.image(cx + ox, cy + oy, 'stonepath', f).setScale(2).setDepth(0.55).setFlipX(Math.random() < 0.5);
+    }
+    this.pathTiles.add(k);
+  }
+
+  // The sunken valley floor: a cobble avenue with lanes up to every gate, a pond
+  // crossed by a bridge, and a row of market stalls + cosy props.
+  private buildPlaza() {
+    const pz = PLAZA;
+    const avY = Math.floor((pz.y0 + pz.y1) / 2) - 1; // avenue spans avY..avY+1
+    const cx = Math.floor((pz.x0 + pz.x1) / 2);
+
+    // An organic pond tucked into the valley floor (built first so paths avoid it).
+    this.buildPond();
+
+    // Pebble avenue across the whole valley.
+    for (let y = avY; y <= avY + 1; y++)
+      for (let x = pz.x0; x <= pz.x1; x++) this.layPath(x, y);
+    // A lane from the player's gate to the avenue (neighbours open onto grass).
+    for (const h of HOMESTEADS) {
+      if (!h.mine) continue;
+      const gx = Math.floor((h.interior.x0 + h.interior.x1) / 2);
+      const a = h.openSide === 'S' ? h.interior.y1 + 1 : h.interior.y0 - 1;
+      const lo = Math.min(a, avY), hi = Math.max(a, avY + 1);
+      for (let y = lo; y <= hi; y++) { this.layPath(gx, y); this.layPath(gx - 1, y); }
+    }
+
+    this.buildMarkets(avY, cx);
+  }
+
+  private buildMarkets(avY: number, cx: number) {
+    const prop = (tx: number, ty: number, key: string, frame?: number, scale = 2) => {
+      if (!this.inBounds(tx, ty)) return;
+      const px = tx * TILE + TILE / 2, py = ty * TILE + TILE;
+      const img = frame === undefined ? this.add.image(px, py, key) : this.add.image(px, py, key, frame);
+      img.setOrigin(0.5, 1).setScale(scale).setDepth(py);
+      this.addCollider(px, py - 10, TILE, 14);
+      return img;
+    };
+    // Well as a centrepiece beside the avenue.
+    prop(cx + 4, avY - 1, 'well');
+    // Market stalls: a counter flanked by a barrel + a crate, with a little sign.
+    for (const sx of [cx - 4, cx + 12, cx + 20]) {
+      prop(sx, avY - 1, 'furniture', 30); // table / counter
+      prop(sx - 1, avY - 1, 'furniture', 24); // barrel
+      prop(sx + 1, avY - 1, 'furniture', 25); // crate
+      this.add.image(sx * TILE + TILE / 2, (avY - 1) * TILE + TILE, 'signs', 0).setOrigin(0.5, 1).setScale(2).setDepth((avY - 1) * TILE + 40);
+    }
+    // Cosy props below the avenue.
+    prop(cx - 16, avY + 4, 'workstation');
+    prop(cx + 16, avY + 5, 'chest', 0);
+    // A picnic blanket (flat on the ground) with a basket.
+    this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'picnic').setScale(2).setDepth((avY + 5) * TILE - 20);
+    this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'basket').setOrigin(0.5, 1).setScale(2).setDepth((avY + 5) * TILE + 10);
+  }
+
   // Refresh a tile and its 4 neighbours (their autotile edges depend on it).
   private refreshTile(x: number, y: number) {
     const around: Array<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
     for (const [dx, dy] of around) if (this.inBounds(x + dx, y + dy)) this.setGroundTexture(x + dx, y + dy);
   }
 
+  private placeDecorations() {
+    // Scatter nature across the open grass — never on beach/ocean, inside a
+    // homestead, on a path, or on water.
+    const free = (tx: number, ty: number) =>
+      this.inBounds(tx, ty) && !this.tiles[ty][tx].obstacle &&
+      this.tileZone(tx, ty) === 'land' && !this.inAnyHomestead(tx, ty) &&
+      !this.pathTiles.has(this.key(tx, ty)) && !this.pondTiles.has(this.key(tx, ty));
+
+    const scatter = (n: number, tries: number, fn: (tx: number, ty: number) => void) => {
+      let placed = 0, guard = 0;
+      while (placed < n && guard++ < tries) {
+        const tx = Phaser.Math.Between(1, GRID_W - 2), ty = Phaser.Math.Between(1, GRID_H - 2);
+        if (!free(tx, ty)) continue;
+        fn(tx, ty);
+        placed++;
+      }
+    };
+
+    // Flowers, bushes, sprouts & stumps from the biome sheet.
+    const decoFrames = ['flower_y', 'flower_p', 'flower_p2', 'bush', 'bush2', 'sprout', 'stump'];
+    let di = 0;
+    scatter(150, 3000, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'biome', decoFrames[di++ % decoFrames.length]).setScale(2).setDepth(2));
+
+    // Mushrooms, flowers & stones — a wide variety for a lush valley floor.
+    const mfsFrames = [0, 1, 2, 3, 4, 5, 6, 12, 13, 15, 24, 25, 36, 37, 38, 39, 40, 48, 49, 52];
+    let mi = 0;
+    scatter(90, 2400, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'mfs', mfsFrames[mi++ % mfsFrames.length]).setScale(2).setDepth(3));
+
+    // Berry bushes & shrubs (per-row depth so the player passes behind them).
+    const bushFrames = [36, 37, 38, 39, 40, 48, 49, 50, 51];
+    let bi = 0;
+    scatter(56, 1600, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', bushFrames[bi++ % bushFrames.length]).setScale(2).setDepth(ty * TILE + TILE));
+
+    // Tree stumps & fallen logs for a foresty, lived-in feel.
+    const logFrames = [72, 73, 74, 75, 76, 77];
+    let li = 0;
+    scatter(22, 900, (tx, ty) =>
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'nature', logFrames[li++ % logFrames.length]).setScale(2).setDepth(ty * TILE + TILE));
+
+    // Swaying shade trees dotted across the open grass.
+    const treeFrames = ['tree', 'tree_apple'];
+    let ti = 0;
+    scatter(30, 1600, (tx, ty) => {
+      const cx = tx * TILE + TILE / 2;
+      const baseY = ty * TILE + TILE;
+      const tree = this.add
+        .image(cx, baseY + 4, 'biome', treeFrames[ti++ % treeFrames.length])
+        .setOrigin(0.5, 1).setScale(2).setDepth(baseY);
+      this.tiles[ty][tx].obstacle = true;
+      this.addCollider(cx, baseY - 4, 16, 12);
+      this.tweens.add({
+        targets: tree, angle: { from: -1.3, to: 1.3 },
+        duration: 2200 + Math.random() * 800, delay: Math.random() * 1500,
+        yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    });
+  }
+
+  // True if a tile sits inside any homestead's fenced footprint (fence ring incl.).
+  private inAnyHomestead(tx: number, ty: number): boolean {
+    for (const h of HOMESTEADS) {
+      if (tx >= h.interior.x0 - 1 && tx <= h.interior.x1 + 1 && ty >= h.interior.y0 - 1 && ty <= h.interior.y1 + 1) return true;
+    }
+    return false;
+  }
+
   private addCollider(cx: number, cy: number, w: number, h: number) {
     const box = this.obstacles.create(cx, cy, 'pixel') as Phaser.Physics.Arcade.Sprite;
     box.setVisible(false).setDisplaySize(w, h).refreshBody();
+  }
+
+  private encloseRegion(
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    opts: { top?: boolean; bottom?: boolean; left?: boolean; right?: boolean; gap?: [number, number] },
+  ) {
+    // Collect the perimeter tiles we actually want a fence on (skipping anything
+    // already occupied, e.g. a rock or the coop), then autotile each.
+    const want = new Set<string>();
+    const add = (x: number, y: number) => {
+      if (this.inBounds(x, y) && !this.tiles[y][x].obstacle) want.add(this.key(x, y));
+    };
+    if (opts.top) for (let x = tx0; x <= tx1; x++) add(x, ty0);
+    if (opts.bottom) for (let x = tx0; x <= tx1; x++) add(x, ty1);
+    if (opts.left) for (let y = ty0; y <= ty1; y++) add(tx0, y);
+    if (opts.right) for (let y = ty0; y <= ty1; y++) add(tx1, y);
+    if (opts.gap) want.delete(this.key(opts.gap[0], opts.gap[1]));
+
+    for (const k of want) {
+      const [x, y] = k.split(',').map(Number);
+      const has = (dx: number, dy: number) => want.has(this.key(x + dx, y + dy));
+      const u = has(0, -1);
+      const d = has(0, 1);
+      const l = has(-1, 0);
+      const r = has(1, 0);
+      // Sheet rows pick the vertical connection, columns the horizontal one.
+      const row = u && d ? 1 : d ? 0 : u ? 2 : 3;
+      const col = l && r ? 2 : r ? 1 : l ? 3 : 0;
+      const cx = x * TILE + TILE / 2;
+      const cy = y * TILE + TILE / 2;
+      this.add.image(cx, cy, 'fences', row * 4 + col).setScale(2).setDepth(cy + 6);
+      // Make the fence solid (gaps were excluded above, so gates stay walkable).
+      this.tiles[y][x].obstacle = true;
+      this.addCollider(cx, cy, TILE, TILE);
+    }
+  }
+
+  // ---- homesteads ---------------------------------------------------------
+
+  // Build all 10 fenced homesteads. Each has a house, a crop farm and an animal
+  // pen. #0 is the player's (farmable, real animals); the rest are decorative
+  // neighbours so the neighbourhood reads as alive.
+  private buildPlots() {
+    HOMESTEADS.forEach((h, i) => this.buildHomestead(h, i));
+  }
+
+  // One self-contained homestead: an outer fence (with a front gate gap), a 7×7
+  // crop farm on the left, and two separate animal areas on the right — a chicken
+  // pen (with coop) and a cow pasture — plus an orchard.
+  private buildHomestead(h: Homestead, plot: number) {
+    const it = h.interior;
+    const gateCx = Math.floor((it.x0 + it.x1) / 2);
+    const south = h.openSide === 'S';
+    const gateY = south ? it.y1 + 1 : it.y0 - 1; // fence row that opens to the plaza
+    const fence = () => this.encloseRegion(it.x0 - 1, it.y0 - 1, it.x1 + 1, it.y1 + 1, {
+      top: true, bottom: true, left: true, right: true, gap: [gateCx, gateY],
+    });
+
+    // Every plot uses the same "Cozy Homestead" design: a chicken house + run
+    // and a cow pen (no cottage). Fence first so the pens autotile against it.
+    fence();
+    this.buildChickenPen(h);
+    this.buildCowPen(h);
+    this.addGateStairs(gateCx, gateY, south);
+    // Floating holographic nameplate at the GATE (just outside, toward the plaza)
+    // so it reads as the plot's entrance sign. Text comes from the roster (whose
+    // plot it is); "Available" until then.
+    const holoX = gateCx * TILE + TILE / 2;
+    const holoY = (south ? gateY + 1 : gateY - 1) * TILE + TILE / 2;
+    this.addPlotHologram(plot, holoX, holoY, plot === this.myPlotIndex ? 'Your Plot' : 'Available');
+
+    if (!h.mine) return; // a furnished but unclaimed neighbour plot — no interactive farm
+
+    // The player's interactive farm: a tinted crop bed that unlocks row-by-row.
+    this.markPlayerFarm();
+
+    // Working front gate that swings open on approach.
+    const gx = gateCx * TILE + TILE / 2;
+    const gy = gateY * TILE + TILE / 2;
+    // Static closed frame (the swing is a scale tween — the spritesheet's swing
+    // frames don't slice cleanly and looked like a spin).
+    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+  }
+
+  // A little staircase bridging the plateau cliff just outside a gate, so each
+  // homestead reads as stepping down into the plaza. hills stairs: 28/29 (top),
+  // 34/35 (bottom); flipped for the bottom band (stairs face up).
+  private addGateStairs(gateCx: number, gateY: number, south: boolean) {
+    const flip = !south;
+    const topY = south ? gateY + 1 : gateY - 2;
+    const put = (tx: number, ty: number, frame: number) => {
+      if (!this.inBounds(tx, ty)) return;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'hills', frame).setScale(2).setDepth(0.6).setFlipY(flip);
+    };
+    put(gateCx - 1, topY, flip ? 34 : 28);
+    put(gateCx, topY, flip ? 35 : 29);
+    put(gateCx - 1, topY + 1, flip ? 28 : 34);
+    put(gateCx, topY + 1, flip ? 29 : 35);
+  }
+
+  // The chicken pen: a small orange-roof coop crowning the top edge, a U-shaped
+  // fence (left/right/bottom) framing it, and a little hay dressing.
+  private buildChickenPen(h: Homestead) {
+    const p = h.chickenPen;
+    // Coop (flag its footprint obstacle) before the fence so it autotiles cleanly.
+    const coopX = Math.round((p.x0 + p.x1) / 2) * TILE + TILE / 2;
+    const coopBase = (p.y0 + 1) * TILE;
+    this.add.image(coopX, coopBase, 'coop', 'coop').setOrigin(0.5, 1).setScale(1.7).setDepth(coopBase);
+    for (let oy = p.y0; oy <= p.y0 + 1; oy++) {
+      for (let ox = p.x0 + 1; ox <= p.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
+    }
+    this.addCollider(coopX, coopBase - 14, 92, 22);
+    // U-shaped fence; the coop crowns the open top.
+    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, { left: true, right: true, bottom: true });
+    this.add.image((p.x0 + 1) * TILE + 16, (p.y1 - 1) * TILE, 'hay', 6).setScale(2).setDepth((p.y1 - 1) * TILE);
+    this.add.image((p.x1 - 1) * TILE, (p.y1 - 1) * TILE, 'hay', 7).setScale(2).setDepth((p.y1 - 1) * TILE);
+  }
+
+  // The cow pasture: an open fenced field (gate gap at the bottom-centre) with a
+  // few hay bales. No building — cows graze in the open, distinct from the coop.
+  private buildCowPen(h: Homestead) {
+    const p = h.cowPen;
+    const gap = Math.round((p.x0 + p.x1) / 2);
+    this.encloseRegion(p.x0, p.y0, p.x1, p.y1, {
+      top: true, left: true, right: true, bottom: true, gap: [gap, p.y1],
+    });
+    this.add.image((p.x0 + 1) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 6).setScale(2).setDepth((p.y0 + 2) * TILE);
+    this.add.image((p.x0 + 2) * TILE + 16, (p.y0 + 2) * TILE, 'hay', 7).setScale(2).setDepth((p.y0 + 2) * TILE);
+    this.add.image((p.x1 - 1) * TILE, (p.y1 - 2) * TILE, 'hay', 0).setScale(2).setDepth((p.y1 - 2) * TILE);
+  }
+
+  // Drop a few idle, static animals into a neighbour's pens for life: chickens in
+  // the chicken pen, cows in the cow pasture.
+  // How many of the crop bed's rows are unlocked — one more per player level,
+  // growing from the front (gate side) back toward the top. (Base bed is 10 rows
+  // tall; this free level-unlock is unchanged.)
+  private unlockedFarmRows(): number {
+    // New players get more tillable rows up front (3 + level) so the early
+    // farming loop has enough throughput; fully opens by level 7.
+    return Math.min(this.myFarmRect().ph, 3 + levelInfo(this.xp).level);
+  }
+
+  // A tile is tillable when it sits inside the farmable bed (base + purchased
+  // expansion columns) AND within the level-unlocked rows. Expansion columns use
+  // the SAME row gate as the base bed, so buying width never grants extra rows.
+  private isUnlockedFarm(tx: number, ty: number): boolean {
+    const f = this.expandedFarmRect();
+    if (!isInPlot(f, tx, ty)) return false;
+    return ty >= f.py + f.ph - this.unlockedFarmRows();
+  }
+
+  // Player's crop bed: tint the grass so the cultivated plot reads clearly against
+  // the wild grass. Tillable (level-unlocked) rows get a warm "ready soil" tint;
+  // still-locked rows are dimmer so you can see the whole plot and what's left to
+  // unlock. The tint only shows on untilled tiles (the dirt overlay covers tilled
+  // ones). Re-run whenever the plot, expansion, or level changes.
+  private markPlayerFarm() {
+    const f = this.expandedFarmRect();
+    const unlockedFromY = f.py + f.ph - this.unlockedFarmRows();
+    const x0 = f.px, x1 = f.px + f.pw - 1;
+    const y0 = f.py, y1 = f.py + f.ph - 1;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const tile = this.ground[y]?.[x];
+        if (!tile) continue;
+        tile.setTint(y >= unlockedFromY ? 0xd8e6a8 : 0xb3c2a0);
+      }
+    }
+  }
+
+  // A floating holographic nameplate over a plot, showing whose plot it is.
+  // Cyan glow + gentle bob/flicker so it reads as a hologram. The text is updated
+  // from the roster (see onRoster); starts as "Available"/"Your Plot".
+  private addPlotHologram(plot: number, x: number, baseY: number, text: string) {
+    const label = this.add
+      .text(x, baseY, text, {
+        fontFamily: 'Pixelify Sans, monospace',
+        fontSize: '16px',
+        color: '#9af2ff',
+        stroke: '#06303f',
+        strokeThickness: 4,
+        // Dark translucent backing so the cyan reads against bright grass.
+        backgroundColor: 'rgba(8,38,52,0.5)',
+        padding: { x: 7, y: 3 },
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(60000)
+      .setAlpha(0.95);
+    label.setShadow(0, 0, '#3fd2ff', 10, true, true); // cyan glow → holographic
+    // Gentle hover + flicker so it feels projected, not painted on (kept readable).
+    this.tweens.add({ targets: label, y: baseY - 5, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: label, alpha: 0.72, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.plotLabels.set(plot, label);
   }
 
   // ---- helpers ------------------------------------------------------------
@@ -917,6 +1400,19 @@ export class FarmScene extends Phaser.Scene {
 
   private cropDepth(ty: number): number {
     return ty * TILE + TILE;
+  }
+
+  // Lazily create (or reuse) the tilled-dirt overlay image for a farm tile.
+  // Overlays only exist on the player's own crop bed; when the owned plot is
+  // re-pointed (multiplayer) we create the new plot's overlays on demand.
+  private ensureOverlay(x: number, y: number): Phaser.GameObjects.Image {
+    const existing = this.overlay[y]?.[x];
+    if (existing) return existing;
+    const cx = x * TILE + TILE / 2;
+    const cy = y * TILE + TILE / 2;
+    const ov = this.add.image(cx, cy, 'tilled', 42).setScale(2).setDepth(1).setVisible(false);
+    this.overlay[y][x] = ov;
+    return ov;
   }
 
   private setGroundTexture(x: number, y: number) {
@@ -947,15 +1443,20 @@ export class FarmScene extends Phaser.Scene {
       if (did) {
         this.playAction('hoe');
         sfx.play('till'); // once per click, not per tilled tile
+        bus.emit('action', 'till');
       }
     } else if (this.selected === 'can') {
-      let did = false;
+      let watered = 0;
       this.forArea(tx, ty, toolRadius(this.upgrades.water), (x, y) => {
-        if (this.waterTile(x, y)) did = true;
+        if (this.waterTile(x, y)) watered++;
       });
-      if (did) {
+      if (watered > 0) {
         this.playAction('water');
         sfx.play('water'); // once per click, not per watered tile
+        bus.emit('action', 'water');
+        // A tiny global-XP trickle for tending crops: +1 per newly-watered tile,
+        // capped per action so a big sprinkler radius can't be cheesed for XP.
+        this.gainXp(Math.min(watered, WATER_XP_CAP));
       }
     } else if (this.selected === 'seed') {
       this.plant(tx, ty);
@@ -973,13 +1474,8 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // A tile is farmable if the authored map flagged it as tilled-dirt (farmTiles).
-  private isFarmable(tx: number, ty: number): boolean {
-    return this.farmTiles.has(this.key(tx, ty));
-  }
-
   private till(x: number, y: number): boolean {
-    if (!this.isFarmable(x, y)) return false; // can only farm the map's dirt cells
+    if (!this.isUnlockedFarm(x, y)) return false; // only unlocked rows of your plot
     const t = this.tiles[y][x];
     if (t.tilled || this.crops.has(this.key(x, y))) return false;
     t.tilled = true;
@@ -987,10 +1483,14 @@ export class FarmScene extends Phaser.Scene {
     return true;
   }
 
+  // Returns true only when a *dry* tilled tile becomes wet — re-watering an
+  // already-wet tile re-applies the timer but doesn't count (so it can't be
+  // spammed for the watering XP trickle).
   private waterTile(x: number, y: number): boolean {
     if (!this.tiles[y][x].tilled) return false;
+    const wasDry = !this.isWet(x, y);
     this.water(x, y);
-    return true;
+    return wasDry;
   }
 
   private water(tx: number, ty: number) {
@@ -1025,7 +1525,8 @@ export class FarmScene extends Phaser.Scene {
       .setTint(plant.cropTint ?? 0xffffff)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
-      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
+      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false,
+      quality: 'none', matureAt: 0, withered: false, sprite,
     });
     // Thrifty: a chance the seed isn't consumed when planting.
     if (Math.random() < this.mods().seedSaveChance) {
@@ -1041,15 +1542,53 @@ export class FarmScene extends Phaser.Scene {
       scale: { start: 1, end: 0 },
     }, 6);
     sfx.play('plant');
+    bus.emit('action', 'plant');
+    this.farmDirty = true; // push an updated crop snapshot to peers ASAP
     this.emitState();
   }
 
   private matureCrop(crop: Crop) {
     crop.mature = true;
     crop.stage = STAGES - 1;
-    crop.mutation = this.forcedMutation ?? pickMutation(fortuneLuck(this.upgrades.fortune) * this.mods().mutationLuckMult);
-    crop.wetAtMature = this.isWet(crop.tx, crop.ty);
+    // Mutation luck = Fortune upgrade × Farming-skill luck, with a small extra
+    // nudge if the tile is wet at maturity (watering pays off beyond growth/sale).
+    const wet = this.isWet(crop.tx, crop.ty);
+    // Fortune "Lucky Clover" fork adds flat mutation luck; Sprinkler "Misting"
+    // fork adds extra luck only on wet tiles. "Jackpot" fork biases the top
+    // mutations (Gold/Rainbow) via topLuck instead of lifting every tier.
+    const fortuneFork = this.fork('fortune');
+    const mistBonus = wet ? this.fork('sprinkler').mutationLuckMult ?? 0 : 0;
+    const luck =
+      fortuneLuck(this.upgrades.fortune) *
+      this.mods().mutationLuckMult *
+      (1 + (fortuneFork.mutationLuckMult ?? 0) + mistBonus) *
+      (wet ? WET_MUTATION_LUCK : 1);
+    // topMutationLuckMult is an additive bonus to the top-mutation multiplier
+    // (1 ⇒ ×2 jackpot odds, 0 ⇒ none) to match the rest of the additive bag.
+    const topLuck = 1 + (fortuneFork.topMutationLuckMult ?? 0);
+    crop.mutation = this.forcedMutation ?? pickMutation(luck, topLuck);
+    crop.wetAtMature = wet;
+    crop.quality = rollQuality(this.qualityLuck());
+    crop.matureAt = this.time.now;
+    crop.withered = false;
     this.applyMatureVisuals(crop, true);
+  }
+
+  // Quality-roll luck from the Fertilizer upgrade (`growth`) + the Farming skill.
+  // mods().cropValueMult is 1 at base and climbs with farming level/perks, so its
+  // excess over 1 is a clean "how good am I at farming" bonus.
+  private qualityLuck(): number {
+    const farmingBonus = Math.max(0, this.mods().cropValueMult - 1);
+    return 1 + this.upgrades.growth * 0.5 + farmingBonus;
+  }
+
+  // Withering is ON unless the toggle (owned by the UI) is explicitly set to '0'.
+  private witherEnabled(): boolean {
+    try {
+      return localStorage.getItem('solana-valley:crop-wither') !== '0';
+    } catch {
+      return true;
+    }
   }
 
   // Sprite tint + glow + sparkle for a mature crop. Shared by fresh maturity
@@ -1098,11 +1637,53 @@ export class FarmScene extends Phaser.Scene {
         })
         .setDepth(this.cropDepth(crop.ty) + 1);
 
-      if (announce) {
-        const label = m.id !== 'normal' ? `${m.name} ` : '';
-        this.toast(`✨ ${label}${crop.plant.name} is ready!`);
-      }
     }
+
+    // Tasteful quality marker: a small coloured ★ above silver+ crops.
+    this.applyQualityStar(crop);
+
+    if (announce) {
+      const mutLabel = m.id !== 'normal' ? `${m.name} ` : '';
+      const q = QUALITY[crop.quality];
+      const qLabel = q.stars ? `${q.label} ${'★'.repeat(q.stars)} ` : '';
+      const special = m.id !== 'normal' || rank >= 3 || crop.quality !== 'none';
+      if (special) this.toast(`✨ ${qLabel}${mutLabel}${crop.plant.name} is ready!`);
+    }
+  }
+
+  // Small star above a ripe crop indicating its quality tier (none = no star).
+  // Rebuilt fresh; cleared on harvest/regrow/wither via removeCrop / clearStar.
+  private applyQualityStar(crop: Crop) {
+    crop.star?.destroy();
+    crop.star = undefined;
+    const q = QUALITY[crop.quality];
+    if (q.stars <= 0) return;
+    const cx = crop.tx * TILE + TILE / 2;
+    const cy = crop.ty * TILE + TILE / 2;
+    crop.star = this.add
+      .text(cx, cy - 24, '★'.repeat(q.stars), {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '12px', color: q.css,
+        stroke: '#2a1f12', strokeThickness: 3,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(this.cropDepth(crop.ty) + 2);
+  }
+
+  // A ripe crop left too long wilts: brown desaturated tint, glow/sparkle/star
+  // removed. Gentle — it stays harvestable, just worth 40%.
+  private applyWitherVisuals(crop: Crop) {
+    crop.glow?.destroy(); crop.glow = undefined;
+    crop.sparkle?.destroy(); crop.sparkle = undefined;
+    crop.star?.destroy(); crop.star = undefined;
+    this.rainbowCrops.delete(crop);
+    crop.sprite.setFrame(crop.plant.cropRow * 5 + (STAGES - 1));
+    crop.sprite.setTint(0x8a6b4a); // wilted brown
+  }
+
+  // Growth duration (ms) for the crop's current cycle: full the first time, then
+  // the shorter `regrow` window after a multi-harvest reset.
+  private cropGrowMs(crop: Crop): number {
+    return (crop.growMs ?? crop.plant.growthSeconds * 1000) * GROWTH_TIME_SCALE;
   }
 
   private harvest(tx: number, ty: number) {
@@ -1110,12 +1691,15 @@ export class FarmScene extends Phaser.Scene {
     const crop = this.crops.get(k);
     if (!crop || !crop.mature) return;
     sfx.play('harvest');
+    bus.emit('action', 'harvest');
     const mods = this.mods();
     const m = crop.mutation ?? MUTATION_BY_ID.normal;
-    const value = cropValue(crop.plant, m, crop.wetAtMature);
-    const sk = stackKey(crop.plant.id, m.id, crop.wetAtMature);
-    // Bountiful / Master Farmer: a chance this harvest yields two of the crop.
-    const doubled = Math.random() < mods.cropDoubleChance;
+    const value = cropValue(crop.plant, m, crop.wetAtMature, crop.quality, crop.withered);
+    const sk = stackKey(crop.plant.id, m.id, crop.wetAtMature, crop.quality, crop.withered);
+    // Bountiful / Master Farmer (skill) + Fertilizer "Bountiful" fork: a chance
+    // this harvest yields two of the crop.
+    const doubleChance = mods.cropDoubleChance + (this.fork('growth').cropDoubleChance ?? 0);
+    const doubled = Math.random() < doubleChance;
     this.harvestInv[sk] = (this.harvestInv[sk] ?? 0) + (doubled ? 2 : 1);
 
     const cx = tx * TILE + TILE / 2;
@@ -1141,8 +1725,17 @@ export class FarmScene extends Phaser.Scene {
     }
 
     const plant = crop.plant;
-    this.removeCrop(crop);
-    this.crops.delete(k);
+    const wasWithered = crop.withered;
+    const harvestedQuality = crop.quality;
+    // Multi-harvest: a regrow crop that hasn't wilted is reset for another cycle
+    // rather than removed; a wilted one (or a non-regrow crop) is taken out.
+    const regrew = plant.regrow != null && !wasWithered;
+    if (regrew) {
+      this.regrowCrop(crop);
+    } else {
+      this.removeCrop(crop);
+      this.crops.delete(k);
+    }
 
     this.harvested += 1;
     this.discoveredPlants.add(plant.id);
@@ -1154,13 +1747,42 @@ export class FarmScene extends Phaser.Scene {
     this.addSkillXp('farming', harvestXp(value)); // Farming skill grows per harvest
     this.checkAchievements();
 
-    const label = m.id !== 'normal' ? `${m.name} ` : '';
-    this.toast(`Harvested ${label}${plant.name}${doubled ? ' ×2' : ''} (worth ${value}🪙)`);
+    const mutLabel = m.id !== 'normal' ? `${m.name} ` : '';
+    const q = QUALITY[harvestedQuality];
+    const qLabel = q.stars ? `${q.label} ${'★'.repeat(q.stars)} ` : '';
+    const witherTag = wasWithered ? ' (wilted)' : '';
+    this.toast(`Harvested ${qLabel}${mutLabel}${plant.name}${doubled ? ' ×2' : ''}${witherTag} (worth ${value}🪙)`);
     // Master Farmer capstone: a chance to instantly re-till + re-plant for free.
-    if (mods.autoReplant && Math.random() < 0.15 && this.isFarmable(tx, ty)) {
+    // Skip for regrow crops — they're already replanting themselves.
+    if (!regrew && mods.autoReplant && Math.random() < 0.15 && this.isInMyFarm(tx, ty)) {
       this.autoReplant(tx, ty, plant);
     }
+    this.farmDirty = true; // a crop changed -> peers should see it ASAP
     this.emitState();
+  }
+
+  // Multi-harvest reset: keep the crop + its tile, but send it back to a growing
+  // state. Its next cycle uses the (shorter) `regrow` duration, so it ripens
+  // again in ~regrow seconds rather than the full growthSeconds.
+  private regrowCrop(crop: Crop) {
+    crop.glow?.destroy(); crop.glow = undefined;
+    crop.sparkle?.destroy(); crop.sparkle = undefined;
+    crop.star?.destroy(); crop.star = undefined;
+    this.rainbowCrops.delete(crop);
+    crop.mature = false;
+    crop.mutation = null;
+    crop.quality = 'none';
+    crop.withered = false;
+    crop.matureAt = 0;
+    crop.grownMs = 0;
+    crop.stage = 0;
+    crop.growMs = (crop.plant.regrow ?? crop.plant.growthSeconds) * 1000;
+    crop.sprite.clearTint();
+    crop.sprite.setTint(crop.plant.cropTint ?? 0xffffff);
+    crop.sprite.setFrame(crop.plant.cropRow * 5); // back to first growing frame
+    const cx = crop.tx * TILE + TILE / 2;
+    const cy = crop.ty * TILE + TILE / 2;
+    this.floatText(cx, cy - 16, '🌱 regrow', '#bff58a');
   }
 
   // Free re-till + re-plant of the same crop on a just-harvested tile (Master
@@ -1176,7 +1798,8 @@ export class FarmScene extends Phaser.Scene {
       .setTint(plant.cropTint ?? 0xffffff)
       .setDepth(this.cropDepth(ty) - 1);
     this.crops.set(this.key(tx, ty), {
-      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false, sprite,
+      plant, tx, ty, grownMs: 0, stage: 0, mature: false, mutation: null, wetAtMature: false,
+      quality: 'none', matureAt: 0, withered: false, sprite,
     });
     this.floatText(tx * TILE + TILE / 2, ty * TILE - 16, '🌱 replant', '#bff58a');
   }
@@ -1200,6 +1823,7 @@ export class FarmScene extends Phaser.Scene {
     crop.sprite.destroy();
     crop.glow?.destroy();
     crop.sparkle?.destroy();
+    crop.star?.destroy();
     this.rainbowCrops.delete(crop);
   }
 
@@ -1222,26 +1846,55 @@ export class FarmScene extends Phaser.Scene {
   private buySeed(plantId: string) {
     const plant = PLANT_BY_ID[plantId];
     if (!plant) return;
-    if (RARITY_UNLOCK[plant.rarity] > levelInfo(this.xp).level) {
-      this.toast(`${plant.rarity} unlocks at level ${RARITY_UNLOCK[plant.rarity]}`);
-      return;
-    }
-    if ((this.shopStock[plantId] ?? 0) <= 0) {
+    // No level gate: any seed in stock is buyable if you can afford it (price is
+    // the gate now). Rare seeds simply rarely appear and cost a lot. Stock is the
+    // shared island pool — buying drains it for everyone on the island.
+    if (this.remainingStock(plantId) <= 0) {
       this.toast('Out of stock');
       return;
     }
-    if (this.coins < plant.seedCost) {
+    // Shop Supply upgrade + its fork give a modest personal seed discount.
+    const supplyFork = this.fork('supply');
+    let discount = seedDiscount(this.upgrades.supply ?? 0) + (supplyFork.seedDiscount ?? 0);
+    if (rarityRank(plant.rarity) >= 3) discount += supplyFork.rareSeedDiscount ?? 0; // Legendary+
+    const cost = Math.max(1, Math.round(plant.seedCost * (1 - Math.min(0.6, discount))));
+    if (this.coins < cost) {
       this.toast('Not enough coins');
       return;
     }
-    this.coins -= plant.seedCost;
-    this.shopStock[plantId] -= 1;
+
+    // Optimistically grant the seed + drain the shared pool, then confirm against
+    // the authoritative DB when on a real island. This keeps buying instant while
+    // staying correct: if we lost a race for the last unit, we roll back.
+    const cap = this.shopPool[plantId] ?? 0;
+    this.coins -= cost;
+    this.shopBought[plantId] = (this.shopBought[plantId] ?? 0) + 1;
     this.seeds[plantId] = (this.seeds[plantId] ?? 0) + 1;
     this.selectedSeed = plantId;
     this.selected = 'seed';
     sfx.play('buy');
     this.toast(`Bought ${plant.name} seed`);
+    bus.emit('mp:shopBuy', { plantId }); // live nudge to island peers
+    this.checkGoals(); // claims "get your first seed" the moment you own one
     this.emitState();
+
+    if (this.shopShared) {
+      void buySeedRemote(this.island, this.shopEpoch, plantId, cap).then((result) => {
+        if (result === null) return; // DB unavailable -> keep optimistic result
+        if (result === -1) {
+          // Sold out — we lost the race. Refund and undo.
+          this.coins += cost;
+          this.seeds[plantId] = Math.max(0, (this.seeds[plantId] ?? 0) - 1);
+          this.shopBought[plantId] = cap; // it's truly empty this window
+          this.toast(`${plant.name} just sold out!`);
+          this.emitState();
+          return;
+        }
+        // Adopt the authoritative count (includes our buy + any concurrent ones).
+        this.shopBought[plantId] = Math.max(this.shopBought[plantId] ?? 0, result);
+        this.emitState();
+      });
+    }
   }
 
   private selectSeed(plantId: string) {
@@ -1254,32 +1907,96 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
+  // Per-crop sale value for one stack item, before count/global multipliers but
+  // INCLUDING the Market Stall forks: "Connoisseur" lifts Legendary+ crops, then
+  // "Wholesale" adds a flat coin bonus per crop. Shared by sellStack/sellAll.
+  private cropSaleUnit(plant: Plant, mutation: Mutation, wet: boolean, quality: Quality, withered: boolean): number {
+    const fork = this.fork('market');
+    let v = cropValue(plant, mutation, wet, quality, withered);
+    if ((fork.rareSaleMult ?? 0) > 0 && rarityRank(plant.rarity) >= 3) v *= 1 + (fork.rareSaleMult ?? 0);
+    return v + (fork.saleFlatBonus ?? 0);
+  }
+
   private sellStack(key: string) {
     const count = this.harvestInv[key] ?? 0;
     if (count <= 0) return;
-    const [plantId, mutId, wet] = key.split('|');
+    // Fish stacks (`fish|<id>`) are sold by their species value × the Fishing
+    // value multiplier — they're NOT crops, so this must come BEFORE the crop
+    // parse below (PLANT_BY_ID has no fish ids and would crash).
+    if (key.startsWith('fish|')) {
+      const id = key.slice(5);
+      const fish = FISH_BY_ID[id];
+      if (!fish) { delete this.harvestInv[key]; return; } // unknown id: drop it safely
+      const value = Math.round(fish.value * count * this.mods().fishValueMult);
+      delete this.harvestInv[key];
+      this.coins += value;
+      this.earned += value;
+      sfx.play('sell');
+      bus.emit('action', 'sell');
+      this.checkAchievements();
+      this.toast(`Sold ${count}× ${fish.name} (+${value}🪙)`);
+      this.emitState();
+      return;
+    }
+    // Tolerant parse: legacy 3-/4-part keys default quality 'none', withered '0'.
+    const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+    const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const value = Math.round(
-      cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') *
+      this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
-        this.mods().cropValueMult,
+        this.mods().cropValueMult *
+        this.collectionMult(),
     );
     delete this.harvestInv[key];
     this.coins += value;
     this.earned += value;
     sfx.play('sell');
+    bus.emit('action', 'sell');
     this.checkAchievements();
-    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)`);
+    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}`);
     this.emitState();
   }
 
+  // Permanent Collection Bonus multiplier, derived live from cumulative
+  // discoveries (distinct plants + mutations + completed tiers). Keeps Commons
+  // relevant since every new find lifts ALL crop sale value forever.
+  private collectionMult(): number {
+    return collectionBonus(this.discoveredPlants, this.discoveredMutations).mult;
+  }
+
+  // Suffix for sell toasts that surfaces the Market Stall + Collection bonuses
+  // when active, so players actually feel these (otherwise invisible) sale-price
+  // boosts pay off.
+  private marketBonusTag(): string {
+    const market = Math.round((marketBonus(this.upgrades.market) - 1) * 100);
+    const coll = collectionBonus(this.discoveredPlants, this.discoveredMutations).pct;
+    let tag = '';
+    if (market > 0) tag += ` · +${market}% Market Stall`;
+    if (coll > 0) tag += ` · +${coll}% Collection`;
+    return tag;
+  }
+
   private sellAll() {
-    let total = 0;
+    let cropTotal = 0;
+    let fishTotal = 0;
+    const fishValueMult = this.mods().fishValueMult;
     for (const [key, count] of Object.entries(this.harvestInv)) {
-      const [plantId, mutId, wet] = key.split('|');
-      total += cropValue(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1') * count;
+      // Fish stacks are valued on their own track (species value × Fishing mult),
+      // outside the crop market/collection multipliers. Branch BEFORE the crop
+      // parse so a fish key never hits PLANT_BY_ID/cropValue (which would crash).
+      if (key.startsWith('fish|')) {
+        const fish = FISH_BY_ID[key.slice(5)];
+        if (fish) fishTotal += fish.value * count * fishValueMult;
+        continue;
+      }
+      const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+      const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
+      cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
     }
-    total = Math.round(total * marketBonus(this.upgrades.market) * this.mods().cropValueMult);
+    const total = Math.round(
+      cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() + fishTotal,
+    );
     if (total <= 0) {
       this.toast('Nothing to sell');
       return;
@@ -1288,9 +2005,84 @@ export class FarmScene extends Phaser.Scene {
     this.coins += total;
     this.earned += total;
     sfx.play('sell');
+    bus.emit('action', 'sell');
     this.checkAchievements();
-    this.toast(`Sold everything (+${total}🪙)`);
+    this.toast(`Sold everything (+${total}🪙)${this.marketBonusTag()}`);
     this.emitState();
+  }
+
+  // (Re)create the Phaser Key objects for the remappable movement binds. Old
+  // keys are removed first so rebinding never leaves duplicate listeners.
+  private buildMoveKeys() {
+    const kb = this.input.keyboard;
+    if (!kb) return;
+    for (const a of Object.keys(this.moveKeys) as MoveAction[]) {
+      const k = this.moveKeys[a];
+      if (k) kb.removeKey(k, true);
+    }
+    this.moveKeys = {};
+    const binds = getKeyBinds();
+    (Object.keys(binds) as MoveAction[]).forEach((a) => {
+      const name = mapKeyName(binds[a]);
+      if (name) this.moveKeys[a] = kb.addKey(name);
+    });
+  }
+
+  // Poll the first connected gamepad for movement (left stick + dpad) and, when
+  // low-risk, tool select / act. Returns a movement vector or null. Everything is
+  // guarded so missing gamepad APIs never throw.
+  private pollGamepad(): { x: number; y: number } | null {
+    let gp: Gamepad | null = null;
+    try {
+      const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
+      if (pads) {
+        for (const p of pads) {
+          if (p) {
+            gp = p;
+            break;
+          }
+        }
+      }
+    } catch {
+      return null;
+    }
+    if (!gp) return null;
+
+    const DEAD = 0.25;
+    const axisX = gp.axes[0] ?? 0;
+    const axisY = gp.axes[1] ?? 0;
+    let x = Math.abs(axisX) > DEAD ? axisX : 0;
+    let y = Math.abs(axisY) > DEAD ? axisY : 0;
+
+    const pressed = (i: number): boolean => {
+      const b = gp!.buttons[i];
+      return !!b && (typeof b === 'object' ? b.pressed : (b as number) > 0.5);
+    };
+    // Dpad (12=up, 13=down, 14=left, 15=right) overrides/augments the stick.
+    if (pressed(12)) y = -1;
+    else if (pressed(13)) y = 1;
+    if (pressed(14)) x = -1;
+    else if (pressed(15)) x = 1;
+
+    // Edge-triggered actions: face buttons select tools, A acts on the tile.
+    const edge = (i: number): boolean => {
+      const now = pressed(i);
+      const was = this.padPrev[i] ?? false;
+      this.padPrev[i] = now;
+      return now && !was;
+    };
+    if (edge(2)) this.setTool('hoe'); // X / square
+    if (edge(1)) this.setTool('can'); // B / circle
+    if (edge(3)) this.setTool('seed'); // Y / triangle
+    if (edge(0)) {
+      // A / cross → use the held tool on the player's current tile.
+      const tx = Math.floor(this.player.x / TILE);
+      const ty = Math.floor(this.player.y / TILE);
+      this.useToolAt(tx, ty);
+    }
+
+    if (x === 0 && y === 0) return null;
+    return { x, y };
   }
 
   private setTool(id: string) {
@@ -1302,10 +2094,60 @@ export class FarmScene extends Phaser.Scene {
     this.emitState();
   }
 
-  private restock() {
-    this.shopStock = rollShop(levelInfo(this.xp).level);
-    this.restockMs = Math.max(20_000, RESTOCK_MS - restockReductionMs(this.upgrades.supply));
-    this.toast('🛒 The seed shop restocked!');
+  // ---- shared island seed shop -------------------------------------------
+  // The current restock window: a wall-clock epoch so every island peer flips
+  // windows at the same instant (shared pool needs a shared boundary).
+  private currentEpoch(): number {
+    return Math.floor(Date.now() / RESTOCK_MS);
+  }
+
+  // Units of a seed still buyable this window: shared pool minus what's been
+  // bought (by anyone on the island), floored at 0.
+  private remainingStock(id: string): number {
+    return Math.max(0, (this.shopPool[id] ?? 0) - (this.shopBought[id] ?? 0));
+  }
+
+  // (Re)roll the shared pool for the current island/window/online-count, keeping
+  // this window's purchases. Called on join, on roster change (count changes the
+  // ×players multiplier), and at the start of each window.
+  private refreshShopPool() {
+    this.shopPool = rollShopAt(this.island, this.shopEpoch, this.onlineCount);
+  }
+
+  // Start a fresh restock window: reset purchases and re-roll the shared pool.
+  // When on a real island, pull the authoritative bought-counts for the new
+  // window from the DB (so the pool is exact, not just broadcast-derived).
+  private rollShopWindow(epoch: number) {
+    this.shopEpoch = epoch;
+    this.shopBought = {};
+    this.refreshShopPool();
+    if (this.shopShared) this.syncShopFromDb();
+  }
+
+  // True once we're seated on a real multiplayer island (vs. offline solo play).
+  private get shopShared(): boolean {
+    return !!this.myMpId;
+  }
+
+  // Pull the authoritative bought-counts for the current window from Supabase and
+  // adopt them, so late joiners / missed broadcasts can't desync the shared pool.
+  // Best-effort: a null result (DB not configured / offline) leaves local state.
+  private syncShopFromDb() {
+    if (!this.shopShared) return;
+    const island = this.island;
+    const epoch = this.shopEpoch;
+    void fetchShopBought(island, epoch).then((bought) => {
+      if (!bought) return; // DB unavailable -> keep local/broadcast state
+      if (this.shopEpoch !== epoch || this.island !== island) return; // stale
+      this.shopBought = bought;
+      this.emitState();
+    });
+  }
+
+  // A peer on the island bought a seed — drain the shared pool locally too.
+  private onRemoteShopBuy(plantId: string) {
+    if (!PLANT_BY_ID[plantId]) return;
+    this.shopBought[plantId] = (this.shopBought[plantId] ?? 0) + 1;
     this.emitState();
   }
 
@@ -1316,7 +2158,10 @@ export class FarmScene extends Phaser.Scene {
     if (after > before) {
       sfx.play('levelup');
       this.toast(`⭐ Level ${after}!`);
-      this.shopStock = rollShop(after); // reveal newly-unlocked tiers right away
+      if (this.unlockedFarmRows() > Math.min(this.myFarmRect().ph, 3 + before)) {
+        this.markPlayerFarm(); // reveal the newly-unlocked crop row
+        this.toast('🌱 New farm row unlocked!');
+      }
     }
   }
 
@@ -1332,7 +2177,7 @@ export class FarmScene extends Phaser.Scene {
     const after = skillLevel(this.skills[id]);
     if (after > before) {
       sfx.play('levelup');
-      this.toast(`${def.icon} ${def.name} reached Lv ${after}!`);
+      this.toast(`⭐ ${def.name} reached Lv ${after}!`);
       this.burst(this.player.x, this.player.y - 16, 'p_star', {
         speed: { min: 40, max: 110 },
         lifespan: 850,
@@ -1368,35 +2213,28 @@ export class FarmScene extends Phaser.Scene {
     this.recomputeMods();
     const chosen = perk === ms.a.id ? ms.a : ms.b;
     sfx.play('upgrade');
-    this.toast(`${def.icon} ${chosen.name} — ${chosen.desc}`);
+    this.toast(`✨ ${chosen.name} — ${chosen.desc}`);
     this.emitState();
     this.saveState();
   }
 
-  // Spend fishing points to unlock an Angler's Tree node. Validates the node
-  // exists, isn't already owned, has its prerequisites met, and is affordable;
-  // then applies its bonus to the modifier bag immediately.
-  private unlockFishNode(id: string) {
-    const node = FISH_NODE_BY_ID[id];
-    if (!node) return;
-    if (this.fishNodes.has(id)) return; // already unlocked
-    if (!prereqMet(node, this.fishNodes)) {
-      this.toast('🎣 Unlock the earlier nodes first.');
+  // Wipe all chosen milestone perks AND maxed-upgrade forks for an escalating
+  // coin cost (first is free), so every unlocked milestone/fork becomes a pending
+  // choice again. Skill XP/levels and upgrade levels are untouched — only the
+  // picks reset. A plain coin sink, no dark pattern.
+  private respecPerks() {
+    const cost = respecCost(this.respecs);
+    if (this.coins < cost) {
+      this.toast(`Need ${cost.toLocaleString()}🪙 to respec perks`);
       return;
     }
-    const available = this.fishPts - spentPoints(this.fishNodes);
-    if (available < node.cost) {
-      this.toast(`🎣 Need ${node.cost - available} more fishing point${node.cost - available > 1 ? 's' : ''} — catch more fish!`);
-      return;
-    }
-    this.fishNodes.add(id);
-    this.recomputeMods(); // node bonus applies right away
+    this.coins -= cost;
+    this.respecs += 1;
+    this.perks = { ...EMPTY_PERKS };
+    this.upgradeForks = { ...EMPTY_UPGRADE_FORKS }; // forks reset alongside perks
+    this.recomputeMods(); // dropping perks changes the modifier bag immediately
     sfx.play('upgrade');
-    this.toast(`🎣 ${node.name} unlocked — ${node.desc}`);
-    this.burst(this.player.x, this.player.y - 16, 'p_star', {
-      speed: { min: 40, max: 110 }, lifespan: 800, scale: { start: 1.1, end: 0 },
-      tint: [0x7bd0ff, 0xbff5ff, 0xffffff],
-    }, 12);
+    this.toast('Perks & upgrade forks reset — choose again!');
     this.emitState();
     this.saveState();
   }
@@ -1413,8 +2251,48 @@ export class FarmScene extends Phaser.Scene {
       if (!this.achievements.has(a.id) && a.test(stats)) {
         this.achievements.add(a.id);
         this.coins += a.reward;
+        this.gainXp(a.xp); // achievements feed the global level too
         sfx.play('achievement');
-        this.toast(`🏆 ${a.name}!  +${a.reward}🪙`);
+        this.toast(`🏆 ${a.name}!  +${a.reward}🪙 · +${a.xp} XP`);
+      }
+    }
+    this.checkGoals(); // the rewarded goal ladder rides the same action hooks
+  }
+
+  // Snapshot the few stats the goal ladder predicates read (see game/goals.ts).
+  private goalStats(): GoalStats {
+    return {
+      seedsOwned: Object.values(this.seeds).reduce((a, b) => a + b, 0),
+      harvested: this.harvested,
+      earned: this.earned,
+      level: levelInfo(this.xp).level,
+      upgradesBought: Object.values(this.upgrades).filter((lvl) => lvl > 0).length,
+      animalsOwned: Object.values(this.animalCounts).reduce((a, b) => a + b, 0),
+      plantsDiscovered: this.discoveredPlants.size,
+      mutationsFound: this.mutationsFound,
+    };
+  }
+
+  // Auto-claim any newly-satisfied goals exactly once, paying out coins/XP/seeds.
+  // Coins are added directly (NOT via `earned`, so payouts can't snowball the
+  // coin-earned goals). Loops until stable so a reward that pushes the player
+  // over the next rung (e.g. XP triggers a level-up) is caught in the same tick.
+  private checkGoals() {
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      const stats = this.goalStats();
+      for (const g of GOALS) {
+        if (this.claimedGoals.has(g.id) || !g.test(stats)) continue;
+        this.claimedGoals.add(g.id);
+        this.coins += g.reward.coins;
+        if (g.reward.seed && PLANTS.some((p) => p.id === g.reward.seed!.id)) {
+          this.seeds[g.reward.seed.id] = (this.seeds[g.reward.seed.id] ?? 0) + g.reward.seed.count;
+        }
+        sfx.play('achievement');
+        this.toast(`🎯 Goal complete: ${g.label}!  ${rewardLabel(g.reward)}`);
+        if (g.reward.xp) this.gainXp(g.reward.xp); // may level up → loop re-checks
+        progressed = true;
       }
     }
   }
@@ -1422,6 +2300,11 @@ export class FarmScene extends Phaser.Scene {
   private buyUpgrade(id: string) {
     const def = UPGRADE_BY_ID[id as UpgradeId];
     if (!def) return;
+    const playerLevel = levelInfo(this.xp).level;
+    if (!upgradeUnlocked(def, playerLevel)) {
+      this.toast(`Reach level ${def.req} to unlock the ${def.name}`);
+      return;
+    }
     const lvl = this.upgrades[def.id];
     if (lvl >= def.max) {
       this.toast('Already maxed');
@@ -1435,8 +2318,55 @@ export class FarmScene extends Phaser.Scene {
     this.coins -= cost;
     this.upgrades[def.id] = lvl + 1;
     sfx.play('upgrade');
-    this.toast(`${def.icon} ${def.name} upgraded to Lv ${lvl + 1}!`);
+    let msg = `⬆️ ${def.name} upgraded to Lv ${lvl + 1}!`;
+    // Reaching MAX on a fork-able upgrade unlocks its 1-of-2 specialization.
+    if (def.fork && this.upgrades[def.id] >= def.max) {
+      msg += ' MAX — choose a specialization in Upgrades!';
+    }
+    this.toast(msg);
     this.emitState();
+  }
+
+  // Buy the next crop-bed expansion column. A plain, escalating coin sink: each
+  // purchase widens the farmable bed by one column into the free interior band
+  // (right of the bed), capped at MAX_PLOT_EXPANSION. The new tiles become
+  // tillable immediately (they share the level-based row unlock) and get their
+  // tilled-dirt overlays so they render like the rest of the bed.
+  private buyExpansion() {
+    if (this.plotExpansion >= MAX_PLOT_EXPANSION) {
+      this.toast('Garden fully expanded');
+      return;
+    }
+    const cost = plotExpansionCost(this.plotExpansion);
+    if (this.coins < cost) {
+      this.toast('Not enough coins');
+      return;
+    }
+    this.coins -= cost;
+    this.plotExpansion += 1;
+    this.ensureFarmOverlays(); // create the new column's tilled overlays
+    this.markPlayerFarm();     // keep the wider bed's grass natural
+    sfx.play('upgrade');
+    this.toast(`🌱 Garden expanded! +1 column (${this.plotExpansion}/${MAX_PLOT_EXPANSION})`);
+    this.emitState();
+    this.saveState();
+  }
+
+  // Lock in a maxed upgrade's 1-of-2 specialization (mirrors choosePerk). Only
+  // valid once the upgrade is at MAX level and the fork id is one of the two on
+  // offer; once chosen it's locked (a perk respec clears it — see respecPerks).
+  private chooseUpgradeFork(id: UpgradeId, fork: string) {
+    const def = UPGRADE_BY_ID[id];
+    if (!def?.fork) return;
+    if (!upgradeForkAvailable(def, this.upgrades[id] ?? 0)) return; // not maxed yet
+    if (fork !== def.fork.a.id && fork !== def.fork.b.id) return; // unknown fork id
+    if (this.upgradeForks[id]) return; // already chosen (respec to change)
+    this.upgradeForks[id] = fork;
+    const chosen = fork === def.fork.a.id ? def.fork.a : def.fork.b;
+    sfx.play('upgrade');
+    this.toast(`✨ ${chosen.name} — ${chosen.desc}`);
+    this.emitState();
+    this.saveState();
   }
 
   // ---- animals ------------------------------------------------------------
@@ -1445,8 +2375,10 @@ export class FarmScene extends Phaser.Scene {
   // chickens (and any other small animal) in the chicken pen. Used both to spawn
   // a new producer and to clamp its wandering.
   private producerArea(def: AnimalDef) {
-    if (def.category === 'tree') return ORCHARD;
-    return def.id === 'cow' ? COW_PEN : CHICKEN_PEN;
+    // Use the pens of the plot we currently own, so animals spawn where we are.
+    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
+    if (def.category === 'tree') return px(h.orchard);
+    return def.id === 'cow' ? px(h.cowPen) : px(h.chickenPen);
   }
 
   // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
@@ -1516,6 +2448,10 @@ export class FarmScene extends Phaser.Scene {
     if (!def) return;
     if (levelInfo(this.xp).level < def.unlockLevel) {
       this.toast(`${def.name}s unlock at level ${def.unlockLevel}`);
+      return;
+    }
+    if ((this.animalCounts[id] ?? 0) >= MAX_PRODUCERS) {
+      this.toast(`You can have at most ${MAX_PRODUCERS} ${def.name}s`);
       return;
     }
     if (this.coins < def.cost) {
@@ -1651,8 +2587,72 @@ export class FarmScene extends Phaser.Scene {
 
   // ---- fishing ------------------------------------------------------------
 
-  // Water (and where to fish) now comes from the authored map: every
-  // `ground_tiles_water` cell is solid + in `pondTiles`. See buildFromMap.
+  // An organic oval pond on the valley floor. No bridge, no sand ring — the
+  // hard waterline is hidden the natural way, by fringing the bank with reeds,
+  // cattails, lily pads and a soft ground shadow. Water tiles are obstacles so
+  // the player fishes from the bank.
+  private buildPond() {
+    const pz = PLAZA;
+    const cx = Math.floor((pz.x0 + pz.x1) / 2) - 2; // a touch left of centre
+    const cyc = Math.floor((pz.y0 + pz.y1) / 2) + 4; // sits below the avenue
+    const rx = 6, ry = 3;
+    this.pond = { x0: cx - rx, y0: cyc - ry, x1: cx + rx, y1: cyc + ry };
+    const inPond = (x: number, y: number, s = 1) => {
+      const dx = (x - cx) / (rx * s), dy = (y - cyc) / (ry * s);
+      return dx * dx + dy * dy <= 1;
+    };
+
+    // Soft shadow on the grass to ground the pond.
+    this.add
+      .ellipse(cx * TILE + TILE / 2, cyc * TILE + TILE / 2, (2 * rx + 2.4) * TILE, (2 * ry + 1.6) * TILE, 0x244a30, 0.16)
+      .setDepth(0.2);
+
+    // Water tiles inside the ellipse (organic shape).
+    for (let y = cyc - ry; y <= cyc + ry; y++) {
+      for (let x = cx - rx; x <= cx + rx; x++) {
+        if (!this.inBounds(x, y) || !inPond(x, y)) continue;
+        const px = x * TILE + TILE / 2, py = y * TILE + TILE / 2;
+        if (this.anims.exists('water-anim')) this.add.sprite(px, py, 'water', 0).setScale(2).setDepth(3.8).play('water-anim');
+        else this.add.image(px, py, 'water', 0).setScale(2).setDepth(3.8);
+        this.tiles[y][x].obstacle = true;
+        this.tiles[y][x].tilled = false;
+        this.pondTiles.add(this.key(x, y));
+        // One tile-sized collider per water tile. (Was TILE*2 — a 64px box on a
+        // 32px tile, which overhung ~16px onto the grass and made an invisible
+        // wall ringing the pond.)
+        this.addCollider(px, py, TILE, TILE);
+      }
+    }
+
+    // Faint surface ripples (waterobj 12–17).
+    for (const [tx, ty] of [[cx - 2, cyc - 1], [cx + 2, cyc + 1], [cx, cyc]] as Array<[number, number]>) {
+      if (this.pondTiles.has(this.key(tx, ty))) {
+        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
+      }
+    }
+
+    // Lily pads (waterobj 8–10), gently bobbing.
+    const lily = (tx: number, ty: number, frame: number) => {
+      if (!this.pondTiles.has(this.key(tx, ty))) return;
+      const cyp = ty * TILE + TILE / 2;
+      const pad = this.add.image(tx * TILE + TILE / 2, cyp, 'waterobj', frame).setScale(2).setDepth(4.4);
+      this.tweens.add({ targets: pad, y: cyp + 2, duration: 1800 + Math.random() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    };
+    lily(cx - 3, cyc, 8); lily(cx + 1, cyc - 1, 9); lily(cx + 3, cyc + 1, 10);
+
+    // Reeds, cattails & a rock fringing the bank to hide the hard waterline
+    // (per-row depth so the player passes behind them).
+    const fringe: Array<[number, number, number]> = [
+      [cx - rx, cyc, 6], [cx + rx, cyc, 7],
+      [cx - rx + 2, cyc - ry, 7], [cx + rx - 2, cyc - ry, 6],
+      [cx - rx + 2, cyc + ry, 6], [cx + rx - 2, cyc + ry, 7],
+      [cx - 1, cyc - ry, 6], [cx + rx - 3, cyc + ry, 3],
+    ];
+    for (const [tx, ty, f] of fringe) {
+      if (!this.inBounds(tx, ty)) continue;
+      this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
+    }
+  }
 
   private isPondTile(tx: number, ty: number): boolean {
     return this.pondTiles.has(this.key(tx, ty));
@@ -1664,6 +2664,12 @@ export class FarmScene extends Phaser.Scene {
   private tryFish(tx: number, ty: number): boolean {
     const ocean = this.tileZone(tx, ty) === 'ocean';
     if (!this.isPondTile(tx, ty) && !ocean) return false;
+    // You fish only with the rod equipped; otherwise nudge the player to switch
+    // (still swallow the click so a hoe/can doesn't fire on the water).
+    if (this.selected !== 'rod') {
+      this.toast('🎣 Equip your fishing rod to fish');
+      return true;
+    }
     if (this.casting) return true; // a cast is already in progress; swallow the click
     if (!this.inRange(tx, ty)) {
       this.toast('🎣 Move closer to the water to cast.');
@@ -1692,12 +2698,9 @@ export class FarmScene extends Phaser.Scene {
     const tip: Record<Dir, { x: number; y: number }> = {
       down: { x: 6, y: -2 }, up: { x: -6, y: -18 }, left: { x: -14, y: -10 }, right: { x: 14, y: -10 },
     };
-    const m = this.mods();
     this.fishingCast.begin({
       origin: () => ({ x: this.player.x + tip[this.facing].x, y: this.player.y + tip[this.facing].y }),
       target: { x: cx, y: cy },
-      biteDelayMult: 1 / Math.max(0.2, m.fishBiteSpeedMult), // Quick Bite shortens the wait
-      hookWindowMult: m.fishHookWindowMult, // Steady Hands widens the click window
       onPhase: (phase) => this.playCastAnim(phase),
       onResolve: (o) => {
         if (o.hooked) {
@@ -1708,18 +2711,16 @@ export class FarmScene extends Phaser.Scene {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
         this.casting = false;
-        // Return the player from the cast pose to the normal idle on their skin.
+        // Return the player from the cast pose to the normal idle.
         this.player.setFlipX(false);
-        this.player.setTexture(this.playerSheet(), 0);
-        this.player.anims.play(`${this.playerSheet()}-idle-${this.facing}`, true);
+        this.player.setTexture('pchar', 0);
+        this.player.anims.play(`idle-${this.facing}`, true);
         this.emitState();
       },
     });
   }
 
-  // Map a FishingCast phase to the player's casting animation. The cast sheets
-  // are a separate (non-recoloured) base cat; on a non-default coat the cast
-  // briefly shows the cream coat — acceptable for the scaffold. left/right share
+  // Map a FishingCast phase to the player's casting animation. left/right share
   // the side sheet via flipX.
   private playCastAnim(phase: CastPhase) {
     const dir = this.facing;
@@ -1739,25 +2740,33 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  // Roll what's actually on the line and present it. Treasure Hunter can swap
-  // the fish for a treasure; the Legendary Angler capstone can land a huge haul.
+  // Roll what's actually on the line. Treasure Hunter can swap the fish for a
+  // treasure (coins); the Legendary Angler capstone can land a huge haul. A real
+  // fish goes to the BAG as a sellable item (key `fish|<id>`) — never to coins.
   private landCatch(cx: number, cy: number, ocean: boolean) {
     const m = this.mods();
     const oceanValue = ocean ? 1.3 : 1;
     const oceanLuck = ocean ? 1.25 : 1;
 
+    // Treasure Hunter: a chance to reel a treasure instead of a fish (still coins).
     if (Math.random() < m.treasureChance) {
       const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
       this.coins += coins;
       this.earned += coins;
-      this.fishPts += Math.max(1, Math.round(3 * m.fishPtMult)); // treasure funds the Angler's Tree
       this.addSkillXp('fishing', 12);
+      this.gainXp(harvestXp(coins)); // treasure feeds the global level
       sfx.play('achievement');
       const frame = TREASURE_FRAMES[Math.floor(Math.random() * TREASURE_FRAMES.length)];
-      this.popCatch(cx, cy, frame, 0xffd21a, true);
+      const chest = this.add.image(cx, cy - 6, FISH_SHEET, frame).setScale(2.2).setDepth(99990);
+      this.tweens.add({
+        targets: chest, y: cy - 42, scale: 2.8, duration: 700, ease: 'Back.out',
+        onComplete: () => this.tweens.add({ targets: chest, alpha: 0, y: cy - 58, duration: 500, onComplete: () => chest.destroy() }),
+      });
+      this.burst(cx, cy - 4, 'p_star', { speed: { min: 40, max: 120 }, lifespan: 800, scale: { start: 1.4, end: 0 }, tint: [0xffe066, 0xffd21a, 0xffffff] }, 16);
       this.floatText(cx, cy - 50, '💰 Treasure!', '#ffd21a');
       this.toast(`💰 Treasure! +${coins}🪙`);
       this.checkAchievements();
+      this.emitState();
       return;
     }
 
@@ -1765,68 +2774,117 @@ export class FarmScene extends Phaser.Scene {
     const f = catchFish(m.fishLuckMult * oceanLuck, water);
     // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
     const legendary = m.legendaryFish && Math.random() < 0.03;
-    // Double Catch (Angler's Tree): land two at once.
-    const doubled = Math.random() < m.fishDoubleCatchChance;
-    const baseValue = legendary ? f.value * 12 : f.value;
-    const coins = Math.round(baseValue * m.fishValueMult * oceanValue) * (doubled ? 2 : 1);
-    this.coins += coins;
-    this.earned += coins;
-    // Fishing points fund the Angler's Tree — rarer fish (and doubles) pay more.
-    let pts = fishPointsForCatch(f.rarity) + (legendary ? 5 : 0);
-    if (doubled) pts *= 2;
-    this.fishPts += Math.max(1, Math.round(pts * m.fishPtMult));
     this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
+    this.gainXp(harvestXp(f.value)); // fishing feeds the global level (scaled to value)
     sfx.play(legendary ? 'achievement' : 'sell');
-    this.popCatch(cx, cy, f.frame, fishColor(f), legendary);
-    if (doubled) this.floatText(cx + 14, cy - 30, '×2!', '#7bd0ff');
+
+    // PAYOUT → BAG: the fish rides in harvestInv as a `fish|<id>` stack so it can
+    // be sold later (NOT auto-converted to coins).
+    const key = `fish|${f.id}`;
+    this.harvestInv[key] = (this.harvestInv[key] ?? 0) + 1;
+
+    // Tell island peers so they see the catch fly into our avatar (cosmetic).
+    bus.emit('mp:catch', { fishId: f.id, rarity: legendary ? 8 : rarityRank(f.rarity), x: cx, y: cy });
+
     if (legendary) {
       this.floatText(cx, cy - 50, '🌟 LEGENDARY!', '#ffd21a');
-      this.toast(`🌟 LEGENDARY ${f.name}!${doubled ? ' ×2!' : ''} +${coins}🪙`);
-    } else if (doubled) {
-      this.floatText(cx, cy - 46, f.rarity, fishCss(f));
-      this.toast(`🎣 Double catch — ${f.name} ×2 (${f.rarity})! +${coins}🪙`);
+      this.toast(`🌟 LEGENDARY ${f.name}! Added to your bag`);
     } else {
       this.floatText(cx, cy - 46, f.rarity, fishCss(f));
-      this.toast(`🎣 Caught a ${f.name} (${f.rarity})! +${coins}🪙`);
+      this.toast(`🎣 Caught a ${f.name} (${f.rarity})! Added to your bag`);
     }
+    // The fish pops out of the water and flies into the player, landing in the bag.
+    this.popCatch(cx, cy, f, legendary);
     this.checkAchievements();
+    this.emitState();
   }
 
-  // The catch popup: the real Fish-Sheet sprite arcs up out of the water with a
-  // rarity-tinted sparkle.
-  private popCatch(cx: number, cy: number, frame: number, glow: number, special: boolean) {
+  // The catch animation: the real Fish-Sheet sprite pops up out of the water,
+  // then flies into the player and shrinks away — it's been bagged.
+  private popCatch(cx: number, cy: number, f: Fish, special: boolean) {
     const sprite = this.add
-      .image(cx, cy - 6, FISH_SHEET, frame)
+      .image(cx, cy - 6, FISH_SHEET, f.frame)
       .setDepth(99990)
       .setScale(special ? 2.2 : 1.8);
-    this.tweens.add({
-      targets: sprite, y: cy - 40, scale: special ? 2.8 : 2.2, duration: 700, ease: 'Back.out',
-      onComplete: () =>
-        this.tweens.add({ targets: sprite, alpha: 0, y: cy - 56, duration: 500, onComplete: () => sprite.destroy() }),
-    });
+    const glow = fishColor(f);
+    // Splash as it breaks the surface.
     this.burst(cx, cy - 4, special ? 'p_star' : 'p_droplet', {
       speed: { min: 40, max: 110 }, angle: { min: 220, max: 320 }, lifespan: 600,
       scale: { start: 1.4, end: 0 }, gravityY: special ? 0 : 240,
       tint: special ? [0xffe066, 0xffd21a, 0xffffff] : [glow, 0xffffff],
     }, special ? 16 : 10);
+    // (1) a small pop-up arc out of the water, then (2) fly into the player.
+    this.tweens.add({
+      targets: sprite, y: cy - 40, scale: special ? 2.8 : 2.2, duration: 420, ease: 'Back.out',
+      onComplete: () => {
+        this.tweens.add({
+          targets: sprite,
+          x: this.player.x,
+          y: this.player.y - 16,
+          scale: 0.4,
+          alpha: 0.6,
+          duration: 480,
+          ease: 'Quad.in',
+          onComplete: () => {
+            sprite.destroy();
+            // Landed in the bag: a little sparkle + "+1 {name}" over the player.
+            this.burst(this.player.x, this.player.y - 16, 'p_star', {
+              speed: { min: 30, max: 90 }, lifespan: 650, scale: { start: 1, end: 0 },
+              tint: special ? [0xffe066, 0xffd21a, 0xffffff] : [glow, 0xffffff],
+            }, special ? 12 : 8);
+            this.floatText(this.player.x, this.player.y - 26, `+1 ${f.name}`, fishCss(f));
+            sfx.play('sell');
+          },
+        });
+      },
+    });
+  }
+
+  // A remote player landed a catch (broadcast over the island channel). COSMETIC
+  // ONLY — we award no coins/XP and never touch our inventory/crops. We just fly a
+  // fish sprite from the water up into that player's avatar so the moment is
+  // visible to everyone.
+  private onRemoteCatch({ id, fishId, rarity, x, y }: { id: string; fishId: string; rarity: number; x: number; y: number }) {
+    const rp = this.remotePlayers.get(id);
+    const f = FISH_BY_ID[fishId];
+    const tint = f ? fishColor(f) : 0xffffff;
+    const frame = f ? f.frame : 3;
+    const special = rarity >= 4; // Legendary+ → sparkle flourish
+    // Target the avatar if we have one; otherwise the payload point (lifted).
+    const tx = rp ? rp.sprite.x : x;
+    const ty = rp ? rp.sprite.y : y - 40;
+
+    const sprite = this.add.image(x, y - 6, FISH_SHEET, frame).setDepth(99990).setScale(special ? 2.2 : 1.8);
+    this.burst(x, y - 4, special ? 'p_star' : 'p_droplet', {
+      speed: { min: 40, max: 110 }, angle: { min: 220, max: 320 }, lifespan: 600,
+      scale: { start: 1.4, end: 0 }, gravityY: special ? 0 : 240,
+      tint: special ? [0xffe066, 0xffd21a, 0xffffff] : [tint, 0xffffff],
+    }, special ? 16 : 10);
+    this.tweens.add({
+      targets: sprite, y: y - 40, scale: special ? 2.8 : 2.2, duration: 420, ease: 'Back.out',
+      onComplete: () => {
+        this.tweens.add({
+          targets: sprite, x: tx, y: ty - 16, scale: 0.4, alpha: 0.6, duration: 480, ease: 'Quad.in',
+          onComplete: () => sprite.destroy(),
+        });
+      },
+    });
   }
 
   // ---- foraging -----------------------------------------------------------
 
-  // True if a tile is open grass suitable for a forage node: an authored grass
-  // Ground cell that isn't an obstacle/structure, water, a farm/dirt tile or a
-  // path, and is free of crops. (Keeps nodes on the playable island, not the
-  // surrounding open sea.)
+  // True if a tile is open grass suitable for a forage node (or the pond): not
+  // an obstacle/structure, not inside any homestead, not on the player's plot or
+  // pond, and free of crops.
   private isOpenGrass(tx: number, ty: number): boolean {
-    const k = this.key(tx, ty);
     return (
       this.inBounds(tx, ty) &&
-      !!this.ground[ty]?.[tx] && // there is an authored ground tile here
       !this.tiles[ty][tx].obstacle &&
+      this.tileZone(tx, ty) === 'land' &&
+      !this.inAnyHomestead(tx, ty) &&
+      !this.isInMyFarm(tx, ty) &&
       !this.isPondTile(tx, ty) &&
-      !this.farmTiles.has(k) &&
-      !this.pathTiles.has(k) &&
-      !this.crops.has(k)
+      !this.crops.has(this.key(tx, ty))
     );
   }
 
@@ -1896,6 +2954,7 @@ export class FarmScene extends Phaser.Scene {
       this.coins += coins;
       this.earned += coins;
       this.addSkillXp('foraging', forageXp(n.forage));
+      this.gainXp(harvestXp(coins)); // foraging feeds the global level (scaled to value)
       sfx.play(gem ? 'achievement' : 'sell');
       this.burst(cx, cy - 6, 'p_star', {
         speed: { min: 30, max: 90 }, lifespan: 700, scale: { start: 1, end: 0 },
@@ -1920,50 +2979,66 @@ export class FarmScene extends Phaser.Scene {
   // ---- persistence (localStorage) ----------------------------------------
 
   private saveState() {
+    // Persist tilled tiles + crops RELATIVE to the owned farm-bed origin so they
+    // re-render correctly on whichever plot the player is assigned on load. All
+    // farmable tiles live inside this rect, so its top-left is a valid origin.
+    const origin = this.myFarmRect();
+    const ox = origin.px, oy = origin.py;
     const tiles: SaveData['tiles'] = [];
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < GRID_W; x++) {
         const t = this.tiles[y][x];
-        if (t.tilled) tiles.push([x, y, Math.max(0, t.wetUntil - this.time.now)]);
+        if (t.tilled) tiles.push([x - ox, y - oy, Math.max(0, t.wetUntil - this.time.now)]);
       }
     }
     const crops: SaveData['crops'] = [];
     for (const c of this.crops.values()) {
       crops.push({
-        x: c.tx, y: c.ty, p: c.plant.id, g: Math.round(c.grownMs),
+        x: c.tx - ox, y: c.ty - oy, p: c.plant.id, g: Math.round(c.grownMs),
         m: c.mature, mut: c.mutation?.id ?? null, wet: c.wetAtMature,
+        q: c.quality, ma: c.matureAt, wth: c.withered,
+        // Persist the regrow cycle's growth duration only when it differs from
+        // the plant's default, so the timer stays correct across reloads.
+        rg: c.growMs,
       });
     }
     const data: SaveData = {
       v: SAVE_VERSION,
+      rel: 1, // tiles[]/crops[] coords above are origin-relative offsets
       coins: this.coins,
       selected: this.selected,
       selectedSeed: this.selectedSeed,
       seeds: this.seeds,
       harvest: this.harvestInv,
-      shopStock: this.shopStock,
       timeMs: this.timeMs,
-      restockMs: this.restockMs,
       tiles,
       crops,
       xp: this.xp,
       upgrades: this.upgrades,
+      upgradeForks: this.upgradeForks,
       earned: this.earned,
       harvested: this.harvested,
       mutationsFound: this.mutationsFound,
       discPlants: [...this.discoveredPlants],
       discMutations: [...this.discoveredMutations],
       achievements: [...this.achievements],
+      claimedGoals: [...this.claimedGoals],
       animals: this.animalCounts,
       skills: this.skills,
       perks: this.perks,
-      fishNodes: [...this.fishNodes],
-      fishPts: this.fishPts,
-      skin: this.skin,
-      ownedSkins: [...this.ownedSkins],
+      respecs: this.respecs,
+      plotExpansion: this.plotExpansion,
+      // Restore the player exactly where they were on the next load (rounded to
+      // whole pixels — sub-pixel precision is meaningless here).
+      px: Math.round(this.player.x),
+      py: Math.round(this.player.y),
+      plotIndex: this.myPlotIndex,
+      island: this.island,
     };
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      const json = JSON.stringify(data);
+      localStorage.setItem(SAVE_KEY, json);
+      bus.emit('saved', json); // notify cloud-save sync (best-effort, debounced)
     } catch {
       // storage may be unavailable (private mode); ignore
     }
@@ -1978,19 +3053,35 @@ export class FarmScene extends Phaser.Scene {
     } catch {
       return false;
     }
-    if (!data || data.v !== SAVE_VERSION) return false;
+    // Accept the current version (15) and v11–v14. Each bump only ADDED fields:
+    // v11→v12 added the `respecs` counter; v12→v13 added `upgradeForks`;
+    // v13→v14 added `plotExpansion`; v14→v15 added `px`/`py`/`plotIndex`. Every
+    // other field is read defensively with `?? default`, so older saves migrate
+    // cleanly — respecs defaults to 0, upgradeForks defaults to {}, plotExpansion
+    // defaults to 0, and the v15 position/plot fields default below.
+    if (!data || (data.v !== SAVE_VERSION && data.v !== 15 && data.v !== 14 && data.v !== 13 && data.v !== 12 && data.v !== 11)) return false;
+
+    // Re-point the owned plot BEFORE any tiles/crops are placed: tile/crop coords
+    // are stored relative to the owned-plot origin (myFarmRect), so the index must
+    // be correct before placement or the farm renders on the wrong homestead.
+    // Absent (older saves / single-player) ⇒ plot 0, the create() default.
+    this.myPlotIndex =
+      Number.isInteger(data.plotIndex) && data.plotIndex! >= 0 && data.plotIndex! < HOMESTEADS.length
+        ? data.plotIndex!
+        : 0;
 
     this.coins = data.coins ?? this.coins;
     this.seeds = data.seeds ?? this.seeds;
     this.harvestInv = data.harvest ?? {};
-    this.shopStock = data.shopStock ?? this.shopStock;
+    // Shop is the shared deterministic pool now — no per-player stock to restore;
+    // it was already rolled for the current window in create().
     this.timeMs = data.timeMs ?? this.timeMs;
-    this.restockMs = data.restockMs ?? RESTOCK_MS;
     this.selected = data.selected ?? 'hoe';
     this.selectedSeed = data.selectedSeed ?? null;
 
     this.xp = data.xp ?? 0;
     this.upgrades = { ...EMPTY_UPGRADES, ...(data.upgrades ?? {}) };
+    this.upgradeForks = { ...EMPTY_UPGRADE_FORKS, ...(data.upgradeForks ?? {}) }; // v13 field; older saves default to {}
     this.earned = data.earned ?? 0;
     this.harvested = data.harvested ?? 0;
     this.mutationsFound = data.mutationsFound ?? 0;
@@ -1999,12 +3090,25 @@ export class FarmScene extends Phaser.Scene {
     this.achievements = new Set(data.achievements ?? []);
     this.skills = { ...EMPTY_SKILLS, ...(data.skills ?? {}) };
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
-    this.fishNodes = new Set(data.fishNodes ?? []);
-    this.fishPts = data.fishPts ?? 0;
-    this.ownedSkins = new Set([DEFAULT_SKIN, ...(data.ownedSkins ?? [])]);
-    this.skin = this.ownedSkins.has(data.skin) ? data.skin : DEFAULT_SKIN;
+    this.respecs = data.respecs ?? 0; // additive v12 field; v11 saves default to 0
+    // Purchased crop-bed expansion (additive v14 field; older saves default to 0).
+    // Clamp to the cap so a corrupt/forward save can't widen past the free band.
+    this.plotExpansion = Math.max(0, Math.min(MAX_PLOT_EXPANSION, data.plotExpansion ?? 0));
+    // Now that the expansion width is known, create the extra columns' tilled
+    // overlays (buildWorld only made base-bed overlays, before this load ran) and
+    // re-mark the bed so the wider area renders/tills correctly.
+    this.ensureFarmOverlays();
+    this.markPlayerFarm();
     this.recomputeMods(); // restored skills/perks change the modifier bag
     this.animalCounts = data.animals ?? {};
+    // Rewarded goal ladder (v16+). For legacy saves (no claimedGoals field),
+    // retro-mark every goal the player ALREADY satisfies as claimed WITHOUT
+    // paying out — so existing players don't get a flood of back-rewards; only
+    // brand-new completions earn from here on. (Runs after every stat the
+    // predicates read, incl. animalCounts above, is loaded.)
+    this.claimedGoals = data.claimedGoals
+      ? new Set(data.claimedGoals)
+      : new Set(GOALS.filter((g) => g.test(this.goalStats())).map((g) => g.id));
     for (const [type, count] of Object.entries(this.animalCounts)) {
       const adef = ANIMAL_BY_ID[type];
       if (!adef) continue;
@@ -2018,10 +3122,23 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    for (const [x, y, wetRemaining] of data.tiles ?? []) {
-      // Drop tilled tiles saved outside the map's farmable cells so a save never
-      // leaves stray dirt patches off the authored farm.
-      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !this.isFarmable(x, y)) continue;
+    // Translate saved tile/crop coords into CURRENT world tiles. Stored coords are
+    // either origin-relative offsets (rel saves) or absolute world tiles anchored
+    // to plot 0's farm origin (legacy). Either way the result is `stored + (dx,dy)`:
+    //   rel:    absolute = currentOrigin + storedOffset           → (dx,dy)=currentOrigin
+    //   legacy: absolute = currentOrigin + (stored - plot0Origin) → (dx,dy)=currentOrigin-plot0Origin
+    // In single-player (plot 0) the legacy delta is (0,0), so coords round-trip
+    // identically (save rel = A - O0; load at O0 + (A - O0) = A).
+    const origin = this.myFarmRect();
+    const plot0 = homesteadPlot(0);
+    const dx = data.rel ? origin.px : origin.px - plot0.px;
+    const dy = data.rel ? origin.py : origin.py - plot0.py;
+
+    for (const [sx, sy, wetRemaining] of data.tiles ?? []) {
+      const x = sx + dx, y = sy + dy;
+      // Drop tilled tiles that fall outside the world or off the (possibly
+      // recycled) farm so a bad offset can't crash and no stray dirt is left.
+      if (!this.inBounds(x, y) || this.tiles[y][x].obstacle || !this.isInMyFarm(x, y)) continue;
       this.tiles[y][x].tilled = true;
       if (wetRemaining > 0) {
         this.tiles[y][x].wetUntil = this.time.now + wetRemaining;
@@ -2036,31 +3153,60 @@ export class FarmScene extends Phaser.Scene {
 
     for (const c of data.crops ?? []) {
       const plant = PLANT_BY_ID[c.p];
-      // Likewise ignore crops saved outside the map's farmable cells.
-      if (!plant || !this.inBounds(c.x, c.y) || !this.isFarmable(c.x, c.y)) continue;
+      const cx = c.x + dx, cy = c.y + dy; // stored offset → current world tile
+      // Likewise ignore crops that land outside the world or off the current farm.
+      if (!plant || !this.inBounds(cx, cy) || !this.isInMyFarm(cx, cy)) continue;
       const sprite = this.add
-        .image(c.x * TILE + TILE / 2, c.y * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
+        .image(cx * TILE + TILE / 2, cy * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
         .setScale(2)
         .setTint(plant.cropTint ?? 0xffffff)
-        .setDepth(this.cropDepth(c.y) - 1);
+        .setDepth(this.cropDepth(cy) - 1);
       const crop: Crop = {
-        plant, tx: c.x, ty: c.y, grownMs: c.g, stage: 0,
-        mature: false, mutation: null, wetAtMature: false, sprite,
+        plant, tx: cx, ty: cy, grownMs: c.g, stage: 0,
+        mature: false, mutation: null, wetAtMature: false,
+        // Default crop-depth fields so old v11 saves (without them) still load.
+        quality: (c.q && c.q in QUALITY ? c.q : 'none') as Quality,
+        matureAt: c.ma ?? this.time.now,
+        withered: c.wth ?? false,
+        growMs: c.rg, // undefined on legacy/non-regrow crops → falls back to full duration
+        sprite,
       };
-      this.crops.set(this.key(c.x, c.y), crop);
+      this.crops.set(this.key(cx, cy), crop);
       if (c.m) {
         crop.mature = true;
         crop.stage = STAGES - 1;
         crop.mutation = MUTATION_BY_ID[c.mut ?? 'normal'] ?? MUTATION_BY_ID.normal;
         crop.wetAtMature = c.wet;
-        this.applyMatureVisuals(crop, false);
+        if (crop.withered) this.applyWitherVisuals(crop);
+        else this.applyMatureVisuals(crop, false);
       } else {
-        const ns = Math.min(STAGES - 1, Math.floor((c.g / (plant.growthSeconds * 1000)) * (STAGES - 1)));
+        const ns = Math.min(STAGES - 1, Math.floor((c.g / this.cropGrowMs(crop)) * (STAGES - 1)));
         crop.stage = ns;
         crop.sprite.setFrame(plant.cropRow * 5 + ns);
       }
     }
+
+    // create() set up the owned-plot visuals for the DEFAULT plot 0 before this
+    // load ran; re-run them now so a restored non-0 plot gets its overlays/gate.
+    // Idempotent and safe for plot 0 too.
+    this.setupOwnedPlot();
+
+    // Restore the player exactly where they were (v15+). Absent ⇒ leave the
+    // create() spawn (centre of the owned farm).
+    if (typeof data.px === 'number' && typeof data.py === 'number') {
+      this.player.setPosition(data.px, data.py);
+    }
     return true;
+  }
+
+  // (Re)apply the visuals for the currently-owned homestead: tilled overlays,
+  // the crop-bed tint/unlock rows, and the swinging gate. Used after a save load
+  // restores a non-0 plot and on a multiplayer plot change. Idempotent — safe to
+  // run for plot 0 or repeatedly.
+  private setupOwnedPlot() {
+    this.ensureFarmOverlays();
+    this.markPlayerFarm();
+    this.moveGateTo(this.myPlotIndex);
   }
 
   private toast(msg: string) {
@@ -2075,7 +3221,7 @@ export class FarmScene extends Phaser.Scene {
       selectedSeed: this.selectedSeed,
       seeds: { ...this.seeds },
       harvest: { ...this.harvestInv },
-      shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.shopStock[p.id] ?? 0 })),
+      shop: PLANTS.map((p) => ({ plantId: p.id, stock: this.remainingStock(p.id) })),
       animalCounts: { ...this.animalCounts },
       progress: {
         level: info.level,
@@ -2088,12 +3234,16 @@ export class FarmScene extends Phaser.Scene {
         discoveredPlants: [...this.discoveredPlants],
         discoveredMutations: [...this.discoveredMutations],
         achievements: [...this.achievements],
+        plotExpansion: this.plotExpansion,
+        plotExpansionMax: MAX_PLOT_EXPANSION,
+        // 0 once fully expanded so the UI can show "MAX" without recomputing.
+        plotExpansionCost: this.plotExpansion >= MAX_PLOT_EXPANSION ? 0 : plotExpansionCost(this.plotExpansion),
       },
       skills: { ...this.skills },
       perks: { ...this.perks },
-      fishTree: { unlocked: [...this.fishNodes], pts: this.fishPts },
-      skin: this.skin,
-      ownedSkins: [...this.ownedSkins],
+      respecs: this.respecs,
+      upgradeForks: { ...this.upgradeForks },
+      goalsClaimed: [...this.claimedGoals],
     });
   }
 
@@ -2106,7 +3256,8 @@ export class FarmScene extends Phaser.Scene {
       day: Math.floor(this.timeMs / DAY_LENGTH_MS) + 1,
       clock,
       phase,
-      restockIn: Math.ceil(this.restockMs / 1000),
+      // Time to the next shared restock window (wall-clock aligned for everyone).
+      restockIn: Math.ceil((RESTOCK_MS - (Date.now() % RESTOCK_MS)) / 1000),
     });
   }
 
@@ -2186,74 +3337,779 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
-  update(time: number, delta: number) {
-    // Keep the rod + line tracking the player and the bobber (no-op when idle).
-    this.fishingCast.update();
+  // ---- multiplayer: remote avatars ----------------------------------------
 
-    // movement — locked while a cast is in progress so the line stays anchored.
+  // Deterministic hue per player id so remote avatars are visually distinct.
+  // Returns a soft pastel tint (kept light so the sheet stays readable).
+  private tintForId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const hue = (h >>> 0) % 360;
+    return Phaser.Display.Color.HSVToRGB(hue / 360, 0.45, 1).color;
+  }
+
+  // Create a brand-new remote avatar (shared 'pchar' sheet + name label),
+  // distinguished by an id-hashed tint. Visual only — no physics body.
+  private createRemote(id: string, name: string, x: number, y: number, facing: Dir): RemotePlayer {
+    const sprite = this.add.sprite(x, y, 'pchar', FarmScene.IDLE_ROW[facing]);
+    sprite.setOrigin(0.5, 0.72).setScale(1.85).setTint(this.tintForId(id));
+    sprite.play(`idle-${facing}`, true);
+    const label = this.add
+      .text(x, y, name, {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '12px', color: '#ffffff',
+        stroke: '#2a1f12', strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1);
+    const rp: RemotePlayer = { sprite, label, targetX: x, targetY: y, facing, name };
+    this.remotePlayers.set(id, rp);
+    this.depthSortRemote(rp);
+    return rp;
+  }
+
+  // Narrow the bus's loose `facing: string` into our strict Dir union, defaulting
+  // to 'down' on anything unexpected (the bus contract is a plain string).
+  private toDir(facing: string): Dir {
+    return facing === 'up' || facing === 'left' || facing === 'right' ? facing : 'down';
+  }
+
+  // A remote player moved: create their avatar if new, else update the target
+  // pose we interpolate toward each frame (and their facing/name).
+  private onRemoteMove({ id, x, y, facing }: { id: string; x: number; y: number; facing: string }) {
+    const dir = this.toDir(facing);
+    const rp = this.remotePlayers.get(id);
+    if (!rp) {
+      this.createRemote(id, id.slice(0, 4), x, y, dir);
+      return;
+    }
+    rp.targetX = x;
+    rp.targetY = y;
+    rp.facing = dir;
+  }
+
+  private removeRemote(id: string) {
+    // Drop the avatar AND any crops they were showing (a leaver vanishes whole).
+    this.removeRemoteFarm(id);
+    const rp = this.remotePlayers.get(id);
+    if (!rp) return;
+    rp.sprite.destroy();
+    rp.label.destroy();
+    this.remotePlayers.delete(id);
+  }
+
+  // Presence sync: the roster is the full list of who's on the island. SPAWN an
+  // avatar for every online peer right away (at their plot's gate as a placeholder
+  // until a real position streams in via mp:move) so idle or just-joined players
+  // are visible immediately — not only once they move. Also drop avatars for
+  // anyone no longer present, and refresh names.
+  private onRoster(players: Array<{ id: string; name: string; plot: number }>) {
+    const present = new Set(players.map((p) => p.id));
+    for (const id of [...this.remotePlayers.keys()]) {
+      if (!present.has(id)) this.removeRemote(id);
+    }
+    for (const p of players) {
+      if (p.id === this.myMpId) continue; // never spawn an avatar for ourselves
+      let rp = this.remotePlayers.get(p.id);
+      if (!rp) {
+        // A brand-new peer just appeared — rebroadcast our farm snapshot promptly
+        // (next heartbeat) so they see our existing crops without waiting.
+        this.farmDirty = true;
+        // Place them at their own plot's gate until their first pose arrives.
+        const gate = homesteadGateTile(p.plot);
+        rp = this.createRemote(
+          p.id,
+          p.name || p.id.slice(0, 4),
+          gate.tx * TILE + TILE / 2,
+          gate.ty * TILE + TILE / 2,
+          'down',
+        );
+      }
+      if (p.name && rp.name !== p.name) {
+        rp.name = p.name;
+        rp.label.setText(p.name);
+      }
+    }
+
+    // The shared shop pool scales with how many players are on the island, so
+    // re-roll (keeping this window's purchases) whenever the headcount changes.
+    const count = Math.max(1, players.length);
+    if (count !== this.onlineCount) {
+      this.onlineCount = count;
+      this.refreshShopPool();
+      this.emitState();
+    }
+
+    // Update each plot's holographic nameplate to whoever is on it (Available if
+    // empty). Our own plot shows our name.
+    const nameByPlot = new Map<number, string>();
+    for (const p of players) {
+      if (!Number.isInteger(p.plot)) continue;
+      nameByPlot.set(p.plot, p.id === this.myMpId ? 'You' : (p.name || p.id.slice(0, 4)));
+    }
+    for (const [plot, label] of this.plotLabels) {
+      label.setText(nameByPlot.get(plot) ?? 'Available');
+    }
+
+    // Stacking guard: if another player claims OUR plot, the seat assignment has
+    // desynced (their join reclaimed it while we were still present, or vice
+    // versa). Ask the client to re-verify our seat with the authoritative server
+    // right away so whoever actually lost the plot gets re-pointed. Throttled.
+    const conflict = players.some((p) => p.id !== this.myMpId && p.plot === this.myPlotIndex);
+    if (conflict && this.time.now - this.lastReverifyAt > 5000) {
+      this.lastReverifyAt = this.time.now;
+      bus.emit('mp:reverify', undefined);
+    }
+
+    // Tint every OTHER occupied plot's crop bed too, so a friend's farmland reads
+    // as cultivated grass just like ours (uniform — we don't know their unlocked
+    // rows). Un-tint plots whose owner has left.
+    const occupied = new Set<number>();
+    for (const p of players) {
+      if (p.id !== this.myMpId && Number.isInteger(p.plot)) occupied.add(p.plot);
+    }
+    for (const plot of occupied) {
+      if (plot === this.myPlotIndex || this.remotePlotTints.has(plot)) continue;
+      this.markRemotePlot(plot);
+      this.remotePlotTints.add(plot);
+    }
+    for (const plot of [...this.remotePlotTints]) {
+      if (occupied.has(plot)) continue;
+      if (plot !== this.myPlotIndex) this.clearFarmTint(plot);
+      this.remotePlotTints.delete(plot);
+    }
+  }
+
+  // Redraw the island minimap (fixed to the camera): a faint plot grid with a dot
+  // for every player — others in amber, you in green — so you can see who's where.
+  private drawMinimap() {
+    const g = this.minimap;
+    if (!g) return;
+    g.clear();
+    const pad = 4;
+    const scale = Math.min(168 / WORLD_WIDTH, 120 / WORLD_HEIGHT);
+    const mapW = WORLD_WIDTH * scale;
+    const mapH = WORLD_HEIGHT * scale;
+    const sw = this.scale.width;
+    const sh = this.scale.height;
+    const margin = 12;
+    const ox = this.minimapCoarse ? sw - mapW - pad * 2 - margin : margin;
+    // On touch the minimap shares the bottom-right corner with the CA pill, so
+    // lift it to sit above that pill.
+    const oy = sh - mapH - pad * 2 - margin - (this.minimapCoarse ? 40 : 0);
+    const bx = ox + pad;
+    const by = oy + pad;
+    const wx = (x: number) => bx + x * scale;
+    const wy = (y: number) => by + y * scale;
+
+    // Panel.
+    g.fillStyle(0x12241b, 0.62);
+    g.fillRoundedRect(ox, oy, mapW + pad * 2, mapH + pad * 2, 6);
+    g.lineStyle(2, 0x6e4a2b, 0.85);
+    g.strokeRoundedRect(ox, oy, mapW + pad * 2, mapH + pad * 2, 6);
+
+    // Plot blocks for orientation.
+    g.fillStyle(0x9ccb6a, 0.45);
+    for (const h of HOMESTEADS) {
+      const it = h.interior;
+      g.fillRect(wx(it.x0 * TILE), wy(it.y0 * TILE), (it.x1 - it.x0 + 1) * TILE * scale, (it.y1 - it.y0 + 1) * TILE * scale);
+    }
+
+    // Other players (amber dots).
+    g.fillStyle(0xffc23d, 1);
+    this.remotePlayers.forEach((rp) => g.fillCircle(wx(rp.sprite.x), wy(rp.sprite.y), 2.4));
+
+    // You (green dot with a white ring).
+    if (this.player) {
+      g.fillStyle(0x57e08a, 1);
+      g.fillCircle(wx(this.player.x), wy(this.player.y), 3.2);
+      g.lineStyle(1.2, 0xffffff, 0.9);
+      g.strokeCircle(wx(this.player.x), wy(this.player.y), 3.2);
+    }
+  }
+
+  // Tint another player's base crop bed (uniform "cultivated" green) so their plot
+  // reads like a farm. We don't know their expansion width or unlocked rows, so we
+  // mark just the base bed evenly.
+  private markRemotePlot(plot: number) {
+    const f = homesteadPlot(plot);
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw; x++) {
+        this.ground[y]?.[x]?.setTint(0xd8e6a8);
+      }
+    }
+  }
+
+  // Keep a remote avatar + its label y-sorted with the world (same scheme the
+  // local player uses), and float the label just above the head.
+  private depthSortRemote(rp: RemotePlayer) {
+    rp.sprite.setDepth(rp.sprite.y + 18);
+    rp.label.setPosition(rp.sprite.x, rp.sprite.y - 26);
+    rp.label.setDepth(rp.sprite.y + 19);
+  }
+
+  // Smoothly move every remote avatar toward its target each frame and play the
+  // matching walk/idle anim (same keys as the local player). Called from update.
+  private updateRemotes(delta: number) {
+    if (!this.remotePlayers.size) return;
+    // Frame-rate-independent smoothing factor.
+    const t = 1 - Math.pow(0.001, delta / 1000);
+    for (const rp of this.remotePlayers.values()) {
+      const dx = rp.targetX - rp.sprite.x;
+      const dy = rp.targetY - rp.sprite.y;
+      const dist = Math.hypot(dx, dy);
+      const moving = dist > 1.5;
+      if (moving) {
+        rp.sprite.x += dx * t;
+        rp.sprite.y += dy * t;
+      } else {
+        rp.sprite.x = rp.targetX;
+        rp.sprite.y = rp.targetY;
+      }
+      // Play walk while closing distance, idle once arrived — keyed exactly like
+      // the local player so remote avatars animate identically. `play(..., true)`
+      // ignores the call if that exact key is already running, so re-issuing each
+      // frame is cheap and naturally handles a facing change mid-walk.
+      rp.sprite.play(`${moving ? 'walk' : 'idle'}-${rp.facing}`, true);
+      this.depthSortRemote(rp);
+    }
+  }
+
+  // ---- multiplayer: remote crops ------------------------------------------
+
+  // Build the local crop snapshot (relative to our plot origin) and ask the net
+  // layer to broadcast it. Mirrors broadcastSelf: cheap, no-op in single-player
+  // (nobody subscribes to 'mp:farm'). Capped to bound the payload size.
+  private broadcastFarm() {
+    const origin = this.myFarmRect();
+    const ox = origin.px, oy = origin.py;
+    const crops: GameEvents['mp:farm']['crops'] = [];
+    const MAX_CROPS = 150;
+    for (const c of this.crops.values()) {
+      if (crops.length >= MAX_CROPS) break;
+      crops.push([
+        c.tx - ox,
+        c.ty - oy,
+        c.plant.id,
+        Math.round(c.grownMs),       // growth so far (ms) — peers simulate from this
+        Math.round(this.cropGrowMs(c)), // total grow duration (ms) for this cycle
+        c.mature ? 1 : 0,
+        c.mutation?.id ?? '',
+      ]);
+    }
+    // Tilled-soil tiles (plot-relative), so peers see the dirt bed under the crops
+    // rather than crops floating on bare grass. Visual-only, capped to bound size.
+    const tilled: GameEvents['mp:farm']['tilled'] = [];
+    const MAX_TILLED = 200;
+    for (let y = 0; y < GRID_H && tilled.length < MAX_TILLED; y++) {
+      const row = this.tiles[y];
+      for (let x = 0; x < GRID_W; x++) {
+        if (row[x].tilled) {
+          tilled.push([x - ox, y - oy]);
+          if (tilled.length >= MAX_TILLED) break;
+        }
+      }
+    }
+    bus.emit('mp:farm', { crops, tilled });
+  }
+
+  // A remote player's crop snapshot arrived. Reconcile their visual-only crop
+  // sprites against the new snapshot (add/update/remove). Defensive throughout —
+  // a malformed tuple is skipped, never thrown.
+  private onRemoteFarm({ id, plot, crops, tilled }: GameEvents['mp:remoteFarm']) {
+    if (typeof id !== 'string' || !Array.isArray(crops)) return;
+    // `tilled` is optional on the wire (older clients omit it); treat anything
+    // that isn't an array as "no tilled soil".
+    const tilledList = Array.isArray(tilled) ? tilled : [];
+    // Never draw over our own farm (our own crops are authoritative locally).
+    if (plot === this.myPlotIndex) {
+      this.removeRemoteFarm(id);
+      return;
+    }
+    const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : -1;
+    if (next < 0) return;
+
+    let farm = this.remoteFarms.get(id);
+    // If the player moved plots, wipe their old sprites and start fresh.
+    if (farm && farm.plot !== next) {
+      this.removeRemoteFarm(id);
+      farm = undefined;
+    }
+    if (!farm) {
+      farm = { plot: next, sprites: new Map(), tilled: new Map() };
+      this.remoteFarms.set(id, farm);
+    }
+
+    const origin = homesteadPlot(next);
+
+    // ---- tilled soil (visual-only): add new beds, drop ones no longer tilled --
+    const seenTilled = new Set<string>();
+    for (const t of tilledList) {
+      if (!Array.isArray(t) || t.length < 2) continue;
+      const [dx, dy] = t;
+      if (typeof dx !== 'number' || typeof dy !== 'number') continue;
+      const key = `${dx},${dy}`;
+      seenTilled.add(key);
+      if (!farm.tilled.has(key)) {
+        const tx = origin.px + dx, ty = origin.py + dy;
+        // Same 'tilled' texture/scale/depth as a local soil overlay; crops drawn
+        // at cropDepth(ty)-1 sit on top. Use a fixed full-dirt frame (the local
+        // solidTilledFrame keys off this.tiles, which we must not touch).
+        const img = this.add
+          .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'tilled', 56)
+          .setScale(2)
+          .setDepth(1);
+        farm.tilled.set(key, img);
+      }
+    }
+    // DIFF: destroy soil images for tiles no longer tilled (un-tilled/replanted).
+    for (const [key, img] of [...farm.tilled]) {
+      if (!seenTilled.has(key)) {
+        img.destroy();
+        farm.tilled.delete(key);
+      }
+    }
+
+    const seen = new Set<string>();
+    for (const t of crops) {
+      if (!Array.isArray(t) || t.length < 7) continue;
+      const [dx, dy, plantId, grownMs, growMs, mature, mutId] = t;
+      if (typeof dx !== 'number' || typeof dy !== 'number' || typeof plantId !== 'string') continue;
+      const plant = PLANT_BY_ID[plantId];
+      if (!plant) continue; // unknown crop id -> skip
+      const key = `${dx},${dy}`;
+      seen.add(key);
+      this.upsertRemoteCrop(
+        farm, key, origin.px + dx, origin.py + dy, plant,
+        typeof grownMs === 'number' ? grownMs : 0,
+        typeof growMs === 'number' ? growMs : 0,
+        mature === 1,
+        typeof mutId === 'string' ? mutId : '',
+      );
+    }
+
+    // DIFF: destroy sprites for crops no longer present (harvested/removed).
+    for (const [key, rc] of [...farm.sprites]) {
+      if (!seen.has(key)) {
+        this.destroyRemoteCrop(rc);
+        farm.sprites.delete(key);
+      }
+    }
+  }
+
+  // The visual stage for a given growth progress — same maths the local crops
+  // use (floor(progress * (STAGES-1)); ripe crops show the final stage).
+  private remoteStage(grownMs: number, growMs: number, mature: boolean): number {
+    if (mature) return STAGES - 1;
+    if (growMs <= 0) return 0;
+    return Math.max(0, Math.min(STAGES - 1, Math.floor((grownMs / growMs) * (STAGES - 1))));
+  }
+
+  // Create or update a remote crop from an authoritative snapshot: store its
+  // growth state (so update() can simulate it smoothly between snapshots) and
+  // render its current stage/mutation right away.
+  private upsertRemoteCrop(
+    farm: RemoteFarm,
+    key: string,
+    tx: number,
+    ty: number,
+    plant: Plant,
+    grownMs: number,
+    growMs: number,
+    mature: boolean,
+    mutId: string,
+  ) {
+    let rc = farm.sprites.get(key);
+    if (!rc) {
+      const sprite = this.add
+        .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'cropsheet', plant.cropRow * 5)
+        .setScale(2)
+        .setDepth(this.cropDepth(ty) - 1);
+      rc = { sprite, plant, tx, ty, mutId, grownMs: 0, growMs: 0, mature: false, stage: -1 };
+      farm.sprites.set(key, rc);
+    }
+    rc.plant = plant;
+    rc.tx = tx; rc.ty = ty;
+    rc.mutId = mutId;
+    rc.grownMs = Number.isFinite(grownMs) ? Math.max(0, grownMs) : 0;
+    rc.growMs = Number.isFinite(growMs) && growMs > 0 ? growMs : 0;
+    rc.mature = mature;
+    rc.stage = this.remoteStage(rc.grownMs, rc.growMs, rc.mature);
+    // Always re-render on a snapshot: it may have changed mutation, stage, or the
+    // crop may have been replanted (same tile, new plant) since last time.
+    this.renderRemoteCrop(rc);
+  }
+
+  // Smoothly advance every remote crop's SIMULATED growth each frame, re-drawing
+  // only when its visual stage (or maturity) actually changes. Growth runs at the
+  // base 1× rate — a safe lower bound (real growth is ≥1×, boosted by wet/skills/
+  // Fertilizer the peer doesn't see), so we never overshoot; each incoming
+  // snapshot corrects grownMs upward to the truth.
+  private updateRemoteFarms(delta: number) {
+    if (!this.remoteFarms.size) return;
+    for (const farm of this.remoteFarms.values()) {
+      for (const rc of farm.sprites.values()) {
+        if (rc.mature || rc.growMs <= 0) continue; // ripe/unknown -> nothing to advance
+        rc.grownMs = Math.min(rc.growMs, rc.grownMs + delta);
+        const mature = rc.grownMs >= rc.growMs;
+        const stage = this.remoteStage(rc.grownMs, rc.growMs, mature);
+        if (mature !== rc.mature || stage !== rc.stage) {
+          rc.mature = mature;
+          rc.stage = stage;
+          this.renderRemoteCrop(rc);
+        }
+      }
+    }
+  }
+
+  // Draw a remote crop at its current stage: same texture frame + tint as a local
+  // crop, plus glow/sparkle for special (mutated / high-rarity) ripe crops.
+  private renderRemoteCrop(rc: RemoteCropSprite) {
+    const plant = rc.plant;
+    const mut = rc.mutId && MUTATION_BY_ID[rc.mutId] ? MUTATION_BY_ID[rc.mutId] : null;
+    const cx = rc.tx * TILE + TILE / 2;
+    const cy = rc.ty * TILE + TILE / 2;
+
+    rc.sprite.setFrame(plant.cropRow * 5 + (rc.mature ? STAGES - 1 : rc.stage));
+    // Tear down any prior mutation visuals before reapplying (stage/mutation may
+    // have changed between renders).
+    rc.glow?.destroy(); rc.glow = undefined;
+    rc.sparkle?.destroy(); rc.sparkle = undefined;
+
+    if (mut?.rainbow) {
+      rc.sprite.setTint(0xffffff);
+    } else if (mut?.tint != null) {
+      rc.sprite.setTint(mut.tint);
+    } else {
+      rc.sprite.setTint(plant.cropTint ?? 0xffffff);
+    }
+
+    // Add glow + sparkle for special (non-normal mutation OR high-rarity) ripe
+    // crops, mirroring applyMatureVisuals but kept simpler for remote views.
+    const rank = rarityRank(plant.rarity);
+    const special = rc.mature && (!!mut && mut.id !== 'normal' || rank >= 3);
+    if (special) {
+      const tint = mut?.rainbow ? 0xffffff : (mut?.tint ?? RARITY[plant.rarity].glow);
+      rc.glow = this.add
+        .image(cx, cy - 4, 'glow')
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(tint)
+        .setDepth(this.cropDepth(rc.ty) - 2)
+        .setScale(0.7)
+        .setAlpha(0.6);
+      rc.sparkle = this.add
+        .particles(cx, cy - 6, 'p_star', {
+          lifespan: 900,
+          frequency: 260,
+          scale: { start: 0.8, end: 0 },
+          alpha: { start: 0.9, end: 0 },
+          tint: mut?.rainbow ? 0xffffff : (mut?.tint ?? RARITY[plant.rarity].color),
+          speedY: { min: -14, max: -3 },
+          x: { min: -7, max: 7 },
+          y: { min: -12, max: 2 },
+        })
+        .setDepth(this.cropDepth(rc.ty) + 1);
+    }
+  }
+
+  // Destroy one remote crop sprite and its mutation visuals.
+  private destroyRemoteCrop(rc: RemoteCropSprite) {
+    rc.sprite.destroy();
+    rc.glow?.destroy();
+    rc.sparkle?.destroy();
+  }
+
+  // Remove a remote player's entire farm (all crop sprites). Safe if absent.
+  private removeRemoteFarm(id: string) {
+    const farm = this.remoteFarms.get(id);
+    if (!farm) return;
+    for (const rc of farm.sprites.values()) this.destroyRemoteCrop(rc);
+    farm.sprites.clear();
+    for (const img of farm.tilled.values()) img.destroy();
+    farm.tilled.clear();
+    this.remoteFarms.delete(id);
+  }
+
+  // ---- multiplayer: broadcast self ----------------------------------------
+
+  // Throttle (~10/sec) and only when the pose actually changed, tell the net
+  // layer where the local player is so it can broadcast. No-op cost when nobody
+  // is listening (single-player: the bus has no `mp:self` subscribers).
+  private broadcastSelf(time: number) {
+    if (time - this.lastSelfEmit < 100) return;
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    const last = this.lastSelfPose;
+    if (x === last.x && y === last.y && this.facing === last.facing) return;
+    this.lastSelfEmit = time;
+    this.lastSelfPose = { x, y, facing: this.facing };
+    bus.emit('mp:self', { x, y, facing: this.facing });
+  }
+
+  // Periodic crop-snapshot heartbeat (~3.5s) so growth-stage changes and newly
+  // joined peers always converge to current state, plus an immediate push when a
+  // crop just changed (farmDirty). Only fires once we've been assigned a plot, so
+  // single-player never broadcasts. The net layer further throttles the send.
+  private broadcastFarmHeartbeat(time: number) {
+    if (!this.mpConnected) return;
+    const HEARTBEAT_MS = 3500;
+    if (!this.farmDirty && time - this.lastFarmEmit < HEARTBEAT_MS) return;
+    this.lastFarmEmit = time;
+    this.farmDirty = false;
+    this.broadcastFarm();
+  }
+
+  // ---- multiplayer: dynamic owned plot + spawn + guide --------------------
+
+  // The server assigned us a plot. Re-point ownership (clear the old farm tint,
+  // set up the new crop bed + overlays + gate), drop the player at the plaza
+  // centre, and draw a ground guide leading to the new plot's gate.
+  private onAssigned(plot: number) {
+    // We've been assigned a plot -> we're in a live multiplayer session. Gate the
+    // crop-snapshot heartbeat on this so single-player never broadcasts, and push
+    // an immediate snapshot so peers see our crops right away.
+    this.mpConnected = true;
+    this.farmDirty = true;
+    const next = Number.isInteger(plot) && plot >= 0 && plot < HOMESTEADS.length ? plot : 0;
+    if (next !== this.myPlotIndex) {
+      this.plotLabels.get(this.myPlotIndex)?.setText('Available'); // freed our old plot
+      this.clearFarmTint(this.myPlotIndex); // un-tint the previously-owned bed
+      this.myPlotIndex = next;
+      this.setupOwnedPlot();                // new bed's overlays + tint + gate
+      // A genuine new/changed plot relocates the player to the plaza and guides
+      // them to the gate. A refresh/reconnect that returns the SAME plot does NOT
+      // teleport — the player stays exactly where they were (and at the position
+      // restored from the save).
+      this.spawnAtPlaza();
+      this.showGuideToGate();
+    }
+    // Label our own plot immediately — don't wait on (or depend on) realtime
+    // presence syncing, which can be slow/flaky right after connecting.
+    this.plotLabels.get(this.myPlotIndex)?.setText('You');
+  }
+
+  // Reset a homestead's crop-bed ground tint back to plain (used when leaving an
+  // old owned plot so it no longer reads as "yours").
+  private clearFarmTint(index: number) {
+    const f = homesteadPlot(index);
+    const extra = Math.max(0, Math.min(MAX_PLOT_EXPANSION, this.plotExpansion));
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw + extra; x++) {
+        this.ground[y]?.[x]?.clearTint();
+      }
+    }
+  }
+
+  // Make sure tilled-dirt overlays exist across the currently-owned crop bed
+  // including any purchased expansion columns (overlays are created lazily so a
+  // re-pointed plot or a freshly-bought column becomes tillable).
+  private ensureFarmOverlays() {
+    const f = this.expandedFarmRect();
+    for (let y = f.py; y < f.py + f.ph; y++) {
+      for (let x = f.px; x < f.px + f.pw; x++) {
+        if (this.inBounds(x, y)) this.ensureOverlay(x, y);
+      }
+    }
+  }
+
+  // Relocate the swinging front gate sprite to a homestead's gate tile (or
+  // create it if it doesn't exist yet — e.g. assigned before #0's gate built).
+  private moveGateTo(index: number) {
+    const { tx, ty } = homesteadGateTile(index);
+    const gx = tx * TILE + TILE / 2;
+    const gy = ty * TILE + TILE / 2;
+    if (!this.gate) {
+      this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+    } else {
+      this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0).setScale(2);
+    }
+    this.gateOpen = false;
+  }
+
+  // Teleport the local player to the centre of the plaza (the multiplayer spawn).
+  private spawnAtPlaza() {
+    const c = plazaCenterTile();
+    this.player.setPosition(c.tx * TILE + TILE / 2, c.ty * TILE + TILE / 2);
+    this.player.setVelocity(0, 0);
+    this.facing = 'down';
+    this.player.anims.play('idle-down', true);
+  }
+
+  // Roblox-style wayfinding: a glowing dashed trail of ground markers from the
+  // player to the assigned plot's gate, plus a bouncing arrow over the player.
+  // Cheap straight/elbow route (the plaza is open, so no pathfinding needed).
+  private showGuideToGate() {
+    this.clearGuide();
+    const { tx, ty } = this.myGateTile();
+    const gx = tx * TILE + TILE / 2;
+    const gy = ty * TILE + TILE / 2;
+    const sx = this.player.x;
+    const sy = this.player.y;
+
+    // Elbow route: walk horizontally to the gate column, then vertically to it.
+    // Sample evenly-spaced points along the two legs and drop a marker at each.
+    const markers: Phaser.GameObjects.Image[] = [];
+    const STEP = TILE; // one marker per tile
+    const dropMarker = (x: number, y: number) => {
+      const m = this.add
+        .image(x, y, 'glow')
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xffe27a)
+        .setScale(0.42)
+        .setAlpha(0.0)
+        .setDepth(0.7); // just above the ground, below props/crops
+      this.tweens.add({ targets: m, alpha: 0.75, scale: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: markers.length * 60 });
+      markers.push(m);
+    };
+    const legSteps = (from: number, to: number) => Math.max(1, Math.round(Math.abs(to - from) / STEP));
+    const hSteps = legSteps(sx, gx);
+    for (let i = 1; i <= hSteps; i++) dropMarker(sx + ((gx - sx) * i) / hSteps, sy);
+    const vSteps = legSteps(sy, gy);
+    for (let i = 1; i <= vSteps; i++) dropMarker(gx, sy + ((gy - sy) * i) / vSteps);
+
+    // A bouncing floating arrow above the player pointing toward the gate.
+    const arrow = this.add
+      .text(this.player.x, this.player.y - 56, '⬇', {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '28px', color: '#ffe27a',
+        stroke: '#2a1f12', strokeThickness: 5,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(120001);
+    this.tweens.add({ targets: arrow, y: arrow.y - 10, duration: 480, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+
+    this.guide = { markers, arrow, gx, gy };
+  }
+
+  // Update the floating arrow to point from the player toward the gate, fade the
+  // ground markers the player has already passed, and remove the whole guide once
+  // the player reaches the gate (or steps inside the plot).
+  private updateGuide() {
+    const g = this.guide;
+    if (!g) return;
+    const dx = g.gx - this.player.x;
+    const dy = g.gy - this.player.y;
+    const dist = Math.hypot(dx, dy);
+    const ptx = Math.floor(this.player.x / TILE);
+    const pty = Math.floor(this.player.y / TILE);
+    if (dist < TILE * 1.2 || this.isInMyFarm(ptx, pty)) {
+      this.clearGuide();
+      return;
+    }
+    // Arrow hovers over the player's head and rotates toward the gate.
+    g.arrow.setPosition(this.player.x, this.player.y - 56);
+    g.arrow.setRotation(Math.atan2(dy, dx) - Math.PI / 2); // glyph points down at 0
+    // Dim markers the player has already walked past so the trail "burns down".
+    for (const m of g.markers) {
+      if (m.active && Phaser.Math.Distance.Between(this.player.x, this.player.y, m.x, m.y) < TILE * 0.9) {
+        this.tweens.killTweensOf(m);
+        m.destroy();
+      }
+    }
+    g.markers = g.markers.filter((m) => m.active);
+  }
+
+  private clearGuide() {
+    if (!this.guide) return;
+    for (const m of this.guide.markers) {
+      this.tweens.killTweensOf(m);
+      m.destroy();
+    }
+    this.tweens.killTweensOf(this.guide.arrow);
+    this.guide.arrow.destroy();
+    this.guide = null;
+  }
+
+  update(time: number, delta: number) {
+    // movement: keyboard (arrows + remappable keys) wins; otherwise fall back to
+    // the shared virtual joystick / gamepad vector. All three feed the same path.
+    const mk = this.moveKeys;
     let vx = 0;
     let vy = 0;
-    if (!this.casting) {
-      if (this.cursors.left.isDown || this.wasd.left.isDown) vx = -1;
-      else if (this.cursors.right.isDown || this.wasd.right.isDown) vx = 1;
-      if (this.cursors.up.isDown || this.wasd.up.isDown) vy = -1;
-      else if (this.cursors.down.isDown || this.wasd.down.isDown) vy = 1;
+    if (this.cursors.left.isDown || mk.left?.isDown) vx = -1;
+    else if (this.cursors.right.isDown || mk.right?.isDown) vx = 1;
+    if (this.cursors.up.isDown || mk.up?.isDown) vy = -1;
+    else if (this.cursors.down.isDown || mk.down?.isDown) vy = 1;
+    if (vx === 0 && vy === 0) {
+      // No keyboard movement this frame — use the on-screen joystick vector.
+      vx = virtualMove.x;
+      vy = virtualMove.y;
+    }
+    // Poll the gamepad (left stick + dpad); merges into the same vx/vy.
+    const pad = this.pollGamepad();
+    if (pad) {
+      if (vx === 0) vx = pad.x;
+      if (vy === 0) vy = pad.y;
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
-    if (this.casting) {
-      // The cast animation is driven by the FishingCast phase callback; don't
-      // let walk/idle override it while a cast is in progress.
-    } else if (vx !== 0 || vy !== 0) {
+    if (vx !== 0 || vy !== 0) {
       this.actingUntil = 0; // moving cancels the tool pose
       if (vx < 0) this.facing = 'left';
       else if (vx > 0) this.facing = 'right';
       else this.facing = vy < 0 ? 'up' : 'down';
-      this.player.anims.play(`${this.playerSheet()}-walk-${this.facing}`, true);
+      this.player.anims.play(`walk-${this.facing}`, true);
     } else if (time < this.actingUntil) {
       // let the tool-use animation play out
     } else {
-      this.player.anims.play(`${this.playerSheet()}-idle-${this.facing}`, true);
+      this.player.anims.play(`idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
 
-    // Swing the orchard gate open when the farmer is near.
+    // Redraw the fishing line/bobber while a cast is live (no-op otherwise).
+    this.fishingCast.update();
+
+    // Multiplayer: broadcast our pose (throttled/on-change), interpolate remote
+    // avatars, and advance the spawn→gate ground guide. All no-ops when nobody
+    // else is connected (no remotes, no guide, no `mp:self` subscribers).
+    this.broadcastSelf(time);
+    this.broadcastFarmHeartbeat(time);
+    this.updateRemotes(delta);
+    this.updateRemoteFarms(delta); // smoothly simulate peers' crop growth
+    this.updateGuide();
+
+    // Swing the gate open when the farmer is near — a quick scaleX tween (gate
+    // turns edge-on) instead of the goofy spritesheet spin.
     if (this.gate) {
       const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.gate.x, this.gate.y) < 56;
       if (near && !this.gateOpen) {
         this.gateOpen = true;
-        this.gate.play('gate-open');
+        this.tweens.add({ targets: this.gate, scaleX: 0.4, duration: 220, ease: 'Quad.easeOut' });
       } else if (!near && this.gateOpen) {
         this.gateOpen = false;
-        this.gate.play('gate-close');
+        this.tweens.add({ targets: this.gate, scaleX: 2, duration: 220, ease: 'Quad.easeIn' });
       }
     }
 
-    // Boat = future marketplace hub. No scene change yet — just a one-time hint
-    // the first time the player stands next to the rowboat.
-    if (!this.boatToastShown && this.boatTiles.size) {
-      const ptx = Math.floor(this.player.x / TILE);
-      const pty = Math.floor(this.player.y / TILE);
-      let adjacent = false;
-      for (let dy = -1; dy <= 1 && !adjacent; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (this.boatTiles.has(this.key(ptx + dx, pty + dy))) { adjacent = true; break; }
-        }
-      }
-      if (adjacent) {
-        this.boatToastShown = true;
-        this.toast('⛵ Marketplace — coming soon!');
-      }
-    }
+    this.drawMinimap();
 
     this.updateAnimals(time);
 
-    // crop growth
+    // crop growth + withering
+    const witherOn = this.witherEnabled();
     for (const crop of this.crops.values()) {
-      if (crop.mature) continue;
+      if (crop.mature) {
+        // A ripe, un-harvested crop wilts after a generous window. Gentle: it
+        // loses value but is NOT destroyed and stays harvestable.
+        if (witherOn && !crop.withered) {
+          const witherMs = Math.max(90_000, crop.plant.growthSeconds * 1000);
+          if (time - crop.matureAt > witherMs) {
+            crop.withered = true;
+            this.applyWitherVisuals(crop);
+          }
+        }
+        continue;
+      }
       const wet = this.isWet(crop.tx, crop.ty);
-      crop.grownMs += delta * (wet ? 2 : 1) * this.growthMult * growthFactor(this.upgrades.growth) * this.mods().cropGrowthMult;
-      const total = crop.plant.growthSeconds * 1000;
+      // Combined growth-speed multiplier: wet ×2 · Fertilizer upgrade · Farming
+      // skill. Clamped at MAX_GROWTH_MULT so stacked bonuses can't trivialize
+      // growth (keeps wet/Fertilizer meaningful with a sane floor on grow time).
+      // growthMult is a debug/dev knob and stays outside the clamp.
+      // Fertilizer "Rapid" fork adds extra growth speed, still under the clamp.
+      const rapid = 1 + (this.fork('growth').growthMult ?? 0);
+      const speed = Math.min(MAX_GROWTH_MULT, (wet ? 2 : 1) * growthFactor(this.upgrades.growth) * rapid * this.mods().cropGrowthMult);
+      crop.grownMs += delta * this.growthMult * speed;
+      const total = this.cropGrowMs(crop);
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
         crop.stage = ns;
@@ -2282,8 +4138,23 @@ export class FarmScene extends Phaser.Scene {
 
     // clock + restock + ambient
     this.timeMs += delta;
-    this.restockMs -= delta;
-    if (this.restockMs <= 0) this.restock();
+    // Shared shop restocks on the wall-clock window boundary, in sync for the
+    // whole island.
+    const epoch = this.currentEpoch();
+    if (epoch !== this.shopEpoch) {
+      this.rollShopWindow(epoch);
+      this.toast('🛒 The seed shop restocked!');
+      this.emitState();
+    }
+    // Periodically reconcile the shared pool against the authoritative DB so a
+    // missed buy-broadcast can't leave us out of sync for long.
+    if (this.shopShared) {
+      this.shopSyncMs += delta;
+      if (this.shopSyncMs >= 30_000) {
+        this.shopSyncMs = 0;
+        this.syncShopFromDb();
+      }
+    }
     const frac = (this.timeMs % DAY_LENGTH_MS) / DAY_LENGTH_MS;
     const { color, alpha } = this.ambientFor(frac);
     this.ambient.setFillStyle(color);
@@ -2291,8 +4162,10 @@ export class FarmScene extends Phaser.Scene {
     this.fireflies.emitting = (frac < 0.3 || frac >= 0.82) && !this.raining;
     this.updateWeather(time);
 
-    // Sprinkler upgrade keeps tilled tiles watered on a timer.
-    if (time - this.lastSprinkle > sprinklerIntervalMs(this.upgrades.sprinkler) / this.growthMult) {
+    // Sprinkler upgrade keeps tilled tiles watered on a timer. The "Wide" fork
+    // shortens that interval so soil is re-wet more often.
+    const sprinklerInterval = sprinklerIntervalMs(this.upgrades.sprinkler) * (this.fork('sprinkler').sprinklerIntervalMult ?? 1);
+    if (time - this.lastSprinkle > sprinklerInterval / this.growthMult) {
       this.lastSprinkle = time;
       if (this.upgrades.sprinkler > 0) this.rainWater();
     }
@@ -2302,7 +4175,7 @@ export class FarmScene extends Phaser.Scene {
     const tx = Math.floor(p.worldX / TILE);
     const ty = Math.floor(p.worldY / TILE);
     if (this.pointerInside && this.inBounds(tx, ty)) {
-      const canFarm = this.inRange(tx, ty) && this.isFarmable(tx, ty);
+      const canFarm = this.inRange(tx, ty) && this.isInMyFarm(tx, ty);
       this.highlight
         .setVisible(true)
         .setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)

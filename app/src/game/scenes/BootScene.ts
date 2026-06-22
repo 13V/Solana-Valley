@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
-import { buildSkinTextures } from '../skins';
-import { usedTilesetKeys } from '../mapLoader';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -28,11 +26,11 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('pchar', `${A}pchar.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('cropsheet', `${A}crops.png`, { frameWidth: 16, frameHeight: 16 });
     // Fish-Sheet: 9×8 grid of 32px frames (fish + tackle + treasures). Used by
-    // the fishing minigame for the catch popup, bobber and bait.
+    // the fishing minigame for the catch sprite that flies into the player.
     this.load.spritesheet('fish', `${A}fish.png`, { frameWidth: 32, frameHeight: 32 });
     // Ocean Pack (Cup Nooble): the player's casting animations (front/back/side,
-    // 48px — the same cat as pchar), the bobber + water-splash sheet, and a 16px
-    // underwater shadow-fish loop used as the "bite" tell.
+    // 48px — the same character as pchar), the bobber + water-splash sheet, and a
+    // 16px underwater shadow-fish loop used as the "bite" tell.
     for (const v of ['front', 'back', 'side']) {
       this.load.spritesheet(`pfish_${v}`, `${A}fishing_${v}.png`, { frameWidth: 48, frameHeight: 48 });
     }
@@ -63,7 +61,7 @@ export class BootScene extends Phaser.Scene {
     }
     this.load.image('biome', `${A}biome.png`);
     this.load.image('house', `${A}house.png`);
-    this.load.spritesheet('sprouthouse', `${A}sprout_house.png`, { frameWidth: 64, frameHeight: 64 }); // Sorry-pack Village home (3×3 colour variants)
+    this.load.image('cottage_nice', `${A}cottage_nice.png`); // composed brick cottage
     this.load.image('coop', `${A}coop.png`);
     this.load.image('well', `${A}well.png`);
     // Decorative props.
@@ -81,25 +79,17 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
     // Elevation (grassy-plateau cliffs), a wooden bridge, and loose stone decals.
     this.load.spritesheet('hills', `${A}hills.png`, { frameWidth: 16, frameHeight: 16 });
+    // Premium "New tiles" raised grass-hill autotile (11×7) — proper cozy cliff
+    // edges for the raised plot bands. 9-slice: TL0 T1 TR2 / L11 C12 R13 / BL22 B23 BR24.
+    this.load.spritesheet('hillv2', `${A}hillv2.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('bridge', `${A}bridge.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('stonepath', `${A}stonepath.png`, { frameWidth: 16, frameHeight: 16 });
-
-    // Hand-authored start-island map tilesets (startIsland.json). Each PNG in
-    // public/assets/tilesets/ is a 16×16 spritesheet keyed by its filename (sans
-    // .png); the map's frame indices already match these sheets. The load list is
-    // auto-synced to whatever the map references (mapLoader.usedTilesetKeys), so a
-    // new map only needs its tileset PNGs dropped into that folder.
-    const TS = 'assets/tilesets/';
-    for (const key of usedTilesetKeys) {
-      this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
-    }
   }
 
   create() {
     this.makeUtilTextures();
     this.makeFxTextures();
     this.defineAssetFrames();
-    buildSkinTextures(this); // recolour the farmer into selectable outfit skins
     this.scene.start('Farm');
   }
 

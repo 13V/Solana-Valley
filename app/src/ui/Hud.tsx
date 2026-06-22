@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSolBalance } from '../chain/useSolBalance';
+import { useMultiplayer } from '../chain/useMultiplayer';
 import { useGameState, useClock } from './useGameState';
+import { bus } from '../game/EventBus';
 import { sfx } from '../game/audio';
 import { pendingChoices } from '../game/skills';
-import { spentPoints } from '../game/fishingTree';
 
 // Day/night get cropped weather-sheet sprites; dawn/dusk keep their emoji
 // (no clean pixel match in the pack). `emoji` doubles as the img alt text.
@@ -16,7 +17,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'fishtree' | 'almanac' | 'wardrobe' | 'help' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | 'settings' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
@@ -30,9 +31,7 @@ const BUTTONS: Array<{ id: Exclude<Panel, null>; emoji: string; img?: string; la
   { id: 'animals', emoji: '🐔', img: 'assets/sprout-ui/icon_chicken.png', label: 'Animals' },
   { id: 'upgrades', emoji: '⬆️', img: 'assets/sprout-ui/tool_hoe.png', label: 'Upgrades' },
   { id: 'skills', emoji: '🎯', img: 'assets/sprout-ui/icon_star.png', label: 'Skills' },
-  { id: 'fishtree', emoji: '🎣', img: 'assets/sprout-ui/ic_pond.png', label: 'Angler' },
   { id: 'almanac', emoji: '📖', img: 'assets/sprout-ui/icon_almanac.png', label: 'Almanac' },
-  { id: 'wardrobe', emoji: '🐾', label: 'Cat Coats' },
   { id: 'help', emoji: '❔', img: 'assets/sprout-ui/btn_help.png', label: 'Help' },
 ];
 
@@ -45,10 +44,22 @@ export function Hud({
 }) {
   const { publicKey } = useWallet();
   const sol = useSolBalance();
-  const { coins, progress, skills, perks, fishTree } = useGameState();
+  const { connected: mpConnected, island, online } = useMultiplayer();
+  const { coins, progress, skills, perks } = useGameState();
   const { day, clock, phase } = useClock();
   const perkChoices = pendingChoices(skills, perks).length;
-  const fishAvail = (fishTree?.pts ?? 0) - spentPoints(fishTree?.unlocked ?? []);
+
+  // Copy a shareable link that seats friends on this same island.
+  const onInvite = () => {
+    const link = `${location.origin}${location.pathname}?island=${island}`;
+    try {
+      const p = navigator.clipboard?.writeText(link);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      // clipboard unavailable / blocked — still confirm the action below
+    }
+    bus.emit('toast', 'Invite link copied — friends join your island!');
+  };
 
   const addr = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
@@ -63,6 +74,11 @@ export function Hud({
           <img className="dn-frame" src={`assets/sprout-ui/widget_${phase}.png?6`} alt={PHASE_ICON[phase].emoji} />
           <span className="dn-date">Day {day} · {clock}</span>
         </div>
+        {/* Compact day/time pill shown only on mobile, where the big decorative
+            day/night widget is hidden to save screen space (see mobile.css). */}
+        <span className="badge daynight-mini" title={`Day ${day} · ${clock}`}>
+          {PHASE_ICON[phase].emoji} Day {day} · {clock}
+        </span>
         <div className="hud-stats">
           <span className="badge coins">
             <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
@@ -76,15 +92,13 @@ export function Hud({
       </div>
       <div className="hud-buttons">
         {BUTTONS.map((b) => {
-          const dotCount = b.id === 'skills' ? perkChoices : b.id === 'fishtree' ? fishAvail : 0;
-          const showDot = dotCount > 0;
-          const dotNoun = b.id === 'skills' ? 'perk choice' : 'point';
+          const showDot = b.id === 'skills' && perkChoices > 0;
           return (
             <button
               key={b.id}
               className={`iconbtn ${panel === b.id ? 'active' : ''}`}
               onClick={() => onToggle(b.id)}
-              title={showDot ? `${b.label} — ${dotCount} ${dotNoun}${dotCount > 1 ? 's' : ''} available!` : b.label}
+              title={showDot ? `${b.label} — ${perkChoices} perk choice${perkChoices > 1 ? 's' : ''} available!` : b.label}
               style={showDot ? { position: 'relative' } : undefined}
             >
               {b.img ? <img className="btn-ico" src={b.img} alt={b.emoji} /> : b.emoji}
@@ -97,7 +111,7 @@ export function Hud({
                     border: '2px solid #fff3d8', boxSizing: 'border-box',
                   }}
                 >
-                  {dotCount}
+                  {perkChoices}
                 </span>
               )}
             </button>
@@ -119,15 +133,61 @@ export function Hud({
             alt={muted ? '🔇' : '🔊'}
           />
         </button>
+        <button
+          className={`iconbtn ${panel === 'settings' ? 'active' : ''}`}
+          title="Settings"
+          onClick={() => onToggle('settings')}
+        >
+          <img className="btn-ico" src="assets/sprout-ui/set_gear.png" alt="⚙️" />
+        </button>
       </div>
       <div className="hud-right">
-        {addr && (
-          <span className="badge">
-            {addr}
-            {sol !== null ? ` · ${sol.toFixed(2)} SOL` : ''}
+        {/* Wallet cluster on top: SOL balance + the connect/address button. The
+            address lives only on the WalletMultiButton (no duplicate badge). */}
+        <span className="wallet-group">
+          {addr && sol !== null && (
+            <span className="badge sol" title="Your wallet's SOL balance">
+              ◎ {sol.toFixed(2)} SOL
+            </span>
+          )}
+          <WalletMultiButton />
+        </span>
+        {!mpConnected && (
+          <span
+            className="badge"
+            style={{ fontFamily: 'var(--pixel-font)', opacity: 0.85 }}
+            title="Multiplayer needs a connected devnet wallet — every player must connect AND approve the signature to see each other"
+          >
+            {addr ? (
+              '🌐 Connecting…'
+            ) : (
+              <>
+                🌐 <span className="only-wide">Connect wallet for multiplayer</span>
+                <span className="only-narrow">Connect wallet</span>
+              </>
+            )}
           </span>
         )}
-        <WalletMultiButton />
+        {/* Island indicator + Invite tucked underneath the wallet button. */}
+        {mpConnected && (
+          <span className="island-group">
+            <span
+              className="badge"
+              style={{ fontFamily: 'var(--pixel-font)' }}
+              title={`${online} of 20 plots filled on island ${island}`}
+            >
+              🏝 Island {island} · {online}/20
+            </span>
+            <button
+              className="btn sm"
+              style={{ fontFamily: 'var(--pixel-font)' }}
+              title="Copy an invite link so friends join your island"
+              onClick={onInvite}
+            >
+              Invite
+            </button>
+          </span>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { restartTutorial } from './TutorialCoach';
+
 export function HelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel help">
@@ -31,9 +33,20 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
           Your farm autosaves locally. Connect a Solana wallet (devnet) to see your address &amp; balance —
           on-chain land/items and the $SPROUT token are on the roadmap.
         </p>
-        <a className="docs-link" href="docs/" target="_blank" rel="noopener noreferrer">
-          📖 Read the full docs &amp; tokenomics →
-        </a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+          <a
+            className="btn"
+            href="docs/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none' }}
+          >
+            📖 Read the full docs &amp; tokenomics →
+          </a>
+          <button className="btn" onClick={restartTutorial}>
+            ↺ Replay tutorial
+          </button>
+        </div>
       </div>
     </div>
   );

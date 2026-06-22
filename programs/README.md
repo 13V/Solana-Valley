@@ -30,12 +30,27 @@ Custom Anchor program holding gameplay ownership state.
     owner and clear the plot. This is the anti-cheat gate: minting happens
     on-chain, not on the client's say-so.
 
-### 3. `marketplace` program (M4)
-Escrow-based player-to-player trading.
+### 3. `marketplace` program (M4) — **DRAFTED → `programs/marketplace/`**
+Escrow-based player-to-player trading, settled in **`$SPROUT`** (the launched
+token). The Anchor program is written (`programs/marketplace/src/lib.rs`):
 
-- **Listing PDA:** `{ seller, item_mint, price_in_valley, ... }` with the item
-  held in a program-owned escrow token account.
-- **Instructions:** `list`, `buy` (pay `$VALLEY`, receive item), `cancel`.
+- **`Marketplace` config PDA:** `{ admin, sprout_mint, treasury, fee_bps }`
+  (fee capped at 10%).
+- **`Listing` PDA:** `{ seller, item_mint, qty, price, nonce }`; the item sits in
+  a program-owned **escrow** token account (authority = the Listing PDA).
+- **Instructions:** `initialize`, `set_fee`, `list`, `buy` (pay `$SPROUT` →
+  seller gets price − fee, treasury gets fee, buyer gets the item), `cancel`.
+
+**Still to do before it's live (Phase B of `docs/MARKETPLACE.md`):**
+- [ ] `anchor build && deploy` (devnet → mainnet); replace the placeholder
+      `declare_id!`.
+- [ ] **Items on-chain (M2/M3)** — produce must be a real SPL token minted behind
+      an oracle (planted-at-slot check) or the escrow trades fakes. This is the
+      real blocker; the escrow itself is mint-agnostic and ready.
+- [ ] Client integration (`app/src/chain/marketplace.ts`): Anchor client +
+      `list`/`buy`/`cancel` builders, wired via EventBus.
+- [ ] Market UI panel (browse / sell / mine) + a listings indexer.
+- [ ] Security **audit** + compliance review before mainnet.
 
 ## Tooling (when we start)
 

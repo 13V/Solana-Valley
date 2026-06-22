@@ -16,6 +16,15 @@ export const EMPTY_SKILLS: Skills = { farming: 0, ranching: 0, breeding: 0, fish
 export type ChosenPerks = Record<string, string>;
 export const EMPTY_PERKS: ChosenPerks = {};
 
+// Coin cost of the *next* perk respec, given how many have already been done.
+// First respec is free, then escalates: 0, 5k, 15k, 35k, 75k … (each step is
+// roughly double the previous gap) so it stays a meaningful coin sink without
+// ever becoming a pay-to-win timer/gacha — just a plain "change your mind" tax.
+export function respecCost(respecsDone: number): number {
+  if (respecsDone <= 0) return 0;
+  return 5000 * (Math.pow(2, respecsDone) - 1);
+}
+
 // ---- level curve --------------------------------------------------------
 export function skillXpForLevel(level: number): number {
   const l = Math.min(level, MAX_SKILL_LEVEL);
@@ -50,8 +59,6 @@ export type Modifiers = {
   productValueMult: number; prodSpeedMult: number; productDoubleChance: number; goldenProductChance: number;
   breedCapBonus: number; breedSpeedMult: number; rareBabyChance: number;
   fishValueMult: number; fishLuckMult: number; treasureChance: number; legendaryFish: boolean;
-  // Angler's Tree levers (see fishingTree.ts): bite/hook feel, double catch, point gain.
-  fishBiteSpeedMult: number; fishHookWindowMult: number; fishDoubleCatchChance: number; fishPtMult: number;
   forageValueMult: number; forageLuckMult: number; forageRespawnMult: number; gemChance: number;
 };
 export const baseModifiers = (): Modifiers => ({
@@ -59,7 +66,6 @@ export const baseModifiers = (): Modifiers => ({
   productValueMult: 1, prodSpeedMult: 1, productDoubleChance: 0, goldenProductChance: 0,
   breedCapBonus: 0, breedSpeedMult: 1, rareBabyChance: 0,
   fishValueMult: 1, fishLuckMult: 1, treasureChance: 0, legendaryFish: false,
-  fishBiteSpeedMult: 1, fishHookWindowMult: 1, fishDoubleCatchChance: 0, fishPtMult: 1,
   forageValueMult: 1, forageLuckMult: 1, forageRespawnMult: 1, gemChance: 0,
 });
 

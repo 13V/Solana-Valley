@@ -2,9 +2,10 @@ import { PLANTS, RARITY } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
+import { Tooltip, PlantTipBody } from './Tooltip';
 
 export function SeedsPanel({ onClose }: { onClose: () => void }) {
-  const { seeds, selectedSeed } = useGameState();
+  const { seeds, selectedSeed, progress } = useGameState();
   const owned = PLANTS.filter((p) => (seeds[p.id] ?? 0) > 0);
 
   return (
@@ -23,11 +24,13 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
             return (
               <div className={`row ${selectedSeed === p.id ? 'sel' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
                 <span className="dot" style={{ background: r.css, color: r.css }} />
-                <CropIcon id={p.id} kind="seed" />
-                <span className="row-name">
-                  {p.name}
-                  <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>
-                </span>
+                <Tooltip content={<PlantTipBody plant={p} progress={progress} showBuy={false} />}>
+                  <CropIcon id={p.id} kind="seed" />
+                  <span className="row-name">
+                    {p.name}
+                    <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>
+                  </span>
+                </Tooltip>
                 <span className="stock">×{seeds[p.id]}</span>
                 <button className="btn sm" onClick={() => bus.emit('ui:selectSeed', p.id)}>
                   {selectedSeed === p.id ? 'Selected' : 'Select'}

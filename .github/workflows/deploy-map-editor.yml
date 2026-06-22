@@ -1,0 +1,49 @@
+# Auto-deploys the static Map Editor (map-editor/) to GitHub Pages on push.
+# NOTE: .github/workflows/deploy.yml also targets GitHub Pages (the main game,
+# manual-only). Both publish to the same single Pages site, so only ONE should
+# be the active Pages source at a time — this workflow serves the map editor at
+# the Pages site root.
+name: Deploy Map Editor to GitHub Pages
+
+on:
+  push:
+    # NOTE: GitHub Pages deployments are gated by the `github-pages` environment,
+    # which by default only permits the repository's DEFAULT branch. The deploy
+    # job will only succeed when run from the default branch (currently
+    # `claude/loving-cannon-ayy18g`); runs from other branches fail instantly at
+    # the environment gate. List the default branch first so a merge auto-deploys.
+    branches:
+      - claude/loving-cannon-ayy18g   # repo default branch — deploys succeed here
+      - main
+      - claude/trusting-faraday-zib5xc
+    paths:
+      - 'map-editor/**'
+      - '.github/workflows/deploy-map-editor.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress Pages deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: map-editor
+      - id: deployment
+        uses: actions/deploy-pages@v4

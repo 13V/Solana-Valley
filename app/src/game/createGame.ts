@@ -14,6 +14,8 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     backgroundColor: '#6fae52',
     // Fill the window and let the camera reveal more of the world on big screens.
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    // Enable Phaser's gamepad plugin (FarmScene also polls navigator directly).
+    input: { gamepad: true },
     physics: { default: 'arcade', arcade: { debug: false } },
     scene: [BootScene, FarmScene],
   });

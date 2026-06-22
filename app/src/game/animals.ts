@@ -57,8 +57,8 @@ const tree = (
 
 export const ANIMALS: AnimalDef[] = [
   {
-    id: 'chicken', name: 'Chicken', category: 'animal', cost: 150, unlockLevel: 3,
-    productName: 'Egg', productValue: 28, layMs: 30_000, xp: 6,
+    id: 'chicken', name: 'Chicken', category: 'animal', cost: 10_000, unlockLevel: 3,
+    productName: 'Egg', productValue: 100, layMs: 30_000, xp: 6,
     sheet: 'chick_white', idleFrames: [0, 1, 2, 3], walkFrames: [16, 17, 18, 19, 20, 21, 22, 23],
     scale: 2.4, originY: 0.72, stationary: false,
     productSheet: 'eggitem', productFrame: 0, productOffsetY: -20, productScale: 1.4,
@@ -71,8 +71,8 @@ export const ANIMALS: AnimalDef[] = [
     },
   },
   {
-    id: 'cow', name: 'Cow', category: 'animal', cost: 600, unlockLevel: 6,
-    productName: 'Milk', productValue: 85, layMs: 60_000, xp: 16,
+    id: 'cow', name: 'Cow', category: 'animal', cost: 25_000, unlockLevel: 6,
+    productName: 'Milk', productValue: 500, layMs: 60_000, xp: 16,
     sheet: 'cow_light', idleFrames: [0, 1, 2], walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
     scale: 1.7, originY: 0.78, stationary: false,
     productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
@@ -84,10 +84,10 @@ export const ANIMALS: AnimalDef[] = [
       babySheets: ['baby_cow_light', 'baby_cow_brown', 'baby_cow_green', 'baby_cow_pink', 'baby_cow_purple'],
     },
   },
-  tree('apple', 'Apple Tree', 500, 4, 120, 45_000, 14),
-  tree('orange', 'Orange Tree', 900, 8, 230, 55_000, 22),
-  tree('peach', 'Peach Tree', 1500, 12, 420, 70_000, 34),
-  tree('pear', 'Pear Tree', 2400, 16, 680, 85_000, 50),
+  tree('apple', 'Apple Tree', 50_000, 4, 750, 45_000, 14),
+  tree('orange', 'Orange Tree', 90_000, 8, 1650, 55_000, 22),
+  tree('peach', 'Peach Tree', 150_000, 12, 3500, 70_000, 34),
+  tree('pear', 'Pear Tree', 250_000, 16, 7000, 85_000, 50),
 ];
 
 export const ANIMAL_BY_ID: Record<string, AnimalDef> = Object.fromEntries(
