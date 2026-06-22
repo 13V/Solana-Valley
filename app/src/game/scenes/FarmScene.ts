@@ -1088,11 +1088,8 @@ export class FarmScene extends Phaser.Scene {
       const px = tx * TILE + TILE / 2, py = ty * TILE + TILE;
       const img = frame === undefined ? this.add.image(px, py, key) : this.add.image(px, py, key, frame);
       img.setOrigin(0.5, 1).setScale(scale).setDepth(py);
-      // Snug base collider sized to the prop. (Was a flat TILE-wide box that
-      // left invisible walls in the open beside narrow props — barrels, crates,
-      // signs and the chest.)
-      const cw = Math.max(12, Math.round(img.displayWidth * 0.58));
-      this.addCollider(px, py - 7, cw, 10);
+      // No collider: on the start island only fences block, so you can walk
+      // freely past every market prop.
       return img;
     };
     // Well as a centrepiece beside the avenue.
@@ -1169,10 +1166,9 @@ export class FarmScene extends Phaser.Scene {
       const tree = this.add
         .image(cx, baseY + 4, 'biome', treeFrames[ti++ % treeFrames.length])
         .setOrigin(0.5, 1).setScale(2).setDepth(baseY);
-      this.tiles[ty][tx].obstacle = true;
-      // A small trunk-only collider at the base so you can walk under the canopy
-      // (was a taller box offset above the trunk that felt like a stray wall).
-      this.addCollider(cx, baseY, 12, 8);
+      this.tiles[ty][tx].obstacle = true; // keeps tilling off the tree tile (movement is unblocked)
+      // No collider: trees don't block movement (only fences do) — walk right
+      // under the canopy.
       this.tweens.add({
         targets: tree, angle: { from: -1.3, to: 1.3 },
         duration: 2200 + Math.random() * 800, delay: Math.random() * 1500,
@@ -1306,7 +1302,7 @@ export class FarmScene extends Phaser.Scene {
     for (let oy = p.y0; oy <= p.y0 + 1; oy++) {
       for (let ox = p.x0 + 1; ox <= p.x1 - 1; ox++) if (this.inBounds(ox, oy)) this.tiles[oy][ox].obstacle = true;
     }
-    this.addCollider(coopX, coopBase - 14, 92, 22);
+    // No coop collider: only fences block movement on the start island.
     // U-shaped fence; the coop crowns the open top.
     this.encloseRegion(p.x0, p.y0, p.x1, p.y1, { left: true, right: true, bottom: true });
     this.add.image((p.x0 + 1) * TILE + 16, (p.y1 - 1) * TILE, 'hay', 6).setScale(2).setDepth((p.y1 - 1) * TILE);
@@ -2626,13 +2622,11 @@ export class FarmScene extends Phaser.Scene {
         const px = x * TILE + TILE / 2, py = y * TILE + TILE / 2;
         if (this.anims.exists('water-anim')) this.add.sprite(px, py, 'water', 0).setScale(2).setDepth(3.8).play('water-anim');
         else this.add.image(px, py, 'water', 0).setScale(2).setDepth(3.8);
-        this.tiles[y][x].obstacle = true;
+        this.tiles[y][x].obstacle = true; // no-till flag only (movement over the pond is unblocked)
         this.tiles[y][x].tilled = false;
         this.pondTiles.add(this.key(x, y));
-        // One tile-sized collider per water tile. (Was TILE*2 — a 64px box on a
-        // 32px tile, which overhung ~16px onto the grass and made an invisible
-        // wall ringing the pond.)
-        this.addCollider(px, py, TILE, TILE);
+        // No water collider: only fences block on the start island, so you can
+        // walk across the pond (fishing still works on the pond tiles).
       }
     }
 
