@@ -245,14 +245,19 @@ Solana has no native cron, so "auto" = a scheduled job.
   Keep the balance modest and rotate keys. This is the main reason to graduate to
   **Option B (a merkle-distributor program)** for mainnet scale — players self-
   claim against a published root, and you never hold a hot wallet full of rewards.
-- **Transfer-confirmation edge.** If `sendAndConfirmTransaction` times out but the
-  tx actually landed, the reservation is refunded (`cancel_claim`) while tokens
-  moved — a rare double-pay window. Reconcile `reward_claims` against on-chain
-  history; the merkle distributor removes this class of bug entirely.
-- **Stuck `pending`.** If the server dies between reserve and finalize/cancel, the
-  amount stays in `pending` (visible via `pending_at`). An operator finalizes or
-  cancels it after checking the chain. The per-wallet `pending = 0` guard means a
-  user can't start a second claim while one is stuck.
+- **Transfer-confirmation edge (handled).** `api/claim.ts` refunds (`cancel_claim`)
+  **only** when tokens definitively didn't move (send failed, or the tx confirmed
+  with an on-chain error). On an ambiguous confirmation (RPC timeout — the tx may
+  have landed) it leaves the claim `pending` with the signature stamped, so a
+  landed-but-unconfirmed transfer is never refunded-then-repaid.
+- **Stuck `pending` (self-healing).** Those left-pending claims are reconciled by
+  **`scripts/reconcile-claims.mjs`** (run on a schedule —
+  `.github/workflows/reconcile-claims.yml`, every 10 min): it checks each stuck
+  signature on-chain and **finalizes** it (landed), **refunds** it (dropped/failed,
+  after a grace period), or leaves it (still in-flight). Needs no treasury key. The
+  per-wallet `pending = 0` guard means a user can't start a second claim while one
+  is stuck — the cron clears it within ~15 min. Run reconcile against an RPC that
+  retains transaction history so a landed tx is never misread as dropped.
 
 When real money is flowing at volume, migrate the claim step to a merkle
 distributor (fork an audited one — Jito/Jupiter/Saber). The ledger, crediting,

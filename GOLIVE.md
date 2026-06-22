@@ -77,12 +77,17 @@ If that works end-to-end, the system is real.
 ---
 
 ## Keep it running
-Cron the funding + (optional) seasons on a schedule (GitHub Actions / Vercel cron):
-```bash
-node --env-file=.env scripts/buyback.mjs claim-fees --auto && node --env-file=.env scripts/buyback.mjs run 1.0
-node --env-file=.env scripts/reward-season.mjs distribute <id>   # if you run seasons
-```
-Watch `redemption_log` + `reward_claims` in Supabase for anomalies.
+- **Claim reconciliation (do this):** `.github/workflows/reconcile-claims.yml`
+  already runs `scripts/reconcile-claims.mjs` every 10 min — it self-heals any
+  stuck `pending` claim against the chain. Just set the repo secrets
+  `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SOLANA_RPC_URL` (no treasury key
+  needed). Until set, it no-ops.
+- **Funding + seasons** on a schedule (GitHub Actions / Vercel cron):
+  ```bash
+  node --env-file=.env scripts/buyback.mjs claim-fees --auto && node --env-file=.env scripts/buyback.mjs run 1.0
+  node --env-file=.env scripts/reward-season.mjs distribute <id>   # if you run seasons
+  ```
+- Watch `redemption_log` + `reward_claims` in Supabase for anomalies.
 
 ## Before mainnet
 - Keep the treasury balance **modest** (it's a hot wallet) and caps tight.

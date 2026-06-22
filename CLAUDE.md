@@ -68,7 +68,7 @@ app/
 │       └── merkleClaim.ts · MerkleClaim.tsx  # trustless on-chain self-claim (Option B)
 docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
 programs/   # Anchor programs (written, not built here): marketplace · reward-distributor (merkle claims)
-scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · merkle-season · lib/{contribution,merkle} (reward ops — docs/REWARDS.md)
+scripts/    # fetch-assets.mjs (art); rewards-setup · reward-season · buyback · merkle-season · reconcile-claims · lib/{contribution,merkle} (reward ops — docs/REWARDS.md)
 supabase/   # SQL run in the Supabase editor: shop.sql · rewards.sql · seasons.sql · distributors.sql · redemption.sql
 ```
 

@@ -1,0 +1,40 @@
+name: Reconcile reward claims
+
+# Self-heals stuck `pending` reward claims: checks each one's stamped signature
+# on-chain and finalizes (landed), refunds (dropped/failed), or leaves it (still
+# in-flight). Needs NO treasury key — read-only chain check + the guarded
+# finalize/cancel RPCs via the Supabase service key. See scripts/reconcile-claims.mjs.
+#
+# Set the repo secrets below to activate it. Until they're set the script no-ops
+# (exit 0), so the schedule is harmless before launch. Tune/disable the cron freely.
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Don't let two reconcile runs overlap.
+concurrency:
+  group: reconcile-claims
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # --ignore-scripts skips the postinstall art fetch (not needed for this job).
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Reconcile pending claims
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+        run: node scripts/reconcile-claims.mjs
