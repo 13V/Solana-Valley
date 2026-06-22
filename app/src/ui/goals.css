@@ -32,11 +32,11 @@
 .ui-skin .goals-hud {
   background: none;
   border: 16px solid transparent;
-  border-image: url('/assets/sprout-ui/ui_frame.png') 28 fill stretch;
+  border-image: var(--ui-frame, url('/assets/sprout-ui/ui_frame.png')) 28 fill stretch;
   border-radius: 0;
   padding: 0;
   color: var(--ink, #4a3526);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48);
 }
 
 /* When skinned, the frame's border IS the padding, so inset content. */
@@ -71,11 +71,38 @@
   text-decoration: underline;
 }
 
+/* Skinned header: a tappable parchment banner strip. The title sits in deep
+   ink with a soft parchment highlight; the underline-on-hover gives way to a
+   gentle lift so the banner reads like a pressable plaque. */
+.ui-skin .goals-head {
+  border: solid transparent;
+  border-width: 3px 7px 5px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  padding: 4px 8px 3px;
+  margin: 0 0 2px;
+  font-size: 14px;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.55);
+  filter: drop-shadow(0 2px 1px rgba(60, 36, 12, 0.22));
+  transition: filter 0.1s ease, transform 0.1s ease;
+}
+.ui-skin .goals-head:hover {
+  filter: drop-shadow(0 3px 2px rgba(60, 36, 12, 0.28)) brightness(1.03);
+}
+.ui-skin .goals-head:hover .goals-title {
+  text-decoration: none;
+}
+.ui-skin .goals-head:active {
+  transform: translateY(1px);
+}
+
 .goals-title {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
+}
+.ui-skin .goals-title {
+  color: #5a3a18;
 }
 
 .goals-count {
@@ -84,11 +111,32 @@
   font-weight: 700;
 }
 
+/* Skinned count: a small recessed wood chip riding the banner, so the
+   "(3/18)" reads as a tidy progress tally rather than dimmed text. */
+.ui-skin .goals-count {
+  opacity: 1;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--parchment, #efe6cf);
+  background: rgba(74, 47, 21, 0.92);
+  border-radius: 6px;
+  padding: 2px 6px 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 210, 0.18),
+    0 1px 1px rgba(0, 0, 0, 0.25);
+  text-shadow: none;
+}
+
 /* Little chevron that flips when collapsed. */
 .goals-caret {
   font-size: 10px;
   opacity: 0.75;
   transition: transform 0.12s ease;
+}
+.ui-skin .goals-caret {
+  color: #6e4a2b;
+  opacity: 0.9;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.45);
 }
 .goals-hud.is-collapsed .goals-caret {
   transform: rotate(-90deg);
@@ -101,6 +149,20 @@
   font-weight: 700;
   color: var(--ink, #4a3526);
   text-shadow: 0 1px 0 rgba(255, 248, 224, 0.35);
+}
+
+/* Skinned master line: a slim parchment ribbon (banner 9-slice) so the
+   rolled-up "Master Gardener" goal reads as the headline above the rungs. */
+.ui-skin .goals-master {
+  margin: 2px 0 4px;
+  border: solid transparent;
+  border-width: 3px 7px 4px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  padding: 2px 8px 1px;
+  font-size: 12px;
+  color: #5a3a18;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.5);
+  filter: drop-shadow(0 2px 1px rgba(60, 36, 12, 0.18));
 }
 
 .goals-list {
@@ -117,10 +179,37 @@
   padding-right: 2px;
 }
 
+/* Skinned scrollbar: a thin wood-toned track so the overflow doesn't break
+   the cozy frame. */
+.ui-skin .goals-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 74, 43, 0.6) transparent;
+}
+.ui-skin .goals-list::-webkit-scrollbar {
+  width: 6px;
+}
+.ui-skin .goals-list::-webkit-scrollbar-thumb {
+  background: rgba(110, 74, 43, 0.6);
+  border-radius: 3px;
+}
+.ui-skin .goals-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .goals-item {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+}
+
+/* Skinned rows: faint parchment dividers between rungs so the ladder reads
+   as a list without a heavy box around each line. */
+.ui-skin .goals-item {
+  padding: 1px 2px 3px;
+  border-bottom: 1px solid rgba(110, 74, 43, 0.16);
+}
+.ui-skin .goals-item:last-child {
+  border-bottom: 0;
 }
 
 /* Label + reward stacked so the reward never widens the narrow panel. */
@@ -142,7 +231,20 @@
   text-overflow: ellipsis;
 }
 .ui-skin .goals-reward {
-  color: #8a5a1e;
+  color: #7a4a06;
+  /* Tiny coin glyph in front of the payout so the reward reads as currency. */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, 0.4);
+}
+.ui-skin .goals-reward::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  background: url('/assets/sprout-ui/coin.png') center / contain no-repeat;
+  image-rendering: pixelated;
 }
 
 /* Icon slot keeps a fixed width so labels line up. */
@@ -162,6 +264,13 @@
   display: block;
 }
 
+/* check.png is ~14x13: keep its native ratio (don't stretch to the square
+   slot) and let it sit a hair larger than the empty checkbox for a crisp tick. */
+.ui-skin .goals-mark img {
+  width: 14px;
+  height: auto;
+}
+
 /* Dim empty marker (CSS circle) for not-yet-done goals — reads cleaner
    than the pixel dot at this tiny size. */
 .goals-dot {
@@ -172,6 +281,16 @@
   background: rgba(74, 53, 38, 0.12);
   box-sizing: border-box;
 }
+/* Skinned empty marker: a recessed parchment slot so the unchecked rungs look
+   like an empty wooden checkbox waiting for the green tick. */
+.ui-skin .goals-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(110, 74, 43, 0.55);
+  background: rgba(74, 53, 38, 0.16);
+  box-shadow: inset 0 1px 2px rgba(60, 36, 12, 0.3);
+}
 
 .goals-label {
   flex: 1 1 auto;
@@ -180,11 +299,22 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ui-skin .goals-label {
+  color: var(--ink, #4a3526);
+  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.3);
+}
 
 /* Done rows: keep the text but soften it and add a strike. */
 .goals-item.is-done .goals-label {
   opacity: 0.62;
   text-decoration: line-through;
+}
+/* Skinned done rows: fade to a muted ink and tint the strike green to echo
+   the check, so a cleared rung reads as a satisfying tick-off. */
+.ui-skin .goals-item.is-done .goals-label {
+  opacity: 0.7;
+  color: var(--ink-soft, #5c4226);
+  text-decoration-color: rgba(47, 125, 46, 0.7);
 }
 
 .goals-alldone {
@@ -194,8 +324,30 @@
   color: var(--ink-soft, #5c4226);
 }
 
+/* Skinned celebration: a warm gold ribbon so clearing every goal feels like a
+   reward, not just a status line. */
+.ui-skin .goals-alldone {
+  margin: 6px 2px 2px;
+  border: solid transparent;
+  border-width: 3px 7px 5px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  padding: 4px 8px;
+  color: #6a3f06;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.6);
+  filter: saturate(1.4) brightness(1.04) hue-rotate(-10deg)
+    drop-shadow(0 2px 2px rgba(120, 78, 12, 0.3));
+}
+
 /* Compact spacing when collapsed: header only. */
 .goals-hud.is-collapsed .goals-list,
 .goals-hud.is-collapsed .goals-alldone {
   display: none;
+}
+/* Skinned collapsed: drop the header's bottom margin so the pill hugs tight. */
+.ui-skin .goals-hud.is-collapsed .goals-master {
+  display: none;
+}
+.ui-skin .goals-hud.is-collapsed .goals-head {
+  margin-bottom: 0;
 }

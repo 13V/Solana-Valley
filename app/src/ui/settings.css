@@ -156,19 +156,13 @@
 .set-seg .btn.sm.set-opt {
   padding: 2px 8px;
 }
-/* Selected option uses the same green the SkillsPanel uses for chosen perks. */
-.set-seg .btn.sm.set-opt.sel,
-.ui-skin .set-seg .btn.sm.set-opt.sel {
+/* Base (no-skin) selected option uses the same green the SkillsPanel uses for
+   chosen perks. The premium look is handled in the .ui-skin block below. */
+.set-seg .btn.sm.set-opt.sel {
   color: #fff;
   background: #2f7d2e;
   border-color: #2f7d2e;
   box-shadow: 0 0 0 2px rgba(47, 125, 46, 0.35);
-}
-
-/* Keep the green readable on the wooden skin button frame too. */
-.ui-skin .set-seg .btn.sm.set-opt.sel {
-  border-image: none;
-  background: #2f7d2e;
 }
 
 /* ---- Controls (keybind remap) --------------------------------------- */
@@ -205,13 +199,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Capturing state: highlight with the same green the segmented options use. */
-.set-keys .btn.sm.set-key.capturing,
-.ui-skin .set-keys .btn.sm.set-key.capturing {
+/* Base (no-skin) capturing state: highlight with the segmented-option green.
+   Premium capturing styling lives in the .ui-skin block below. */
+.set-keys .btn.sm.set-key.capturing {
   color: #fff;
   background: #2f7d2e;
   border-color: #2f7d2e;
-  border-image: none;
   box-shadow: 0 0 0 2px rgba(47, 125, 46, 0.35);
 }
 .set-keys .btn.sm.set-key.capturing .set-key-act {
@@ -222,6 +215,197 @@
 .set-keys .btn.sm.set-key-reset {
   align-self: center;
   padding: 3px 10px;
+}
+
+/* ===================================================================== */
+/* Premium "wood + parchment" skin (.ui-skin set on <html> at runtime)    */
+/* All rules below are scoped to .ui-skin; the unprefixed rules above are  */
+/* the no-skin fallback and stay working untouched.                       */
+/* ===================================================================== */
+
+/* ---- Row rhythm: align controls cleanly on the parchment panel ------- */
+.ui-skin .settings-rows {
+  gap: 7px;
+}
+.ui-skin .set-row {
+  gap: 12px;
+  padding: 2px 2px;
+}
+.ui-skin .set-row .set-label {
+  color: var(--ink);
+}
+.ui-skin .set-row .set-sub {
+  color: var(--ink-soft);
+  opacity: 0.85;
+}
+.ui-skin .set-volume .set-vol-val {
+  color: var(--ink);
+  opacity: 0.95;
+}
+
+/* ---- Volume slider: recessed wood groove + parchment pill knob -------- */
+/* The runnable track is the 40x7 wood groove (slider_track.png) stretched
+   to a thin inset bar; the thumb is the 20x12 parchment pill knob. Styled
+   for WebKit/Blink and Firefox so both engines match. */
+.ui-skin .set-slider {
+  height: 20px;
+}
+
+/* WebKit / Blink */
+.ui-skin .set-slider::-webkit-slider-runnable-track {
+  height: 12px;
+  border-radius: 0;
+  border: none;
+  background:
+    var(--ui-track, url('/assets/sprout-ui/slider_track.png')) left center / 100% 12px
+      repeat-x;
+  background-color: transparent;
+  image-rendering: pixelated;
+  box-shadow: none;
+}
+.ui-skin .set-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 14px;
+  margin-top: -1px; /* center 14px thumb on 12px track */
+  border: none;
+  border-radius: 0;
+  background: url('/assets/sprout-ui/slider_knob.png') center / 100% 100% no-repeat;
+  background-color: transparent;
+  image-rendering: pixelated;
+  box-shadow: none;
+  cursor: grab;
+}
+.ui-skin .set-slider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+/* Firefox */
+.ui-skin .set-slider::-moz-range-track {
+  height: 12px;
+  border-radius: 0;
+  border: none;
+  background: url('/assets/sprout-ui/slider_track.png') left center / 100% 12px
+    repeat-x;
+  background-color: transparent;
+  image-rendering: pixelated;
+  box-shadow: none;
+}
+/* The pack knob already reads as "filled to here", so drop the green progress
+   tint the no-skin fallback uses — keep the groove uniform under the skin. */
+.ui-skin .set-slider::-moz-range-progress {
+  height: 12px;
+  background: transparent;
+}
+.ui-skin .set-slider::-moz-range-thumb {
+  width: 20px;
+  height: 14px;
+  border: none;
+  border-radius: 0;
+  background: url('/assets/sprout-ui/slider_knob.png') center / 100% 100% no-repeat;
+  background-color: transparent;
+  image-rendering: pixelated;
+  box-shadow: none;
+  cursor: grab;
+}
+
+/* Keyboard focus: a soft gold ring on the pill so the slider is reachable. */
+.ui-skin .set-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgba(122, 74, 6, 0.6);
+}
+.ui-skin .set-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px rgba(122, 74, 6, 0.6);
+}
+
+/* ---- Toggle: small wood button with centered check / X --------------- */
+.ui-skin .set-toggle {
+  border: 8px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  padding: 1px 6px;
+  min-height: 26px;
+  color: var(--ink);
+  transition: filter 0.08s ease;
+}
+.ui-skin .set-toggle .set-toggle-ico {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+.ui-skin .set-toggle .set-toggle-state {
+  color: var(--ink);
+  opacity: 0.95;
+}
+/* ON reads warm/active, OFF reads muted, so the state is legible at a glance. */
+.ui-skin .set-toggle[aria-pressed='true'] .set-toggle-state {
+  color: #2f7d2e;
+}
+.ui-skin .set-toggle[aria-pressed='false'] .set-toggle-state {
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+.ui-skin .set-toggle:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+.ui-skin .set-toggle:hover .set-toggle-ico {
+  transform: scale(1.06);
+}
+.ui-skin .set-toggle:active {
+  border-image: var(--ui-btn-press) 8 fill stretch;
+}
+.ui-skin .set-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(122, 74, 6, 0.6);
+}
+
+/* ---- Segmented options: selected reads clearly pressed --------------- */
+/* Unselected keep the normal wooden button frame (inherited from
+   .ui-skin .btn). Selected uses the pressed frame + an inset shadow + a gold
+   accent on the label so the active choice is unmistakable. */
+.ui-skin .set-seg .btn.sm.set-opt.sel {
+  background: none;
+  border-image: var(--ui-btn-press) 8 fill stretch;
+  color: #7a4a06;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, 0.5);
+  box-shadow: inset 0 1px 3px rgba(74, 53, 38, 0.45);
+}
+.ui-skin .set-seg .btn.sm.set-opt.sel:hover {
+  /* Stay pressed-looking on hover instead of lightening like a normal btn. */
+  border-image: var(--ui-btn-press) 8 fill stretch;
+  color: #7a4a06;
+}
+.ui-skin .set-seg .btn.sm.set-opt:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(122, 74, 6, 0.6);
+}
+
+/* ---- Keybind buttons: wood buttons, capturing glows ------------------ */
+.ui-skin .set-keys .btn.sm.set-key .set-key-act {
+  color: var(--ink-soft);
+}
+.ui-skin .set-keys .btn.sm.set-key .set-key-cap {
+  color: var(--ink);
+}
+.ui-skin .set-keys .btn.sm.set-key:focus-visible,
+.ui-skin .set-keys .btn.sm.set-key-reset:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(122, 74, 6, 0.6);
+}
+
+/* Capturing = "press a key…": light frame + a soft warm glow so it's obvious
+   which binding is listening. Label/value read in the gold accent. */
+.ui-skin .set-keys .btn.sm.set-key.capturing {
+  background: none;
+  border-image: var(--ui-btn-light) 8 fill stretch;
+  box-shadow: 0 0 7px rgba(255, 196, 80, 0.7),
+    inset 0 0 4px rgba(255, 206, 92, 0.35);
+}
+.ui-skin .set-keys .btn.sm.set-key.capturing .set-key-act,
+.ui-skin .set-keys .btn.sm.set-key.capturing .set-key-cap {
+  color: #7a4a06;
+  opacity: 1;
 }
 
 /* ===================================================================== */

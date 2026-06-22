@@ -7,8 +7,10 @@
 
 - Base art (ground, water, character, trees, house, decorations):
   https://cupnooble.itch.io/sprout-lands-asset-pack
-- UI (panel frames, buttons, chips, icons):
-  **Sprout Lands UI Pack — Premium** — https://cupnooble.itch.io/sprout-lands-ui-pack
+- UI (panel frames, nameplate banners, buttons, chips, slots, sliders, toggles,
+  check/cross marks, close button, coins/stars icons) **and the Sprout Lands
+  pixel font**: **Sprout Lands UI Pack — Premium** —
+  https://cupnooble.itch.io/sprout-lands-ui-pack
 - Crops, produce/seed item icons (and additional content):
   **Sprout Lands Sprites — Premium pack** — https://cupnooble.itch.io/sprout-lands-asset-pack
 - Fishing — player rod-cast animations, bobber + water-splash, and fish/shadow
@@ -72,11 +74,16 @@ of Cup Nooble and are credited here as such.
 > separate art for those features. A fungible SPL token ($VALLEY) is not an NFT,
 > but treat the NFT roadmap items as blocked on this until licensing is sorted.
 
-## Font — Pixelify Sans
+## Fonts
 
-UI text uses **Pixelify Sans**, licensed under the SIL Open Font License (OFL).
-The woff2 files are in `app/public/assets/fonts/`. Source:
-https://fonts.google.com/specimen/Pixelify+Sans
+- **Sprout Lands pixel font** (Cup Nooble) — used as the *display* face for
+  titles, buttons and labels. Ships with the **Sprout Lands UI Pack — Premium**
+  and is covered by that pack's license (see the Art section above). Files:
+  `app/public/assets/fonts/sprout-lands.ttf`, `sprout-lands-sm.ttf`.
+- **Pixelify Sans** — SIL Open Font License (OFL).
+  Source: https://fonts.google.com/specimen/Pixelify+Sans
+- A pixel **Minecraft**-style face is used for dense body copy
+  (`app/public/assets/fonts/minecraft.ttf`).
 
 ## Original work
 

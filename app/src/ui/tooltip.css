@@ -95,17 +95,23 @@
   }
 }
 
-/* When the Sprout Lands skin is on, swap the fallback box for the wooden
-   9-slice frame (same asset/slice the .panel uses). */
+/* When the Sprout Lands skin is on, swap the fallback box for a cozy parchment
+   speech bubble — the soft toast_panel 9-slice (slice 12), the same warm look
+   used by the toast/speech bubbles. Comfortable padding, ink palette, and a
+   soft drop-shadow so the bubble lifts off whatever it floats over. */
 .ui-skin .ui-tip {
   background: none;
-  border: 16px solid transparent;
-  border-image: var(--ui-frame, url('/assets/sprout-ui/ui_frame.png')) 28 fill
-    stretch;
+  border: 13px solid transparent;
+  border-image: url('/assets/sprout-ui/toast_panel.png') 12 fill stretch;
   border-radius: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  padding: 2px 6px;
+  padding: 1px 5px 2px;
+  color: var(--ink, #4a3526);
+  /* The border-image already carries its own shadow-y edge; layer a soft
+     ambient drop so the bubble reads as floating, like .panel does. */
+  box-shadow: none;
+  filter: drop-shadow(0 6px 12px rgba(40, 24, 8, 0.4));
 }
 
 /* ---- bubble contents ------------------------------------------------ */
@@ -175,4 +181,74 @@
   font-size: 10px;
   opacity: 0.7;
   white-space: normal;
+}
+
+/* =====================================================================
+   Premium skin polish for the bubble contents. Ink-on-parchment palette,
+   small-caps colored rarity, readable muted/value split, warm dividers.
+   ===================================================================== */
+
+/* Title row: plant name in bold ink, rarity as a small-caps colored tag.
+   The rarity color is set inline (s.rarityCss / mutation.css) — we only
+   shape the typography here so any tier reads as a crisp little label. */
+.ui-skin .ui-tip-title {
+  margin-bottom: 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(110, 74, 43, 0.28);
+}
+.ui-skin .ui-tip-name {
+  color: var(--ink, #4a3526);
+  text-shadow: 0 1px 0 rgba(255, 250, 232, 0.5);
+}
+.ui-skin .ui-tip-rar {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase; /* SproutLands renders lowercase as small-caps;
+                                 base data is title-case so lowercase it here */
+  text-shadow: 0 1px 0 rgba(255, 250, 232, 0.45);
+}
+
+/* Stat lines: key muted ink, value solid ink, boosted value warm green. */
+.ui-skin .ui-tip-line .k {
+  color: var(--ink-soft, #5c4226);
+  opacity: 0.92;
+  font-weight: 600;
+}
+.ui-skin .ui-tip-line .v {
+  color: var(--ink, #4a3526);
+}
+.ui-skin .ui-tip-line .v.boosted {
+  color: #2f7d2e;
+}
+
+/* Sub-section (mutation odds / quality stars): warm dashed divider. */
+.ui-skin .ui-tip-sub {
+  border-top: 1px dashed rgba(110, 74, 43, 0.38);
+}
+.ui-skin .ui-tip-sub-head {
+  color: var(--ink-soft, #5c4226);
+  opacity: 0.95;
+  font-weight: 600;
+}
+
+/* Mutation / quality rows: colored name (inline css) stays bold; odds in
+   muted ink so the variant name leads the eye. */
+.ui-skin .ui-tip-mut .mname {
+  text-shadow: 0 1px 0 rgba(255, 250, 232, 0.35);
+}
+.ui-skin .ui-tip-mut .modds {
+  color: var(--ink-soft, #5c4226);
+  opacity: 0.95;
+}
+
+/* Footnotes: quiet muted ink (a touch more legible than the bare opacity). */
+.ui-skin .ui-tip-note {
+  color: var(--ink-soft, #5c4226);
+  opacity: 0.82;
+}
+
+/* "Locked" warning keeps its alarm-red but warmed to sit on parchment. */
+.ui-skin .ui-tip-locked {
+  color: #b04a2b;
+  text-shadow: 0 1px 0 rgba(255, 250, 232, 0.4);
 }

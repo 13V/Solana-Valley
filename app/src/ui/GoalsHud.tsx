@@ -73,7 +73,7 @@ export function GoalsHud() {
                 <li key={g.id} className={`goals-item${statuses[i] ? ' is-done' : ''}`}>
                   <span className="goals-mark">
                     {statuses[i] ? (
-                      <img src="assets/sprout-ui/goals_check.png" alt="done" />
+                      <img src="assets/sprout-ui/check.png" alt="done" />
                     ) : (
                       <span className="goals-dot" aria-hidden="true" />
                     )}
