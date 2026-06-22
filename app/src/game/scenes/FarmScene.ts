@@ -180,12 +180,13 @@ type RemoteFarm = {
 const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
 
 // The world is the hand-authored startIsland.json map (40×30). The player's
-// spawn and the animal pens/orchard are fixed open-grass rectangles near the
-// island centre (the procedural 20-plot valley is no longer built).
-const ISLAND_SPAWN = { x: 24, y: 12 };
-const CHICKEN_PEN = px({ x0: 14, y0: 9, x1: 19, y1: 13 });
-const COW_PEN = px({ x0: 27, y0: 9, x1: 33, y1: 14 });
-const ORCHARD = px({ x0: 14, y0: 4, x1: 20, y1: 6 });
+// spawn and the animal pens/orchard are fixed open-grass rectangles chosen to sit
+// on this island's clear ground (near the dock, the coop, the barn and the treed
+// headland respectively). The procedural 20-plot valley is no longer built.
+const ISLAND_SPAWN = { x: 23, y: 13 };
+const CHICKEN_PEN = px({ x0: 18, y0: 9, x1: 22, y1: 12 });
+const COW_PEN = px({ x0: 8, y0: 13, x1: 12, y1: 17 });
+const ORCHARD = px({ x0: 7, y0: 2, x1: 12, y1: 5 });
 
 // Hard cap on how many of each producer (chickens / cows / each tree type) a
 // player may own, via buying or breeding.
@@ -224,7 +225,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 17; // bumped: world is now the hand-authored island (farm tiles changed); old plot-valley saves reset cleanly
+const SAVE_VERSION = 18; // bumped: new hand-authored island (farm tiles / spawn / pens changed); prior-island saves reset cleanly
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -1076,8 +1077,10 @@ export class FarmScene extends Phaser.Scene {
     }
 
     // Opaque base fills under the partly-transparent authored autotiles, so a
-    // tile's transparent edges reveal matching ground, not the sea backdrop.
-    const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
+    // tile's transparent edges reveal matching ground, not the sea backdrop. This
+    // island's ground is the darker-grass-hills set, so the base is the matching
+    // darker-grass interior fill (frame 12, like the hub's grass base).
+    const GRASS_BASE_KEY = 'premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers';
     const GRASS_BASE_FRAME = 12;
     const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
     const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
