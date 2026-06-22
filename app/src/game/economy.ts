@@ -94,13 +94,23 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
-// Only TOP-TIER crops can be traded for real $SPROUT — everything else stays
-// coins-only (sold at the shop). Change this one line to widen/narrow the cutoff
-// (e.g. 'Mythical' for stricter, 'Celestial' for apex-only). Default: Legendary+.
-export const TRADEABLE_MIN_RARITY: Rarity = 'Legendary';
+// Crops tradeable for real $LANDS, and the flat USD value each qualifying tier
+// pays out (converted to $LANDS at the live price by app/api/redeem.ts). ONLY
+// these tiers qualify — Divine ($2.50), Prismatic ($5), Celestial ($10).
+// Mutations/quality do NOT multiply the token payout (they still boost coin
+// sales). The redeem API keeps a matching plant→USD copy; keep them in sync.
+export const CLAIM_USD: Partial<Record<Rarity, number>> = {
+  Divine: 2.5,
+  Prismatic: 5,
+  Celestial: 10,
+};
+
+export function claimUsd(plant: Plant): number | null {
+  return CLAIM_USD[plant.rarity] ?? null;
+}
 
 export function isTokenTradeable(plant: Plant): boolean {
-  return rarityRank(plant.rarity) >= rarityRank(TRADEABLE_MIN_RARITY);
+  return claimUsd(plant) !== null;
 }
 
 // Player level at which each rarity tier becomes available in the shop. Re-tuned
@@ -115,8 +125,8 @@ export const RARITY_UNLOCK: Record<Rarity, number> = {
   Legendary: 11,
   Mythical: 15,
   Divine: 20,
-  Prismatic: 25,
-  Celestial: 30,
+  Prismatic: 28,
+  Celestial: 36,
 };
 
 // ---- mutations ----------------------------------------------------------

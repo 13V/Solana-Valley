@@ -5,6 +5,7 @@ import {
   PLANT_BY_ID,
   MUTATION_BY_ID,
   isTokenTradeable,
+  claimUsd,
   type Quality,
 } from '../game/economy';
 import { FISH_BY_ID, fishCss } from '../game/fishing';
@@ -15,7 +16,7 @@ import { Tooltip, StackTipBody, makeStackStats } from './Tooltip';
 import { useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { getWalletAuth } from '../chain/walletAuth';
-import { redeemValue } from '../chain/redeem';
+import { redeemPlant } from '../chain/redeem';
 import { formatAmount } from '../chain/rewards';
 
 // Quality stars rendered next to a crop's name (e.g. ★★ for gold). The glyph is
@@ -59,18 +60,19 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest, progress } = useGameState();
   const { publicKey, signMessage, connected } = useWallet();
 
-  // Redeem a bag stack for real $SPROUT (credited to claimable, withdrawn via the
-  // reward widget). `value` is the stack's COIN value; the server converts it at
-  // the capped pool rate. We only remove the item locally AFTER the credit lands.
+  // Trade a bag stack of a top-tier crop for real $LANDS (credited to claimable,
+  // withdrawn via the reward widget). The server pays a flat USD value per tier
+  // from the `plantId`; `key` is the stack we remove locally AFTER the credit
+  // lands. `count` is the whole stack.
   const redeem = useCallback(
-    async (key: string, count: number, value: number, name: string) => {
+    async (key: string, plantId: string, count: number, name: string) => {
       if (!connected || !publicKey || !signMessage) {
-        bus.emit('toast', 'Connect your wallet to redeem for $SPROUT');
+        bus.emit('toast', 'Connect your wallet to trade for $LANDS');
         return;
       }
       if (
         !window.confirm(
-          `Trade ${count}× ${name} for $SPROUT?\n\nThe item is converted to $SPROUT and added to your claimable balance — withdraw it from the reward widget.`,
+          `Trade ${count}× ${name} for $LANDS?\n\nThe crop is converted to $LANDS and added to your claimable balance — withdraw it from the reward widget.`,
         )
       ) {
         return;
@@ -81,7 +83,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
         return;
       }
       bus.emit('toast', '🌱 Trading…');
-      const result = await redeemValue(session, value, `${count}× ${name}`);
+      const result = await redeemPlant(session, plantId, count);
       if (!result) {
         bus.emit('toast', 'Trade failed — try again');
         return;
@@ -189,10 +191,10 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                 {connected && isTokenTradeable(plant) && (
                   <button
                     className="btn sm gold"
-                    title={`Trade this ${plant.rarity} crop for real $SPROUT`}
-                    onClick={() => redeem(k, count, unit * count, plant.name)}
+                    title={`Trade this ${plant.rarity} crop for ~$${claimUsd(plant)} of $LANDS`}
+                    onClick={() => redeem(k, plant.id, count, plant.name)}
                   >
-                    🌱 $SPROUT
+                    🌱 ~${claimUsd(plant)}
                   </button>
                 )}
               </div>

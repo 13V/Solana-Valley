@@ -2,18 +2,47 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth.js';
 
 // POST /api/redeem
-// Body: { wallet, message, signature, value, label? }
-// Redeems a bag item (worth `value` COINS) for real $SPROUT, on demand. The
-// crediting is done by the atomic `redeem_items` RPC, which converts coins →
-// $SPROUT at the current pool rate and CLAMPS the payout to a daily budget + a
-// per-wallet daily cap (supabase/redemption.sql) — so this can never drain the
-// treasury no matter what `value` a client sends. The credited amount lands in
-// the wallet's `claimable`; the player withdraws it via /api/claim. Responds:
-//   { credited, decimals, symbol }   (credited '0' when capped / disabled)
+// Body: { wallet, message, signature, plantId, count }
+// Trades a TOP-TIER crop (Divine/Prismatic/Celestial only) for real $LANDS, on
+// demand. Payout is a FLAT USD value per tier (Divine $2.50, Prismatic $5,
+// Celestial $10), converted to $LANDS at the current price, then CLAMPED to a
+// daily budget + per-wallet cap by the redeem_items RPC (so it can never drain
+// the treasury). Credits `claimable`; the player withdraws via /api/claim.
+// Responds: { credited, decimals, symbol }.
 //
-// NOTE on trust: items are client-authoritative (like coins), so `value` is the
-// client's assertion. That's acceptable here ONLY because the caps bound the
-// outflow — a forged value just hits the per-wallet daily cap sooner, never more.
+// IMPORTANT: set `base_rate = 1` in redemption_config — this route already
+// computes the $LANDS base-unit amount, and the RPC passes it through (× base_rate
+// × rate_mult) before clamping to the caps.
+
+// Flat USD payout per tradeable plant. KEEP IN SYNC with CLAIM_USD in
+// app/src/game/economy.ts. A plant not listed here is not tradeable for tokens.
+const PLANT_USD: Record<string, number> = {
+  bluerose: 2.5,
+  frostpumpkin: 2.5,
+  starfruit: 5,
+  moonpetal: 5,
+  galaxyfruit: 10,
+  voidbloom: 10,
+};
+
+// $LANDS price in USD. A manual override (LANDS_USD_PRICE) wins — recommended for
+// a fresh pump.fun token that price aggregators may not index yet; otherwise we
+// ask Jupiter's price API. Returns null if neither is available (fail safe).
+async function landsUsdPrice(mint: string): Promise<number | null> {
+  const override = Number(process.env.LANDS_USD_PRICE);
+  if (Number.isFinite(override) && override > 0) return override;
+  try {
+    const api = process.env.JUPITER_PRICE_API || 'https://lite-api.jup.ag/price/v2';
+    const resp = await fetch(`${api}?ids=${mint}`);
+    if (!resp.ok) return null;
+    const json = (await resp.json()) as { data?: Record<string, { price?: string | number }> };
+    const p = Number(json?.data?.[mint]?.price);
+    return Number.isFinite(p) && p > 0 ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = readPostBody(req, res);
   if (!body) return;
@@ -25,21 +54,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const serviceKey = getServiceKey();
-  if (!serviceKey) {
+  const mint = process.env.REWARD_MINT;
+  if (!serviceKey || !mint) {
     res.status(500).json({ error: 'server not configured' });
     return;
   }
 
-  // Item value in COINS. Reject non-positive / non-finite; floor to an integer.
-  const rawValue = Number((body as { value?: unknown }).value);
-  if (!Number.isFinite(rawValue) || rawValue <= 0) {
-    res.status(400).json({ error: 'value must be a positive number' });
+  // Validate the item: only the listed top-tier crops are tradeable.
+  const plantId = String((body as { plantId?: unknown }).plantId ?? '');
+  const usdEach = PLANT_USD[plantId];
+  if (usdEach === undefined) {
+    res.status(400).json({ error: 'this crop is not tradeable for tokens' });
     return;
   }
-  const value = Math.floor(rawValue);
+  const count = Math.floor(Number((body as { count?: unknown }).count ?? 1));
+  if (!Number.isFinite(count) || count <= 0) {
+    res.status(400).json({ error: 'count must be a positive integer' });
+    return;
+  }
 
   const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
   const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
+
+  const price = await landsUsdPrice(mint);
+  if (price === null) {
+    res.status(503).json({ error: 'token price unavailable — set LANDS_USD_PRICE' });
+    return;
+  }
+
+  // USD value → $LANDS base units at the current price.
+  const usd = usdEach * count;
+  const tokenBaseUnits = Math.round((usd / price) * 10 ** decimals);
+  if (!Number.isFinite(tokenBaseUnits) || tokenBaseUnits <= 0) {
+    res.status(400).json({ error: 'computed payout is zero' });
+    return;
+  }
 
   try {
     const resp = await fetch(`${getSupabaseUrl()}/rest/v1/rpc/redeem_items`, {
@@ -50,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ p_wallet: auth.wallet, p_item_value: value }),
+      body: JSON.stringify({ p_wallet: auth.wallet, p_item_value: tokenBaseUnits }),
     });
     if (!resp.ok) {
       const detail = await resp.text().catch(() => '');
@@ -58,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(502).json({ error: 'redeem failed' });
       return;
     }
-    const credited = await resp.json(); // numeric scalar (base units), 0 if capped/off
+    const credited = await resp.json(); // base units credited (clamped to caps), 0 if capped/off
     res.status(200).json({ credited: String(credited ?? '0'), decimals, symbol });
   } catch (err) {
     console.error('redeem error', err);

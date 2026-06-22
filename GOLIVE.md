@@ -31,11 +31,14 @@ Full design detail is in `docs/REWARDS.md` — this is the checklist.
 3. **Env:** put these in a Vercel **Preview** env (and a local `.env` for scripts):
    `SUPABASE_SERVICE_ROLE_KEY`, `SOLANA_RPC_URL` (devnet), `REWARD_MINT`,
    `TREASURY_SECRET_KEY`, `REWARD_DECIMALS=6`, `REWARD_SYMBOL=$LANDS`,
+   `LANDS_USD_PRICE` (USD per token — set any test value on devnet),
    `VITE_SOLANA_RPC` (devnet), `VITE_TOKEN_CA` (the devnet mint).
-4. **Enable the pool** (SQL — see the snippet in `docs/REWARDS.md`):
+4. **Enable the pool** (SQL — full notes in `docs/REWARDS.md`). Trades are
+   USD-pegged (Divine $2.50 / Prismatic $5 / Celestial $10), so also set
+   `LANDS_USD_PRICE` in the env:
    ```sql
    update public.redemption_config set
-     base_rate = 100, daily_budget = 50000000000,
+     base_rate = 1, daily_budget = 50000000000,
      wallet_daily_cap = 1000000000, rate_floor_bps = 10000, enabled = true
    where id = 1;
    ```
@@ -56,7 +59,8 @@ If that works end-to-end, the system is real.
 2. **Production env** in Vercel: `REWARD_MINT` = $LANDS CA, `TREASURY_SECRET_KEY`
    = treasury, `SOLANA_RPC_URL` = a **paid** mainnet RPC (Helius/QuickNode),
    `VITE_SOLANA_RPC` = mainnet, `VITE_TOKEN_CA` = $LANDS CA,
-   `SUPABASE_SERVICE_ROLE_KEY`, `REWARD_SYMBOL=$LANDS`, `REWARD_DECIMALS=6`.
+   `SUPABASE_SERVICE_ROLE_KEY`, `REWARD_SYMBOL=$LANDS`, `REWARD_DECIMALS=6`,
+   `LANDS_USD_PRICE` = USD per $LANDS (set at launch; update as price moves).
 3. **SQL:** run `rewards.sql` + `redemption.sql` on the prod Supabase (once).
 4. **Fund the treasury** with $LANDS:
    ```bash

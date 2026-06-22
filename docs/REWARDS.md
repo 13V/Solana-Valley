@@ -162,43 +162,51 @@ directly.
 
 ---
 
-## Instant item redemption (capped pool)
+## Trade top-tier crops for $LANDS (USD-pegged)
 
-Harvest a **top-tier crop**, and a 🌱 $LANDS button appears on it in the Harvest
-panel — trade it for real $LANDS on demand (no waiting for a season). Only
-top-tier crops qualify (`TRADEABLE_MIN_RARITY` in `economy.ts`, default
-**Legendary+**); commons/fish stay coins-only. To keep this from becoming an open
-tap that drains the treasury, payouts draw from a **capped daily pool**
+Harvest a **top-tier crop** and a 🌱 button appears on it in the Harvest panel —
+trade it for real $LANDS on demand. Each qualifying tier pays a **flat USD value**
+(`CLAIM_USD` in `economy.ts`), converted to $LANDS at the current price:
+
+| Tier | Plants | Payout |
+|---|---|---|
+| Divine | Blue Rose, Frost Pumpkin | **$2.50** |
+| Prismatic | Star Fruit, Moonpetal | **$5** |
+| Celestial | Galaxy Fruit, Voidbloom | **$10** |
+
+Everything below Divine (and fish) stays coins-only. Mutations/quality do **not**
+multiply the token payout (they still boost coin sales). To keep this from
+draining the treasury, payouts are clamped to a **capped daily pool**
 (`supabase/redemption.sql`):
 
-- **`daily_budget`** — how much $LANDS you fund the pool with per UTC day; total
-  payouts can never exceed it (the hard cap that protects the treasury).
+- **`daily_budget`** — most $LANDS payable per UTC day (the hard cap).
 - **`wallet_daily_cap`** — most one wallet can take per day.
-- **flat rate by default** (`rate_floor_bps = 10000`) — payout is simply item
-  value × `base_rate`. (Optional: lower `rate_floor_bps` to make the rate drain
-  with the budget instead of staying flat.)
+- **`base_rate = 1`** — the redeem API already computes the $LANDS amount
+  (USD ÷ price), so the RPC just clamps it to the caps. Keep `rate_floor_bps = 10000`.
 
-Flow: 🌱 → `POST /api/redeem` → `redeem_items` RPC converts the item's coin value
-to $LANDS at the current rate, clamps to both caps, and credits the wallet's
-`claimable`. The item is removed from the bag, and the player withdraws the
-`claimable` via the same claim widget. It **reuses the whole claim rail** — no new
-payout path.
+Flow: 🌱 → `POST /api/redeem {plantId, count}` → the API looks up the tier's USD
+value, divides by the **$LANDS price** (`LANDS_USD_PRICE`, else Jupiter), and calls
+`redeem_items` to clamp + credit `claimable`. The crop leaves the bag; the player
+withdraws via the same claim widget — **no new payout path**.
 
-> ⚠️ Items are client-authoritative (like coins), so the redeemed value is the
-> client's assertion. That's only acceptable because the **caps bound the
-> outflow** — a forged value just hits the per-wallet daily cap sooner, never more.
-> The real fix is on-chain items (roadmap M2/M3); until then keep the budget
-> modest. **Off by default** (`enabled = false`); enable + fund it via SQL:
+> ⚠️ Items are client-authoritative, so which crop is redeemed is the client's
+> assertion. That's bounded because only 6 plants pay out, the value is **fixed per
+> tier** (a forged Celestial is still capped at $10 and the daily/per-wallet caps),
+> and the real fix is on-chain items (M2/M3). Pricing off a fresh, thin pump.fun
+> market is manipulable, so prefer a manual `LANDS_USD_PRICE` at launch and keep
+> the budget modest. **Off by default** (`enabled = false`); enable + fund via SQL:
 
 ```sql
 update public.redemption_config set
-  base_rate        = 100,        -- $LANDS base units per 1 coin of item value (tune!)
-  daily_budget     = 50000000000, -- 50,000 $LANDS/day at 6 decimals (how much you fund)
-  wallet_daily_cap = 1000000000,  -- 1,000 $LANDS/wallet/day
-  rate_floor_bps   = 10000,       -- 10000 = flat rate (simple trade)
+  base_rate        = 1,           -- API computes the $LANDS amount; RPC just clamps
+  daily_budget     = 50000000000, -- max $LANDS/day at 6 decimals (how much you fund)
+  wallet_daily_cap = 1000000000,  -- max $LANDS/wallet/day
+  rate_floor_bps   = 10000,       -- keep at 10000 (no floating)
   enabled          = true
 where id = 1;
 ```
+
+Also set **`LANDS_USD_PRICE`** (USD per $LANDS) so the per-tier values convert.
 
 ---
 

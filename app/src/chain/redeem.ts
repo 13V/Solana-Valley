@@ -15,21 +15,22 @@ export type RedeemResult = {
   symbol: string;
 };
 
-// Redeem an item worth `value` COINS (its in-game value). The server converts
-// coins → $SPROUT at the current pool rate, clamped to the daily + per-wallet
-// caps, and credits the wallet's claimable. `label` is for the server-side audit
-// log only. Returns null on any failure (caller leaves the item in the bag).
-export async function redeemValue(
+// Trade `count` of a top-tier crop (`plantId`) for real $LANDS. The server pays a
+// flat USD value per tier, converts it to $LANDS at the current price, clamps to
+// the daily + per-wallet caps, and credits the wallet's claimable. Returns null
+// on any failure (caller leaves the item in the bag). A non-tradeable plant or a
+// capped/empty pool resolves with `credited: '0'` (or null on a 4xx).
+export async function redeemPlant(
   session: WalletAuth,
-  value: number,
-  label: string,
+  plantId: string,
+  count: number,
 ): Promise<RedeemResult | null> {
   let resp: Response;
   try {
     resp = await fetch('/api/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...session, value, label }),
+      body: JSON.stringify({ ...session, plantId, count }),
     });
   } catch {
     return null;
