@@ -74,6 +74,34 @@ export function GoalsHud() {
 
         {!collapsed && (
           <>
+            {state.daily.quests.length > 0 && (
+              <div style={{ marginBottom: 6 }}>
+                <div className="goals-master" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>📅 Daily Quests</span>
+                  <span title="Daily streak — keep it going!">🔥 {state.daily.streak}</span>
+                </div>
+                <ul className="goals-list">
+                  {state.daily.quests.map((q, i) => (
+                    <li key={i} className={`goals-item${q.done ? ' is-done' : ''}`}>
+                      <span className="goals-mark">
+                        {q.done ? (
+                          <img src="assets/sprout-ui/goals_check.png" alt="done" />
+                        ) : (
+                          <span className="goals-dot" aria-hidden="true" />
+                        )}
+                      </span>
+                      <span className="goals-text">
+                        <span className="goals-label">{q.label}</span>
+                        <span className="goals-reward">{q.current}/{q.target}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {state.daily.allDone && (
+                  <div className="goals-alldone">Daily done! 🔥 {state.daily.streak}-day streak</div>
+                )}
+              </div>
+            )}
             <div className="goals-master">🌱 Master Gardener: {masterPct}%</div>
             {nextMs && (
               <div className="goals-master" style={{ opacity: 0.92 }}>

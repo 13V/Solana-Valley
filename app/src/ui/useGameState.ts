@@ -31,6 +31,7 @@ const initialState: UiState = {
   respecs: 0,
   upgradeForks: {},
   goalsClaimed: [],
+  daily: { quests: [], streak: 0, allDone: false },
 };
 
 const initialClock: ClockState = { day: 1, clock: '06:00', phase: 'day', restockIn: 0 };

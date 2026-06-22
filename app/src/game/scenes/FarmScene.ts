@@ -54,6 +54,10 @@ import {
 import { collectionBonus, completedFamilies, familyBonusFor, FAMILY_SET_BONUS } from '../collection';
 import { plantFamily, familyName } from '../economy';
 import { eventEffectForDay, type EventEffect } from '../events';
+import {
+  EMPTY_DAILY_COUNTERS, dailiesForDate, allDailiesDone, dailyDone, dailyReward,
+  todayKey, dayGap, type DailyKind, type DailyCounters,
+} from '../dailies';
 import { GOALS, GOAL_MILESTONES, rewardLabel, type GoalStats } from '../goals';
 import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
@@ -271,6 +275,12 @@ type SaveData = {
   py?: number;
   plotIndex?: number;
   island?: number; // multiplayer island we were on, so a return can prefer the same seat
+  // v16+: daily-quest progress + streak. All optional so older saves migrate cleanly.
+  dailyDate?: string;
+  dailyCounters?: DailyCounters;
+  dailyClaimed?: boolean;
+  streak?: number;
+  streakDate?: string;
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -344,6 +354,12 @@ export class FarmScene extends Phaser.Scene {
   private achievements = new Set<string>();
   // Rewarded goal-ladder ids already paid out (see game/goals.ts). One-time.
   private claimedGoals = new Set<string>();
+  // Daily quests + streak (real-calendar day; see dailies.ts).
+  private dailyDate = todayKey();
+  private dailyCounters: DailyCounters = { ...EMPTY_DAILY_COUNTERS };
+  private dailyClaimed = false;
+  private streak = 0;
+  private streakDate = '';
   private animals: Animal[] = [];
   private gate?: Phaser.GameObjects.Sprite;
   private gateOpen = false;
@@ -1535,6 +1551,7 @@ export class FarmScene extends Phaser.Scene {
       this.floatText(tx * TILE + TILE / 2, ty * TILE - 14, '🌰 seed kept', '#ffe27a');
     } else {
       this.seeds[seed] -= 1;
+      this.bumpDaily('plant');
     }
     this.burst(tx * TILE + TILE / 2, ty * TILE + 12, 'p_bit', {
       tint: 0x8a5a2b,
@@ -1741,6 +1758,7 @@ export class FarmScene extends Phaser.Scene {
     }
 
     this.harvested += 1;
+    this.bumpDaily('harvest');
     const newPlant = !this.discoveredPlants.has(plant.id);
     this.discoveredPlants.add(plant.id);
     if (newPlant) {
@@ -1754,6 +1772,7 @@ export class FarmScene extends Phaser.Scene {
     if (m.id !== 'normal') {
       this.mutationsFound += 1;
       this.discoveredMutations.add(m.id);
+      this.bumpDaily('mutation');
     }
     this.gainXp(harvestXp(plant.baseValue));
     this.addSkillXp('farming', harvestXp(value)); // Farming skill grows per harvest
@@ -1943,6 +1962,7 @@ export class FarmScene extends Phaser.Scene {
       delete this.harvestInv[key];
       this.coins += value;
       this.earned += value;
+      this.bumpDaily('sell', value);
       sfx.play('sell');
       bus.emit('action', 'sell');
       this.checkAchievements();
@@ -1967,6 +1987,7 @@ export class FarmScene extends Phaser.Scene {
     delete this.harvestInv[key];
     this.coins += value;
     this.earned += value;
+    this.bumpDaily('sell', value);
     sfx.play('sell');
     bus.emit('action', 'sell');
     this.checkAchievements();
@@ -1987,6 +2008,58 @@ export class FarmScene extends Phaser.Scene {
   // events.ts). Read at the mutation roll, growth tick, sales, fishing & foraging.
   private activeEventEffect(): EventEffect {
     return eventEffectForDay(Math.floor(this.timeMs / DAY_LENGTH_MS) + 1);
+  }
+
+  // ---- daily quests + streak ---------------------------------------------
+  // Reset today's counters when the real calendar day changes (keeps streak).
+  private rolloverDailies() {
+    const today = todayKey();
+    if (today === this.dailyDate) return;
+    this.dailyDate = today;
+    this.dailyCounters = { ...EMPTY_DAILY_COUNTERS };
+    this.dailyClaimed = false;
+  }
+
+  // Bump a daily counter; the moment all three of today's quests are done, grant
+  // the streak reward once (with a one-day grace so a single miss doesn't reset).
+  private bumpDaily(kind: DailyKind, n = 1) {
+    this.rolloverDailies();
+    this.dailyCounters[kind] = (this.dailyCounters[kind] ?? 0) + n;
+    if (this.dailyClaimed) return;
+    if (!allDailiesDone(dailiesForDate(this.dailyDate), this.dailyCounters)) return;
+    this.dailyClaimed = true;
+    if (!this.streakDate) this.streak = 1;
+    else {
+      const gap = dayGap(this.streakDate, this.dailyDate);
+      this.streak = gap === 1 || gap === 2 ? this.streak + 1 : 1; // gap 2 = one grace day
+    }
+    this.streakDate = this.dailyDate;
+    const r = dailyReward(this.streak);
+    this.coins += r.coins;
+    this.gainXp(r.xp);
+    sfx.play('achievement');
+    let extra = '';
+    if (this.streak % 7 === 0) {
+      this.seeds['bluerose'] = (this.seeds['bluerose'] ?? 0) + 1; // weekly streak: a rare seed
+      extra = ' · 🎁 1× Blue Rose seed!';
+    }
+    this.toast(`✅ Daily quests done! 🔥 ${this.streak}-day streak · +${r.coins.toLocaleString()}🪙${extra}`);
+  }
+
+  // Snapshot of today's dailies for the HUD.
+  private dailyHud() {
+    this.rolloverDailies();
+    const qs = dailiesForDate(this.dailyDate);
+    return {
+      quests: qs.map((q) => ({
+        label: q.label,
+        current: Math.min(this.dailyCounters[q.kind] ?? 0, q.target),
+        target: q.target,
+        done: dailyDone(q, this.dailyCounters),
+      })),
+      streak: this.streak,
+      allDone: this.dailyClaimed,
+    };
   }
 
   // Suffix for sell toasts that surfaces the Market Stall + Collection bonuses
@@ -2030,6 +2103,7 @@ export class FarmScene extends Phaser.Scene {
     this.harvestInv = {};
     this.coins += total;
     this.earned += total;
+    this.bumpDaily('sell', total);
     sfx.play('sell');
     bus.emit('action', 'sell');
     this.checkAchievements();
@@ -2995,6 +3069,7 @@ export class FarmScene extends Phaser.Scene {
       }
       this.coins += coins;
       this.earned += coins;
+      this.bumpDaily('forage');
       this.addSkillXp('foraging', forageXp(n.forage));
       this.gainXp(harvestXp(coins)); // foraging feeds the global level (scaled to value)
       sfx.play(gem ? 'achievement' : 'sell');
@@ -3076,6 +3151,11 @@ export class FarmScene extends Phaser.Scene {
       py: Math.round(this.player.y),
       plotIndex: this.myPlotIndex,
       island: this.island,
+      dailyDate: this.dailyDate,
+      dailyCounters: this.dailyCounters,
+      dailyClaimed: this.dailyClaimed,
+      streak: this.streak,
+      streakDate: this.streakDate,
     };
     try {
       const json = JSON.stringify(data);
@@ -3151,6 +3231,15 @@ export class FarmScene extends Phaser.Scene {
     this.claimedGoals = data.claimedGoals
       ? new Set(data.claimedGoals)
       : new Set(GOALS.filter((g) => g.test(this.goalStats())).map((g) => g.id));
+    // Daily quests + streak (default to a fresh day for older saves).
+    this.dailyDate = data.dailyDate ?? todayKey();
+    this.dailyCounters = data.dailyCounters
+      ? { ...EMPTY_DAILY_COUNTERS, ...data.dailyCounters }
+      : { ...EMPTY_DAILY_COUNTERS };
+    this.dailyClaimed = data.dailyClaimed ?? false;
+    this.streak = data.streak ?? 0;
+    this.streakDate = data.streakDate ?? '';
+    this.rolloverDailies(); // if the saved day isn't today, start fresh (streak kept)
     for (const [type, count] of Object.entries(this.animalCounts)) {
       const adef = ANIMAL_BY_ID[type];
       if (!adef) continue;
@@ -3286,6 +3375,7 @@ export class FarmScene extends Phaser.Scene {
       respecs: this.respecs,
       upgradeForks: { ...this.upgradeForks },
       goalsClaimed: [...this.claimedGoals],
+      daily: this.dailyHud(),
     });
   }
 

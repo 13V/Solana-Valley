@@ -23,6 +23,10 @@ export type Progress = {
   plotExpansionCost: number;
 };
 
+// A daily quest's live state for the HUD.
+export type DailyHudQuest = { label: string; current: number; target: number; done: boolean };
+export type DailyHud = { quests: DailyHudQuest[]; streak: number; allDone: boolean };
+
 // State the Phaser game pushes up to the React UI on change.
 export type UiState = {
   coins: number;
@@ -38,6 +42,7 @@ export type UiState = {
   respecs: number; // how many perk respecs have been done (drives next respec cost)
   upgradeForks: UpgradeForks; // chosen maxed-upgrade specializations, upgrade id -> fork id
   goalsClaimed: string[]; // rewarded goal-ladder ids already paid out (see game/goals.ts)
+  daily: DailyHud; // rotating daily quests + streak (see game/dailies.ts)
 };
 
 // Lightweight time/restock state, emitted about once per second.
