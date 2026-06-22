@@ -5,7 +5,7 @@ import {
   PLANT_BY_ID,
   MUTATION_BY_ID,
   isTokenTradeable,
-  claimUsdFor,
+  claimTokensFor,
   type Quality,
 } from '../game/economy';
 import { FISH_BY_ID, fishCss } from '../game/fishing';
@@ -55,6 +55,13 @@ type FishRow = {
 };
 const plantOf = (id: string) => PLANT_BY_ID[id];
 const mutationOf = (id: string) => MUTATION_BY_ID[id];
+
+// Compact whole-token amount for the trade button, e.g. 100000→"100K", 1000000→"1M".
+function compactTokens(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
 
 export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest, progress } = useGameState();
@@ -205,10 +212,10 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   <button
                     className="btn sm gold"
                     disabled={redeemingKey !== null}
-                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ~$${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)} of $LANDS (can't be sold for coins)`}
+                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ${compactTokens(claimTokensFor(plant, mutation.id) ?? 0)} $LANDS (can't be sold for coins)`}
                     onClick={() => redeem(k, plant.id, mutation.id, count, plant.name)}
                   >
-                    🌱 ~${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)}
+                    🌱 {compactTokens(claimTokensFor(plant, mutation.id) ?? 0)}
                   </button>
                 )}
               </div>

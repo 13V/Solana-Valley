@@ -94,23 +94,23 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
-// Crops tradeable for real $LANDS, and the flat USD value each qualifying tier
-// pays out (converted to $LANDS at the live price by app/api/redeem.ts). ONLY
-// these tiers qualify — Divine ($2.50), Prismatic ($5), Celestial ($10). A capped
-// special-variant multiplier (CLAIM_MUT_MULT) applies on top; quality stars do
-// NOT. The redeem API keeps a matching plant→USD copy; keep them in sync.
-export const CLAIM_USD: Partial<Record<Rarity, number>> = {
-  Divine: 2.5,
-  Prismatic: 5,
-  Celestial: 10,
+// Whole-$LANDS payout for trading a top-tier crop. FIXED token amounts (not
+// USD-pegged — a fresh token's price is far too volatile to peg to). ONLY these
+// tiers are tradeable: Divine 100K, Prismatic 250K, Celestial 500K $LANDS. A
+// capped special-variant multiplier (CLAIM_MUT_MULT) applies on top; quality
+// stars do NOT. The redeem API keeps a matching plant→tokens copy; keep in sync.
+export const CLAIM_TOKENS: Partial<Record<Rarity, number>> = {
+  Divine: 100_000,
+  Prismatic: 250_000,
+  Celestial: 500_000,
 };
 
-export function claimUsd(plant: Plant): number | null {
-  return CLAIM_USD[plant.rarity] ?? null;
+export function claimTokens(plant: Plant): number | null {
+  return CLAIM_TOKENS[plant.rarity] ?? null;
 }
 
 export function isTokenTradeable(plant: Plant): boolean {
-  return claimUsd(plant) !== null;
+  return claimTokens(plant) !== null;
 }
 
 // Token-payout multiplier for the special variants (mutations), CAPPED at 2× so
@@ -129,10 +129,10 @@ export function claimMult(mutationId: string): number {
   return CLAIM_MUT_MULT[mutationId] ?? 1;
 }
 
-// Effective USD payout for a stack: flat tier value × variant multiplier, or null
-// if the plant isn't tradeable for tokens.
-export function claimUsdFor(plant: Plant, mutationId: string): number | null {
-  const base = claimUsd(plant);
+// Effective whole-$LANDS payout for a stack: fixed tier amount × variant
+// multiplier, or null if the plant isn't tradeable for tokens.
+export function claimTokensFor(plant: Plant, mutationId: string): number | null {
+  const base = claimTokens(plant);
   return base === null ? null : base * claimMult(mutationId);
 }
 

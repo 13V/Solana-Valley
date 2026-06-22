@@ -4,25 +4,27 @@ import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth
 // POST /api/redeem
 // Body: { wallet, message, signature, plantId, mutationId, count }
 // Trades a TOP-TIER crop (Divine/Prismatic/Celestial only) for real $LANDS, on
-// demand. Payout is a FLAT USD value per tier (Divine $2.50, Prismatic $5,
-// Celestial $10) × a capped special-variant multiplier (1×–2×), converted to
-// $LANDS at the current price, then CLAMPED to a daily budget + per-wallet cap by
-// the redeem_items RPC (so it can never drain the treasury). Credits `claimable`;
-// the player withdraws via /api/claim. Responds: { credited, decimals, symbol }.
+// demand. Payout is a FIXED whole-$LANDS amount per tier (Divine 100K, Prismatic
+// 250K, Celestial 500K) × a capped special-variant multiplier (1×–2×) × count,
+// then CLAMPED to a daily budget + per-wallet cap by the redeem_items RPC (so it
+// can never drain the treasury). NOT USD-pegged — a fresh token's price is too
+// volatile to peg to. Credits `claimable`; the player withdraws via /api/claim.
+// Responds: { credited, decimals, symbol }.
 //
 // IMPORTANT: set `base_rate = 1` in redemption_config — this route already
-// computes the $LANDS base-unit amount, and the RPC passes it through (× base_rate
-// × rate_mult) before clamping to the caps.
+// computes the $LANDS base-unit amount, and the RPC passes it through before
+// clamping to the caps. The caps must be ≥ the largest single payout (a Rainbow
+// Celestial = 1,000,000 $LANDS) or every redeem all-or-nothing-fails.
 
-// Flat USD payout per tradeable plant. KEEP IN SYNC with CLAIM_USD in
+// Fixed whole-$LANDS payout per tradeable plant. KEEP IN SYNC with CLAIM_TOKENS in
 // app/src/game/economy.ts. A plant not listed here is not tradeable for tokens.
-const PLANT_USD: Record<string, number> = {
-  bluerose: 2.5,
-  frostpumpkin: 2.5,
-  starfruit: 5,
-  moonpetal: 5,
-  galaxyfruit: 10,
-  voidbloom: 10,
+const PLANT_TOKENS: Record<string, number> = {
+  bluerose: 100_000,
+  frostpumpkin: 100_000,
+  starfruit: 250_000,
+  moonpetal: 250_000,
+  galaxyfruit: 500_000,
+  voidbloom: 500_000,
 };
 
 // Capped special-variant multiplier (mutations). KEEP IN SYNC with CLAIM_MUT_MULT
@@ -35,24 +37,6 @@ const MUT_MULT: Record<string, number> = {
   rainbow: 2,
 };
 
-// $LANDS price in USD. A manual override (LANDS_USD_PRICE) wins — recommended for
-// a fresh pump.fun token that price aggregators may not index yet; otherwise we
-// ask Jupiter's price API. Returns null if neither is available (fail safe).
-async function landsUsdPrice(mint: string): Promise<number | null> {
-  const override = Number(process.env.LANDS_USD_PRICE);
-  if (Number.isFinite(override) && override > 0) return override;
-  try {
-    const api = process.env.JUPITER_PRICE_API || 'https://lite-api.jup.ag/price/v2';
-    const resp = await fetch(`${api}?ids=${mint}`);
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as { data?: Record<string, { price?: string | number }> };
-    const p = Number(json?.data?.[mint]?.price);
-    return Number.isFinite(p) && p > 0 ? p : null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = readPostBody(req, res);
   if (!body) return;
@@ -64,16 +48,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const serviceKey = getServiceKey();
-  const mint = process.env.REWARD_MINT;
-  if (!serviceKey || !mint) {
+  const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
+  if (!serviceKey || !Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
     res.status(500).json({ error: 'server not configured' });
     return;
   }
+  const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
 
   // Validate the item: only the listed top-tier crops are tradeable.
   const plantId = String((body as { plantId?: unknown }).plantId ?? '');
-  const usdEach = PLANT_USD[plantId];
-  if (usdEach === undefined) {
+  const tierTokens = PLANT_TOKENS[plantId];
+  if (tierTokens === undefined) {
     res.status(400).json({ error: 'this crop is not tradeable for tokens' });
     return;
   }
@@ -86,35 +71,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mutationId = String((body as { mutationId?: unknown }).mutationId ?? 'normal');
   const mult = MUT_MULT[mutationId] ?? 1;
 
-  const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
-    res.status(500).json({ error: 'server not configured' });
-    return;
-  }
-  const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
-
-  const price = await landsUsdPrice(mint);
-  if (price === null) {
-    res.status(503).json({ error: 'token price unavailable — set LANDS_USD_PRICE' });
-    return;
-  }
-  // Reject implausibly low prices: a near-zero price would inflate the $LANDS
-  // payout enormously. Treat it like no price (fail safe).
-  const minPrice = Number(process.env.LANDS_MIN_USD_PRICE ?? 1e-9);
-  if (price < minPrice) {
-    res.status(503).json({ error: 'token price unavailable' });
-    return;
-  }
-
-  // USD value → $LANDS base units at the current price. Floor (never round up)
-  // so the payout can't exceed the USD value, and reject non-finite/overflow.
-  const usd = usdEach * mult * count;
-  const tokenBaseUnits = Math.floor((usd / price) * 10 ** decimals);
-  if (
-    !Number.isFinite(tokenBaseUnits) ||
-    tokenBaseUnits <= 0 ||
-    tokenBaseUnits > Number.MAX_SAFE_INTEGER
-  ) {
+  // Fixed whole-token payout → base units. Round (amounts × the 1.25/1.5/1.75/2
+  // mults are exact integers for these tiers) and guard overflow.
+  const tokenBaseUnits = Math.round(tierTokens * mult * count * 10 ** decimals);
+  if (!Number.isFinite(tokenBaseUnits) || tokenBaseUnits <= 0 || tokenBaseUnits > Number.MAX_SAFE_INTEGER) {
     res.status(400).json({ error: 'payout out of range' });
     return;
   }

@@ -162,51 +162,52 @@ directly.
 
 ---
 
-## Trade top-tier crops for $LANDS (USD-pegged)
+## Trade top-tier crops for $LANDS (fixed amounts)
 
 Harvest a **top-tier crop** and a 🌱 button appears on it in the Harvest panel —
-trade it for real $LANDS on demand. Each qualifying tier pays a **flat USD value**
-(`CLAIM_USD` in `economy.ts`), converted to $LANDS at the current price:
+trade it for real $LANDS on demand. Each tier pays a **fixed whole-token amount**
+(`CLAIM_TOKENS` in `economy.ts` — no price feed, since a fresh token's price is
+too volatile to peg to):
 
-| Tier | Plants | Payout |
+| Tier | Plants | Payout (× variant) |
 |---|---|---|
-| Divine | Blue Rose, Frost Pumpkin | **$2.50** |
-| Prismatic | Star Fruit, Moonpetal | **$5** |
-| Celestial | Galaxy Fruit, Voidbloom | **$10** |
+| Divine | Blue Rose, Frost Pumpkin | **100,000 $LANDS** |
+| Prismatic | Star Fruit, Moonpetal | **250,000 $LANDS** |
+| Celestial | Galaxy Fruit, Voidbloom | **500,000 $LANDS** |
 
 Everything below Divine (and fish) stays coins-only. **Divine and above can't be
 sold for coins at all — the only way to cash them in is trading for $LANDS** (the
 coin "Sell" button is hidden for them, and `sellStack`/`sellAll` refuse them).
-**Special variants** add a **capped** multiplier on top (`CLAIM_MUT_MULT`): Shiny **1.25×**, Frosted **1.5×**,
-Gold **1.75×**, Rainbow **2×** — so a Rainbow Celestial pays ~$20, not the ×25 its
-in-game value implies. (Quality stars don't affect the token payout.) To keep this
-from draining the treasury, payouts are clamped to a **capped daily pool**
+**Special variants** multiply the payout, capped at 2× (`CLAIM_MUT_MULT`): Shiny
+**1.25×**, Frosted **1.5×**, Gold **1.75×**, Rainbow **2×** — so a Rainbow Celestial
+pays **1,000,000 $LANDS** (not the ×25 its in-game value implies). Quality stars
+don't affect it. Payouts are clamped to a **capped daily pool**
 (`supabase/redemption.sql`):
 
 - **`daily_budget`** — most $LANDS payable per UTC day (the hard cap).
-- **`wallet_daily_cap`** — most one wallet can take per day.
-- **`base_rate = 1`** — the redeem API already computes the $LANDS amount
-  (USD ÷ price), so the RPC just clamps it to the caps. Keep `rate_floor_bps = 10000`.
+- **`wallet_daily_cap`** — most one wallet can take per day. Must be **≥ the
+  largest single payout** (Rainbow Celestial = 1,000,000 $LANDS) or every redeem
+  all-or-nothing-fails.
+- **`base_rate = 1`** — the redeem API already computes the $LANDS base-unit
+  amount, so the RPC just clamps it to the caps. Keep `rate_floor_bps = 10000`.
 
-Flow: 🌱 → `POST /api/redeem {plantId, mutationId, count}` → the API takes the
-tier's USD value × the variant multiplier, divides by the **$LANDS price**
-(`LANDS_USD_PRICE`, else Jupiter), and calls `redeem_items` to clamp + credit
-`claimable`. The crop leaves the bag; the player
-withdraws via the same claim widget — **no new payout path**.
+Flow: 🌱 → `POST /api/redeem {plantId, mutationId, count}` → the API computes the
+fixed tier amount × variant × count and calls `redeem_items` to clamp + credit
+`claimable`. The crop leaves the bag; the player withdraws via the same claim
+widget — **no new payout path, and no price oracle**.
 
 > ⚠️ Items are client-authoritative, so which crop is redeemed is the client's
-> assertion. That's bounded because only 6 plants pay out, the value is **fixed per
-> tier** (a forged Celestial is still capped at $10 and the daily/per-wallet caps),
-> and the real fix is on-chain items (M2/M3). Pricing off a fresh, thin pump.fun
-> market is manipulable, so prefer a manual `LANDS_USD_PRICE` at launch and keep
-> the budget modest. **Off by default** (`enabled = false`); enable + fund via SQL:
+> assertion. That's bounded because only 6 plants pay out, amounts are **fixed per
+> tier**, and the daily/per-wallet caps hold no matter what. The real fix is
+> on-chain items (M2/M3); until then keep the caps as small as the gameplay allows.
+> **Off by default** (`enabled = false`); enable + fund via SQL:
 
 ```sql
 update public.redemption_config set
-  base_rate        = 1,           -- API computes the $LANDS amount; RPC just clamps
-  daily_budget     = 50000000000, -- max $LANDS/day at 6 decimals (how much you fund)
-  wallet_daily_cap = 1000000000,  -- max $LANDS/wallet/day
-  rate_floor_bps   = 10000,       -- keep at 10000 (no floating)
+  base_rate        = 1,             -- API computes the amount; RPC just clamps
+  daily_budget     = 50000000000000, -- 50,000,000 $LANDS/day at 6 decimals (how much you fund)
+  wallet_daily_cap = 2000000000000,  -- 2,000,000 $LANDS/wallet/day (≥ 1 Rainbow Celestial)
+  rate_floor_bps   = 10000,         -- keep at 10000 (no floating)
   enabled          = true
 where id = 1;
 ```
