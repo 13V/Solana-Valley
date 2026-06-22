@@ -39,6 +39,7 @@ export type UiState = {
   progress: Progress;
   skills: Skills; // xp per skill (farming/ranching/breeding/fishing/foraging)
   perks: ChosenPerks; // chosen milestone perks, key `${skillId}:${level}` -> perkId
+  fishTree: { unlocked: string[]; pts: number }; // Angler's Tree: unlocked node ids + lifetime points earned
   respecs: number; // how many perk respecs have been done (drives next respec cost)
   upgradeForks: UpgradeForks; // chosen maxed-upgrade specializations, upgrade id -> fork id
   goalsClaimed: string[]; // rewarded goal-ladder ids already paid out (see game/goals.ts)

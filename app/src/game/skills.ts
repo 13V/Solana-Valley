@@ -59,6 +59,8 @@ export type Modifiers = {
   productValueMult: number; prodSpeedMult: number; productDoubleChance: number; goldenProductChance: number;
   breedCapBonus: number; breedSpeedMult: number; rareBabyChance: number;
   fishValueMult: number; fishLuckMult: number; treasureChance: number; legendaryFish: boolean;
+  // Angler's Tree levers (see fishingTree.ts): bite/hook feel, double catch, point gain.
+  fishBiteSpeedMult: number; fishHookWindowMult: number; fishDoubleCatchChance: number; fishPtMult: number;
   forageValueMult: number; forageLuckMult: number; forageRespawnMult: number; gemChance: number;
 };
 export const baseModifiers = (): Modifiers => ({
@@ -66,6 +68,7 @@ export const baseModifiers = (): Modifiers => ({
   productValueMult: 1, prodSpeedMult: 1, productDoubleChance: 0, goldenProductChance: 0,
   breedCapBonus: 0, breedSpeedMult: 1, rareBabyChance: 0,
   fishValueMult: 1, fishLuckMult: 1, treasureChance: 0, legendaryFish: false,
+  fishBiteSpeedMult: 1, fishHookWindowMult: 1, fishDoubleCatchChance: 0, fishPtMult: 1,
   forageValueMult: 1, forageLuckMult: 1, forageRespawnMult: 1, gemChance: 0,
 });
 

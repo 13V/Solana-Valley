@@ -28,6 +28,7 @@ const initialState: UiState = {
   },
   skills: { ...EMPTY_SKILLS },
   perks: {},
+  fishTree: { unlocked: [], pts: 0 },
   respecs: 0,
   upgradeForks: {},
   goalsClaimed: [],

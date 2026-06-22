@@ -21,6 +21,7 @@ export interface GameEvents {
   'ui:buyAnimal': string; // animal id
   'ui:buyExpansion': void; // buy the next crop-bed expansion column
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
+  'ui:unlockFishNode': string; // Angler's Tree node id -> spend points to unlock
   'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones
 
   // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
@@ -49,6 +50,13 @@ export interface GameEvents {
   // fish flying into our avatar (cosmetic only — no coins/XP awarded on receive).
   'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
   'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
+  // Cast state so peers can render a remote player actually casting (rod-hold
+  // animation + a bobber on the water), not just the final catch. x/y is the
+  // bobber TARGET on the water; px/py is the caster's foot position (where the
+  // rod-hold avatar stands) so a peer who hasn't seen us move yet still places
+  // the avatar on land — not floating on the water at the bobber.
+  'mp:fish': { casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // FarmScene -> network: started/ended a cast (net stamps our id)
+  'mp:remoteFish': { id: string; casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // network -> FarmScene: a peer started/ended a cast
 }
 
 type Handler<T> = (payload: T) => void;
