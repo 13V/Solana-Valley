@@ -1173,6 +1173,13 @@ body {
 /* ===================================================================== */
 /* Boat travel — island destination cards (TravelPanel)                   */
 /* ===================================================================== */
+/* Center the travel panel as a modal so it's always fully on-screen
+   (the default top-anchored panel could be missed / clipped on short views). */
+.panel.travel {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .travel-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

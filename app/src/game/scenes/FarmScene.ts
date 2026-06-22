@@ -892,7 +892,7 @@ export class FarmScene extends Phaser.Scene {
     for (const a of ANIMALS) {
       for (const sheet of a.colorways ?? [a.sheet]) {
         if (!this.anims.exists(`${sheet}-idle`)) {
-          this.anims.create({ key: `${sheet}-idle`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.idleFrames }), frameRate: 3, repeat: -1 });
+          this.anims.create({ key: `${sheet}-idle`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.idleFrames }), frameRate: a.idleFrameRate ?? 3, repeat: -1 });
         }
         if (!this.anims.exists(`${sheet}-walk`)) {
           this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
@@ -1088,7 +1088,11 @@ export class FarmScene extends Phaser.Scene {
       const px = tx * TILE + TILE / 2, py = ty * TILE + TILE;
       const img = frame === undefined ? this.add.image(px, py, key) : this.add.image(px, py, key, frame);
       img.setOrigin(0.5, 1).setScale(scale).setDepth(py);
-      this.addCollider(px, py - 10, TILE, 14);
+      // Snug base collider sized to the prop. (Was a flat TILE-wide box that
+      // left invisible walls in the open beside narrow props — barrels, crates,
+      // signs and the chest.)
+      const cw = Math.max(12, Math.round(img.displayWidth * 0.58));
+      this.addCollider(px, py - 7, cw, 10);
       return img;
     };
     // Well as a centrepiece beside the avenue.
@@ -1166,7 +1170,9 @@ export class FarmScene extends Phaser.Scene {
         .image(cx, baseY + 4, 'biome', treeFrames[ti++ % treeFrames.length])
         .setOrigin(0.5, 1).setScale(2).setDepth(baseY);
       this.tiles[ty][tx].obstacle = true;
-      this.addCollider(cx, baseY - 4, 16, 12);
+      // A small trunk-only collider at the base so you can walk under the canopy
+      // (was a taller box offset above the trunk that felt like a stray wall).
+      this.addCollider(cx, baseY, 12, 8);
       this.tweens.add({
         targets: tree, angle: { from: -1.3, to: 1.3 },
         duration: 2200 + Math.random() * 800, delay: Math.random() * 1500,
@@ -2681,10 +2687,12 @@ export class FarmScene extends Phaser.Scene {
     return this.pondTiles.has(this.key(tx, ty));
   }
 
-  // Click within reach of the moored boat → open the travel UI.
+  // Click on (or right next to) the moored boat → open the travel UI. Uses the
+  // sprite's bounds + a little padding so the whole boat is an easy target.
   private tryBoardBoat(wx: number, wy: number): boolean {
     if (!this.boat) return false;
-    if (Phaser.Math.Distance.Between(wx, wy, this.boat.x, this.boat.y) > 36) return false;
+    const b = this.boat.getBounds();
+    if (!Phaser.Geom.Rectangle.Inflate(b, 10, 10).contains(wx, wy)) return false;
     bus.emit('boat:open', { current: this.currentZone() });
     return true;
   }
