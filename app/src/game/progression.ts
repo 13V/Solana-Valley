@@ -213,4 +213,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'rich', name: 'Tidy Profit', desc: 'Earn 10,000 coins total', reward: 1000, xp: achXp(1000), test: (s) => s.earned >= 10000 },
   { id: 'tycoon', name: 'Valley Tycoon', desc: 'Earn 100,000 coins total', reward: 15000, xp: achXp(15000), test: (s) => s.earned >= 100000 },
   { id: 'seasoned', name: 'Seasoned Farmer', desc: 'Reach level 10', reward: 2000, xp: achXp(2000), test: (s) => s.level >= 10 },
+  { id: 'veteran', name: 'Valley Veteran', desc: 'Reach level 20', reward: 6000, xp: achXp(6000), test: (s) => s.level >= 20 },
+  { id: 'harvest_king', name: 'Harvest King', desc: 'Harvest 1,000 crops', reward: 8000, xp: achXp(8000), test: (s) => s.harvested >= 1000 },
+  { id: 'mutation_hoarder', name: 'Mutation Hoarder', desc: 'Find 100 mutations', reward: 10000, xp: achXp(10000), test: (s) => s.mutationsFound >= 100 },
+  { id: 'millionaire', name: 'Valley Millionaire', desc: 'Earn 1,000,000 coins total', reward: 50000, xp: achXp(50000), test: (s) => s.earned >= 1000000 },
 ];
