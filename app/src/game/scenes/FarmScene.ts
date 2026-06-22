@@ -411,7 +411,6 @@ export class FarmScene extends Phaser.Scene {
   // fishing
   private pond!: Rect; // pond rect in tile coords (inclusive)
   private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
-  private boat?: Phaser.GameObjects.Sprite; // little rowboat moored on the pond — click to open the travel UI
   private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
   private farmTiles = new Set<string>(); // tillable/plantable tiles from the island map's dirt cells
   private boatTiles = new Set<string>(); // rowboat tiles on the island (future hub portal)
@@ -654,9 +653,6 @@ export class FarmScene extends Phaser.Scene {
         this.fishingCast.onPointer();
         return;
       }
-      // Clicking the moored boat opens the travel UI — checked before fishing so
-      // it wins over a cast on the pond tile the boat sits on.
-      if (this.tryBoardBoat(p.worldX, p.worldY)) return;
       // Gathering interactions take priority over the held tool so clicking the
       // pond fishes (never tills/plants) and clicking a node forages.
       if (this.tryCollectAnimal(p.worldX, p.worldY)) return;
@@ -696,8 +692,6 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:unlockFishNode', (id) => this.unlockFishNode(id)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
-      bus.on('ui:openTravel', () => bus.emit('boat:open', { current: this.currentZone() })),
-      bus.on('ui:travel', (id) => this.travelTo(id)),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
       bus.on('mp:assigned', ({ id, island, plot }) => { this.myMpId = id; this.island = island; this.onAssigned(plot); this.rollShopWindow(this.currentEpoch()); }),
       bus.on('mp:roster', (players) => this.onRoster(players)),
@@ -3105,86 +3099,11 @@ export class FarmScene extends Phaser.Scene {
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
     }
 
-    // A little rowboat moored toward the front of the pond. Clicking it opens
-    // the travel UI (handled in tryBoardBoat, ahead of fishing). It bobs gently
-    // and lifts on hover so it reads as interactive.
-    if (this.textures.exists('boats')) {
-      const bx = (cx - 1) * TILE + TILE / 2;
-      const by = (cyc + ry - 1) * TILE + TILE / 2;
-      const boat = this.add
-        .sprite(bx, by, 'boats', 4)
-        .setScale(1.6)
-        .setDepth(by)
-        .setInteractive({ useHandCursor: true });
-      boat.on('pointerover', () => boat.setScale(1.72));
-      boat.on('pointerout', () => boat.setScale(1.6));
-      this.tweens.add({ targets: boat, y: by + 3, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-      this.boat = boat;
-    }
     this.spawnPondLife(); // a few small fish drifting under the surface
   }
 
   private isPondTile(tx: number, ty: number): boolean {
     return this.pondTiles.has(this.key(tx, ty));
-  }
-
-  // Click on (or right next to) the moored boat → open the travel UI. Uses the
-  // sprite's bounds + a little padding so the whole boat is an easy target.
-  private tryBoardBoat(wx: number, wy: number): boolean {
-    if (!this.boat) return false;
-    const b = this.boat.getBounds();
-    if (!Phaser.Geom.Rectangle.Inflate(b, 10, 10).contains(wx, wy)) return false;
-    bus.emit('boat:open', { current: this.currentZone() });
-    return true;
-  }
-
-  // Which island/zone the player is currently standing in (for the "You're
-  // here" marker in the travel UI). '' when out in the open / between zones.
-  private currentZone(): string {
-    const tx = Math.floor(this.player.x / TILE);
-    const ty = Math.floor(this.player.y / TILE);
-    const inR = (r: Rect) => tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1;
-    if (inR(PLAZA)) return 'hub';
-    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
-    if (inR(h.chickenPen)) return 'chicken';
-    if (inR(h.cowPen)) return 'cow';
-    if (inR(h.farm)) return 'farm';
-    return '';
-  }
-
-  // Set sail: teleport the player (camera follows) to one of the four island
-  // zones, mapped onto the current homestead's areas + the central plaza (hub).
-  private travelTo(islandId: string) {
-    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
-    const center = (r: Rect) => ({ tx: Math.floor((r.x0 + r.x1) / 2), ty: Math.floor((r.y0 + r.y1) / 2) });
-    let t: { tx: number; ty: number };
-    let label: string;
-    switch (islandId) {
-      case 'chicken': t = center(h.chickenPen); label = 'the Chicken Coop'; break;
-      case 'cow': t = center(h.cowPen); label = 'the Cow Pasture'; break;
-      case 'hub': t = plazaCenterTile(); label = 'the Hub'; break;
-      case 'farm':
-      default: t = center(h.farm); label = 'your Farm'; break;
-    }
-    const arrive = () => {
-      this.player.setPosition(t.tx * TILE + TILE / 2, t.ty * TILE + TILE / 2);
-      this.player.setVelocity(0, 0);
-      this.facing = 'down';
-      this.player.anims.play('idle-down', true);
-    };
-    bus.emit('toast', `⛵ Set sail to ${label}!`);
-    // A short "sailing" dip to deep-water blue, teleport mid-fade, then back —
-    // unless reduced motion is on, in which case jump there instantly.
-    const cam = this.cameras.main;
-    if (document.documentElement.classList.contains('reduce-motion')) {
-      arrive();
-      return;
-    }
-    cam.fadeOut(240, 18, 42, 64);
-    cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      arrive();
-      cam.fadeIn(300, 18, 42, 64);
-    });
   }
 
   // Ambient pond life: a handful of small fish that lazily drift between water
