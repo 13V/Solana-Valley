@@ -1,15 +1,16 @@
-# 🌱 Launch-Night Content Drop Queue — 10 Packed Drops
+# 🌱 Launch-Night Content Drop Queue — 11 Packed Drops
 
-Ten big, themed updates to release **one per hour**. Each drop is a **checkpoint**
+Eleven big, themed updates to release **one per hour**. Each drop is a **checkpoint**
 bundling a batch of additive commits — releasing one is a single fast-forward of
-your deploy branch to that drop's SHA, in order (1 → 10). Everything **typechecks
+your deploy branch to that drop's SHA, in order (1 → 11). Everything **typechecks
 clean** (`npm run typecheck`) and is additive: no save migrations, no chain code.
 
 ## What this queue delivers
 **196 plants · 15 mutations · 62 fish · 22 forageables · 34 achievements · 50-rung
 quest ladder (with Divine+ seed milestones) · 280 item descriptions · 14 rotating
-festivals · Shop/Seeds filters · a Lv18 perk tier for all 5 skills.** Crops & mutations are art-free (existing
-sprite rows recolored via `cropTint`); no item was added without a real sprite.
+festivals · Shop/Seeds filters · plant-family set bonuses · a Lv18 perk tier for all
+5 skills.** Crops & mutations are art-free (existing sprite rows recolored via
+`cropTint`); no item was added without a real sprite.
 
 ---
 
@@ -24,7 +25,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 
 ---
 
-## The 10 drops
+## The 11 drops
 
 | Hr | Drop | Deploy SHA | What lands |
 |----|------|-----------|-----------|
@@ -38,10 +39,11 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 | 8 | **Elements, Deep & Sweets** | `307e169` | 24 crops (aquatic, candy, volcanic) + 20 fish + 6 forage + 4 mutations (incl. **Abyssal 150×**) + 12 achievements |
 | 9 | **The Compendium** | `833069f` | **280 item flavor descriptions** (plant tooltips + Almanac Fish Bestiary & Forage Field Guide) + **rarity/search filters** on Shop & Seeds |
 | 10 | **Quests & Festivals** | `ccb518d` | **Questline 18 → 50 goals** + **goal-set milestones** (every 10 goals cleared → a guaranteed Divine+ seed, up to Celestial) + **14 rotating seasonal festivals** (daily banner) |
+| 11 | **Collection Power** | `8220261` | **Plant-family set bonuses** — discover every plant in a family (23 families) and that family's crops permanently sell **+12%**. New Almanac "Plant Families" grid + a "🌾 family complete!" toast. Makes the 196-plant Almanac economically load-bearing. |
 
 > Each SHA bundles several commits — that's what makes them "packed." Releasing in
 > order applies cleanly. Drops 1–6 are the collectible waves; 7–8 are the big
-> expansion; 9–10 are the depth layer (lore, filters, quests, events).
+> expansion; 9–11 are the depth layer (lore, filters, quests, events, collection power).
 
 ---
 
@@ -57,6 +59,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 8. **🍬 ELEMENTS, DEEP & SWEETS!** Aquatic blooms, a candy garden, a volcanic chase line, 20 more fish, and the rarest mutation ever — **Abyssal 150×.** 💎
 9. **📖 THE COMPENDIUM!** Every one of the 280 crops, fish & forageables now has its own flavor description — explore the new Fish Bestiary & Field Guide. Plus rarity & search filters so the shop's a breeze. 
 10. **🎯 QUESTS & FESTIVALS!** A 50-rung quest ladder — and every 10 goals you clear now drops a guaranteed **Divine-or-better seed** (clear them all for a Celestial!). Plus 14 rotating seasonal festivals. The grand finale! 🎉
+11. **🌾 COLLECTION POWER!** Finishing a plant family now permanently boosts that family's crop prices by **+12%** — 23 families to complete, from Root Veg to Cosmic Harvest. Your Almanac just became your money-maker. Gotta grow 'em all! 📖
 
 ---
 
