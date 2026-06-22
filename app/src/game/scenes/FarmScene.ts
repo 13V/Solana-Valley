@@ -288,7 +288,7 @@ type SaveData = {
 
 export class FarmScene extends Phaser.Scene {
   private tiles: Tile[][] = [];
-  private ground: Phaser.GameObjects.Image[][] = [];
+  private ground: (Phaser.GameObjects.Image | Phaser.GameObjects.Sprite)[][] = []; // sprites for animated water
   private overlay: Phaser.GameObjects.Image[][] = []; // tilled-dirt autotile over grass
   private crops = new Map<string, Crop>();
   private wetTiles = new Set<string>();
@@ -1072,7 +1072,13 @@ export class FarmScene extends Phaser.Scene {
     // Opaque base fills under the partly-transparent authored autotiles, so a
     // tile's transparent edges reveal matching ground, not the sea backdrop.
     const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
-    const GRASS_BASE_FRAME = 12;
+    // Same-colour blue-tinge grass variants (all verified ~the same average RGB
+    // as the default fill, frame 12). The map's interior grass is overwhelmingly
+    // frame 12, so we swap those for a stable-random variant — varied tiles, one
+    // colour. Authored autotile edges (other frames) keep their frame.
+    const GRASS_VARIANTS = [12, 16, 17, 27, 9, 19, 20];
+    const GRASS_PLAIN = new Set([12]); // the plain interior fill frame we vary
+    const grassFrame = (x: number, y: number) => GRASS_VARIANTS[((x * 49157 + y * 24593) >>> 0) % GRASS_VARIANTS.length];
     const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
     const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
     const dirtFrame = (x: number, y: number) => DIRT_VARIANTS[((x * 73856 + y * 19349) >>> 0) % DIRT_VARIANTS.length];
@@ -1092,14 +1098,18 @@ export class FarmScene extends Phaser.Scene {
         const cy = gy * TILE + TILE / 2;
         const cat = classify(key);
         if (cat === 'farm' && hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
-        else if (cat !== 'water' && hasGrass) this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
-        if (this.textures.exists(key)) this.ground[gy][gx] = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
-        if (cat === 'water') {
+        else if (cat !== 'water' && hasGrass) this.add.image(cx, cy, GRASS_BASE_KEY, grassFrame(gx, gy)).setScale(2).setDepth(-1);
+        if (cat === 'water' && this.textures.exists(key)) {
+          this.ground[gy][gx] = this.animatedWater(cx, cy, key, frame, 0);
           this.tiles[gy][gx].obstacle = true;
           this.pondTiles.add(k); // fishable water
           this.addCollider(cx, cy, TILE, TILE);
-        } else if (cat === 'farm') {
-          this.farmTiles.add(k); // tillable/plantable
+        } else if (this.textures.exists(key)) {
+          // Vary the plain interior grass (frame 12) among same-colour blue-tinge
+          // frames; authored autotile edges + everything else keep their frame.
+          const f = key === GRASS_BASE_KEY && GRASS_PLAIN.has(frame) ? grassFrame(gx, gy) : frame;
+          this.ground[gy][gx] = this.add.image(cx, cy, key, f).setScale(2).setDepth(0);
+          if (cat === 'farm') this.farmTiles.add(k); // tillable/plantable
         }
       }
     }
@@ -1114,7 +1124,12 @@ export class FarmScene extends Phaser.Scene {
         const cx = lx * TILE + TILE / 2;
         const cy = ly * TILE + TILE / 2;
         const cat = classify(key);
-        if (cat === 'solidObj') {
+        if (cat === 'water') {
+          this.animatedWater(cx, cy, key, frame, 1);
+          this.tiles[ly][lx].obstacle = true;
+          this.pondTiles.add(k);
+          this.addCollider(cx, cy, TILE, TILE);
+        } else if (cat === 'solidObj') {
           this.add.image(cx, cy, key, frame).setScale(2).setDepth(cy);
           this.tiles[ly][lx].obstacle = true;
           this.addCollider(cx, cy, TILE, TILE);
@@ -1142,6 +1157,24 @@ export class FarmScene extends Phaser.Scene {
     this.pond = this.waterBounds();
     this.islandFarm = this.farmBounds();
     this.spawnPondLife(); // a few small fish drifting under the island's water
+  }
+
+  // An animated water tile. The island's water tilesets are 4-frame shimmer
+  // cycles; each tile starts at a random phase so the water doesn't pulse in
+  // lockstep. Returns the sprite (added at the given depth).
+  private animatedWater(cx: number, cy: number, key: string, frame: number, depth: number): Phaser.GameObjects.Sprite {
+    const animKey = `water-${key}`;
+    if (!this.anims.exists(animKey)) {
+      this.anims.create({
+        key: animKey,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
+        frameRate: 5, repeat: -1,
+      });
+    }
+    const s = this.add.sprite(cx, cy, key, frame).setScale(2).setDepth(depth);
+    s.play(animKey);
+    s.anims.setProgress(Math.random()); // desync the ripple between tiles
+    return s;
   }
 
   // Bounding rect (inclusive tile coords) over all fishable water cells.
