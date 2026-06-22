@@ -33,6 +33,20 @@ export function EventBanner() {
     >
       <span style={{ fontSize: 14 }}>{ev.emoji}</span>
       <strong>{ev.name}</strong>
+      {ev.effect.label && (
+        <span
+          style={{
+            background: 'rgba(123,214,106,0.22)',
+            color: '#bff0b0',
+            borderRadius: 6,
+            padding: '1px 6px',
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          {ev.effect.label}
+        </span>
+      )}
       <span style={{ opacity: 0.82, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.blurb}</span>
     </div>
   );

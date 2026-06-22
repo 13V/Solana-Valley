@@ -53,6 +53,7 @@ import {
 } from '../progression';
 import { collectionBonus, completedFamilies, familyBonusFor, FAMILY_SET_BONUS } from '../collection';
 import { plantFamily, familyName } from '../economy';
+import { eventEffectForDay, type EventEffect } from '../events';
 import { GOALS, GOAL_MILESTONES, rewardLabel, type GoalStats } from '../goals';
 import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
@@ -1563,7 +1564,8 @@ export class FarmScene extends Phaser.Scene {
       fortuneLuck(this.upgrades.fortune) *
       this.mods().mutationLuckMult *
       (1 + (fortuneFork.mutationLuckMult ?? 0) + mistBonus) *
-      (wet ? WET_MUTATION_LUCK : 1);
+      (wet ? WET_MUTATION_LUCK : 1) *
+      (this.activeEventEffect().mutationLuckMult ?? 1);
     // topMutationLuckMult is an additive bonus to the top-mutation multiplier
     // (1 ⇒ ×2 jackpot odds, 0 ⇒ none) to match the rest of the additive bag.
     const topLuck = 1 + (fortuneFork.topMutationLuckMult ?? 0);
@@ -1952,13 +1954,15 @@ export class FarmScene extends Phaser.Scene {
     const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
     const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const famMult = familyBonusFor(plantId, completedFamilies(this.discoveredPlants));
+    const evMult = this.activeEventEffect().cropValueMult ?? 1;
     const value = Math.round(
       this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
         this.mods().cropValueMult *
         this.collectionMult() *
-        famMult,
+        famMult *
+        evMult,
     );
     delete this.harvestInv[key];
     this.coins += value;
@@ -1967,7 +1971,8 @@ export class FarmScene extends Phaser.Scene {
     bus.emit('action', 'sell');
     this.checkAchievements();
     const famTag = famMult > 1 ? ` · +${Math.round(FAMILY_SET_BONUS * 100)}% ${familyName(plantFamily(PLANT_BY_ID[plantId]))} set` : '';
-    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}${famTag}`);
+    const evTag = evMult > 1 ? ` · 🎉 +${Math.round((evMult - 1) * 100)}% festival` : '';
+    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}${famTag}${evTag}`);
     this.emitState();
   }
 
@@ -1976,6 +1981,12 @@ export class FarmScene extends Phaser.Scene {
   // relevant since every new find lifts ALL crop sale value forever.
   private collectionMult(): number {
     return collectionBonus(this.discoveredPlants, this.discoveredMutations).mult;
+  }
+
+  // The gameplay buff for the festival active on the current in-game day (see
+  // events.ts). Read at the mutation roll, growth tick, sales, fishing & foraging.
+  private activeEventEffect(): EventEffect {
+    return eventEffectForDay(Math.floor(this.timeMs / DAY_LENGTH_MS) + 1);
   }
 
   // Suffix for sell toasts that surfaces the Market Stall + Collection bonuses
@@ -1995,6 +2006,7 @@ export class FarmScene extends Phaser.Scene {
     let fishTotal = 0;
     const fishValueMult = this.mods().fishValueMult;
     const fams = completedFamilies(this.discoveredPlants);
+    const evMult = this.activeEventEffect().cropValueMult ?? 1;
     for (const [key, count] of Object.entries(this.harvestInv)) {
       // Fish stacks are valued on their own track (species value × Fishing mult),
       // outside the crop market/collection multipliers. Branch BEFORE the crop
@@ -2009,7 +2021,7 @@ export class FarmScene extends Phaser.Scene {
       cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count * familyBonusFor(plantId, fams);
     }
     const total = Math.round(
-      cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() + fishTotal,
+      cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() * evMult + fishTotal,
     );
     if (total <= 0) {
       this.toast('Nothing to sell');
@@ -2801,7 +2813,7 @@ export class FarmScene extends Phaser.Scene {
     }
 
     const water: WaterKind = ocean ? 'salt' : 'fresh';
-    const f = catchFish(m.fishLuckMult * oceanLuck, water);
+    const f = catchFish(m.fishLuckMult * oceanLuck * (this.activeEventEffect().fishLuckMult ?? 1), water);
     // Legendary Angler capstone: ~3% of catches are a huge legendary haul.
     const legendary = m.legendaryFish && Math.random() < 0.03;
     this.addSkillXp('fishing', legendary ? fishXp(f) * 3 : fishXp(f));
@@ -2938,7 +2950,7 @@ export class FarmScene extends Phaser.Scene {
   private spawnForageNode() {
     const spot = this.randomForageSpot();
     if (!spot) return;
-    const forage = pickForage(this.mods().forageLuckMult);
+    const forage = pickForage(this.mods().forageLuckMult * (this.activeEventEffect().forageLuckMult ?? 1));
     const cx = spot.tx * TILE + TILE / 2;
     const cy = spot.ty * TILE + TILE / 2;
     const sprite = this.add
@@ -4117,6 +4129,7 @@ export class FarmScene extends Phaser.Scene {
 
     // crop growth + withering
     const witherOn = this.witherEnabled();
+    const eventGrowth = this.activeEventEffect().cropGrowthMult ?? 1;
     for (const crop of this.crops.values()) {
       if (crop.mature) {
         // A ripe, un-harvested crop wilts after a generous window. Gentle: it
@@ -4138,7 +4151,7 @@ export class FarmScene extends Phaser.Scene {
       // Fertilizer "Rapid" fork adds extra growth speed, still under the clamp.
       const rapid = 1 + (this.fork('growth').growthMult ?? 0);
       const speed = Math.min(MAX_GROWTH_MULT, (wet ? 2 : 1) * growthFactor(this.upgrades.growth) * rapid * this.mods().cropGrowthMult);
-      crop.grownMs += delta * this.growthMult * speed;
+      crop.grownMs += delta * this.growthMult * speed * eventGrowth;
       const total = this.cropGrowMs(crop);
       const ns = Math.min(STAGES - 1, Math.floor((crop.grownMs / total) * (STAGES - 1)));
       if (ns !== crop.stage && ns < STAGES - 1) {
