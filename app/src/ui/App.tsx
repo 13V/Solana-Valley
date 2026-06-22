@@ -20,6 +20,7 @@ import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { MultiplayerSync } from '../chain/MultiplayerSync';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
+import { WhatsNew } from './WhatsNew';
 import { ContractAddress } from './ContractAddress';
 import { Chat } from './Chat';
 import { UpdatePill } from './UpdatePill';
@@ -87,6 +88,7 @@ export function App() {
           <TouchControls />
           {helpSeen && <TutorialCoach />}
           <Toasts />
+          <WhatsNew />
           <ContractAddress />
           <Chat />
           <UpdatePill />
