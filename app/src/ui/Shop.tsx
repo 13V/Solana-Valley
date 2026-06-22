@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PLANTS, RARITY, RARITY_ORDER, type Rarity } from '../game/economy';
+import { PLANTS, RARITY, RARITY_ORDER, claimTokens, type Rarity } from '../game/economy';
 import { useGameState, useClock } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
@@ -39,7 +39,16 @@ export function Shop({ onClose }: { onClose: () => void }) {
                   {p.name}
                   <span className="rarity" style={{ color: r.css }}>{p.rarity}</span>
                 </span>
-                <span className="row-meta">{p.growthSeconds}s · {p.baseValue.toLocaleString()}🪙</span>
+                <span className="row-meta">
+                  {p.growthSeconds}s · {(() => {
+                    const lands = claimTokens(p);
+                    return lands !== null ? (
+                      <span style={{ color: '#7bd66a', fontWeight: 700 }}>🌱 {lands.toLocaleString()} $LANDS</span>
+                    ) : (
+                      `${p.baseValue.toLocaleString()}🪙`
+                    );
+                  })()}
+                </span>
               </Tooltip>
               <span className={`stock ${stock > 0 ? '' : 'out'}`}>
                 {stock > 0 ? `×${stock}` : '—'}

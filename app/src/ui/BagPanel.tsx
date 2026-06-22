@@ -201,7 +201,15 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                       {withered && <span className="mut wilted">Wilted</span>}
                     </span>
                   </span>
-                  <span className="row-meta">{unit.toLocaleString()}🪙 ea</span>
+                  <span className="row-meta">
+                    {isTokenTradeable(plant) ? (
+                      <span style={{ color: '#7bd66a', fontWeight: 700 }}>
+                        🌱 {compactTokens(claimTokensFor(plant, mutation.id) ?? 0)} $LANDS ea
+                      </span>
+                    ) : (
+                      `${unit.toLocaleString()}🪙 ea`
+                    )}
+                  </span>
                 </Tooltip>
                 <span className="stock">×{count}</span>
                 {/* Divine+ crops are $LANDS-only — no coin "Sell" button for them. */}
