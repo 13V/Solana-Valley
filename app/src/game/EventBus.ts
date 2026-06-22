@@ -54,13 +54,18 @@ export interface GameEvents {
   // fish flying into our avatar (cosmetic only — no coins/XP awarded on receive).
   'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
   'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
-  // Cast state so peers can render a remote player actually casting (rod-hold
-  // animation + a bobber on the water), not just the final catch. x/y is the
-  // bobber TARGET on the water; px/py is the caster's foot position (where the
-  // rod-hold avatar stands) so a peer who hasn't seen us move yet still places
-  // the avatar on land — not floating on the water at the bobber.
-  'mp:fish': { casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // FarmScene -> network: started/ended a cast (net stamps our id)
-  'mp:remoteFish': { id: string; casting: boolean; x: number; y: number; px: number; py: number; facing: string }; // network -> FarmScene: a peer started/ended a cast
+  // Player action/animation broadcast so peers see each other tilling, watering
+  // and fishing (not just walking/idling). `action` is 'hoe' | 'water' |
+  // 'fish-cast' | 'fish-wait' | 'fish-reel' | 'fish-catch' | 'fish-end'.
+  'mp:act': { action: string; facing: string }; // FarmScene -> network: a local tool/fishing pose (net stamps our id)
+  'mp:remoteAct': { id: string; action: string; facing: string }; // network -> FarmScene: a peer's pose to animate
+  // Hub presence lifecycle. The home island is PRIVATE (it joins no channel, so
+  // its dormant mp:* handlers never fire). The shared social hub is where
+  // multiplayer lives: HubScene emits enterHub on create and exitHub on shutdown
+  // so the network layer connects/disconnects the SHARED hub channel only while
+  // the player is actually standing on the hub.
+  'mp:enterHub': void; // HubScene -> network: connect me to the shared hub channel
+  'mp:exitHub': void; // HubScene -> network: disconnect me from the hub channel
 }
 
 type Handler<T> = (payload: T) => void;

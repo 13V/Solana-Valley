@@ -1,0 +1,2312 @@
+{
+  "format": "sprout-valley-map",
+  "version": 1,
+  "tile": 16,
+  "w": 40,
+  "h": 30,
+  "bg": true,
+  "active": 2,
+  "layers": [
+    {
+      "name": "Ground",
+      "visible": true,
+      "cells": {
+        "6,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "6,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "6,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "6,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          28
+        ],
+        "6,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "6,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "6,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "6,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "6,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          28
+        ],
+        "6,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          0
+        ],
+        "7,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "7,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "7,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          0
+        ],
+        "8,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          28
+        ],
+        "8,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          0
+        ],
+        "9,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "10,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "11,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "12,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "13,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "14,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "15,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "16,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "17,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "18,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "19,2": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          2
+        ],
+        "19,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "19,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          27
+        ],
+        "20,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "21,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "22,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          2
+        ],
+        "6,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "6,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          17
+        ],
+        "6,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "6,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          22
+        ],
+        "5,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "5,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          0
+        ],
+        "5,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          22
+        ],
+        "7,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "8,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "9,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "10,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          22
+        ],
+        "10,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          17
+        ],
+        "11,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "12,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "13,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "14,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "15,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "16,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "17,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "18,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "19,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "20,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "21,20": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          24
+        ],
+        "21,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "21,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "21,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          16
+        ],
+        "22,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "23,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "24,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          24
+        ],
+        "24,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "24,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "24,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "24,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "24,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          16
+        ],
+        "24,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "24,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "24,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "24,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "25,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          24
+        ],
+        "25,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "25,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "25,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "25,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "25,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          2
+        ],
+        "8,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,4": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "8,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "7,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "9,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "10,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "19,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "19,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          27
+        ],
+        "23,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "24,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "19,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "21,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "22,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "23,16": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "11,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "12,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "14,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "15,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "16,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "17,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "19,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "20,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "18,17": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ],
+        "13,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          12
+        ]
+      }
+    },
+    {
+      "name": "garden + boat",
+      "visible": true,
+      "cells": {
+        "24,15": [
+          "premium_tilesets_building_parts_wooden_bridge_v2",
+          0
+        ],
+        "25,15": [
+          "premium_tilesets_building_parts_wooden_bridge_v2",
+          8
+        ],
+        "26,15": [
+          "premium_tilesets_building_parts_wooden_bridge_v2",
+          5
+        ],
+        "23,15": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          58
+        ],
+        "23,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          59
+        ],
+        "22,14": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          58
+        ],
+        "22,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          59
+        ],
+        "21,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          58
+        ],
+        "21,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          59
+        ],
+        "19,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2",
+          0
+        ],
+        "20,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2",
+          1
+        ],
+        "19,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2",
+          6
+        ],
+        "20,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hill_tiles_slopes_v2",
+          7
+        ],
+        "20,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          58
+        ],
+        "18,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "21,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "17,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "16,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "15,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          23
+        ],
+        "14,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "14,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          22
+        ],
+        "14,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "14,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "14,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          11
+        ],
+        "14,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          0
+        ],
+        "15,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "16,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "17,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "18,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "19,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "20,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "21,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          1
+        ],
+        "22,5": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          2
+        ],
+        "22,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "22,7": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "22,8": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "22,9": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          13
+        ],
+        "22,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          24
+        ],
+        "14,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          12
+        ],
+        "14,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          12
+        ],
+        "14,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "15,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "16,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "16,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "17,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "16,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "15,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "15,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "17,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          16
+        ],
+        "17,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          27
+        ],
+        "8,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          11
+        ],
+        "8,10": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          11
+        ],
+        "8,11": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          22
+        ],
+        "9,11": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          23
+        ],
+        "10,11": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          24
+        ],
+        "10,10": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          16
+        ],
+        "11,10": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          24
+        ],
+        "11,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          13
+        ],
+        "10,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "10,8": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          27
+        ],
+        "9,8": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "9,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "9,10": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "8,8": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          11
+        ],
+        "13,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          12
+        ],
+        "13,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          12
+        ],
+        "13,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          23
+        ],
+        "14,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          17
+        ],
+        "15,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "16,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_2",
+          12
+        ],
+        "15,18": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          23
+        ],
+        "14,18": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          22
+        ],
+        "15,13": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          1
+        ],
+        "16,13": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          1
+        ],
+        "10,7": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          2
+        ],
+        "9,7": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          1
+        ],
+        "8,7": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          0
+        ],
+        "11,8": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          2
+        ],
+        "17,13": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          2
+        ],
+        "14,13": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          1
+        ],
+        "18,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          2
+        ],
+        "18,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          13
+        ],
+        "18,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          24
+        ],
+        "17,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          13
+        ],
+        "17,18": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          24
+        ],
+        "16,18": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          23
+        ],
+        "13,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          28
+        ],
+        "12,15": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          11
+        ],
+        "12,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          11
+        ],
+        "12,17": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          22
+        ],
+        "12,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          0
+        ],
+        "13,13": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          0
+        ]
+      }
+    },
+    {
+      "name": "texture",
+      "visible": true,
+      "cells": {
+        "26,15": [
+          "premium_objects_boats",
+          0
+        ],
+        "27,15": [
+          "premium_objects_boats",
+          1
+        ],
+        "28,15": [
+          "premium_objects_boats",
+          2
+        ],
+        "26,16": [
+          "premium_objects_boats",
+          9
+        ],
+        "27,16": [
+          "premium_objects_boats",
+          10
+        ],
+        "28,16": [
+          "premium_objects_boats",
+          11
+        ],
+        "17,15": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          101
+        ],
+        "15,16": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          56
+        ],
+        "9,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          67
+        ],
+        "9,8": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          9
+        ],
+        "15,14": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          66
+        ],
+        "11,9": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          45
+        ],
+        "16,18": [
+          "premium_tilesets_ground_tiles_old_tiles_tilled_dirt_wide",
+          45
+        ],
+        "16,14": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          9
+        ],
+        "14,16": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          46
+        ],
+        "10,9": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          46
+        ],
+        "9,10": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          101
+        ],
+        "16,17": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          178
+        ],
+        "10,8": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          81
+        ],
+        "15,15": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          96
+        ],
+        "15,17": [
+          "sorry_early_access_plant_update_2_farming_plants_v2",
+          18
+        ],
+        "14,6": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "14,7": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "14,8": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "14,5": [
+          "premium_tilesets_building_parts_fences",
+          1
+        ],
+        "15,5": [
+          "premium_tilesets_building_parts_fences",
+          2
+        ],
+        "16,5": [
+          "premium_tilesets_building_parts_fences",
+          2
+        ],
+        "17,5": [
+          "premium_tilesets_building_parts_fences",
+          2
+        ],
+        "18,5": [
+          "premium_tilesets_building_parts_fences",
+          2
+        ],
+        "19,6": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          198
+        ],
+        "20,6": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          199
+        ],
+        "21,6": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          200
+        ],
+        "19,7": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          222
+        ],
+        "20,7": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          223
+        ],
+        "21,7": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          224
+        ],
+        "19,8": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          246
+        ],
+        "20,8": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          247
+        ],
+        "21,8": [
+          "premium_tilesets_building_parts_animal_structures_chikcen_houses",
+          248
+        ],
+        "7,9": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "7,10": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "7,11": [
+          "premium_tilesets_building_parts_fences",
+          8
+        ],
+        "7,12": [
+          "premium_tilesets_building_parts_fences",
+          17
+        ],
+        "8,12": [
+          "premium_tilesets_building_parts_fences",
+          26
+        ],
+        "9,12": [
+          "premium_tilesets_building_parts_fences",
+          26
+        ],
+        "10,12": [
+          "premium_tilesets_building_parts_fences",
+          26
+        ],
+        "11,12": [
+          "premium_tilesets_building_parts_fences",
+          26
+        ],
+        "11,11": [
+          "premium_objects_trees_stumps_and_bushes",
+          37
+        ],
+        "12,9": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "12,10": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "7,6": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "7,7": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "18,6": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "18,7": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "23,15": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "23,16": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "10,17": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "10,18": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "11,2": [
+          "premium_objects_trees_stumps_and_bushes",
+          0
+        ],
+        "11,3": [
+          "premium_objects_trees_stumps_and_bushes",
+          12
+        ],
+        "17,3": [
+          "premium_objects_trees_stumps_and_bushes",
+          40
+        ],
+        "24,11": [
+          "premium_objects_trees_stumps_and_bushes",
+          39
+        ],
+        "8,14": [
+          "premium_objects_trees_stumps_and_bushes",
+          39
+        ],
+        "12,3": [
+          "premium_objects_trees_stumps_and_bushes",
+          78
+        ],
+        "11,6": [
+          "premium_objects_trees_stumps_and_bushes",
+          73
+        ],
+        "23,19": [
+          "premium_objects_water_objects",
+          4
+        ],
+        "24,19": [
+          "premium_objects_water_objects",
+          5
+        ],
+        "22,18": [
+          "premium_objects_water_objects",
+          3
+        ],
+        "9,5": [
+          "premium_tilesets_building_parts_chest",
+          16
+        ],
+        "20,15": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          184
+        ],
+        "7,17": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          184
+        ],
+        "13,5": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          184
+        ],
+        "20,17": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "22,15": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "19,13": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "23,11": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "24,9": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "17,9": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "16,7": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "15,3": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "11,13": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "10,16": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "6,13": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          166
+        ],
+        "11,15": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          173
+        ],
+        "17,11": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          173
+        ],
+        "9,3": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          173
+        ],
+        "21,16": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "10,14": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "12,7": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "11,5": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "13,3": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "18,4": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "23,8": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          169
+        ],
+        "20,14": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          251
+        ],
+        "6,15": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          251
+        ],
+        "10,6": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          251
+        ],
+        "8,4": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          251
+        ],
+        "18,8": [
+          "sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers2",
+          251
+        ],
+        "14,14": [
+          "sorry_early_access_plant_update_2_farming_plants_v2_watered",
+          102
+        ],
+        "13,15": [
+          "sorry_early_access_plant_update_2_farming_plants_v2_watered",
+          88
+        ],
+        "13,16": [
+          "sorry_early_access_plant_update_2_farming_plants_v2_watered",
+          65
+        ],
+        "15,13": [
+          "sorry_early_access_plant_update_2_farming_plants_v2_watered",
+          16
+        ],
+        "18,17": [
+          "sorry_early_access_plant_update_2_trees_stumps_and_bushes_v2",
+          21
+        ],
+        "16,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          66
+        ],
+        "18,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          66
+        ],
+        "14,19": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          60
+        ],
+        "16,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          60
+        ],
+        "18,13": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          67
+        ],
+        "12,12": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          67
+        ],
+        "11,18": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers",
+          67
+        ],
+        "12,19": [
+          "premium_objects_trees_stumps_and_bushes",
+          38
+        ],
+        "13,18": [
+          "premium_objects_trees_stumps_and_bushes",
+          78
+        ]
+      }
+    },
+    {
+      "name": "mail box",
+      "visible": true,
+      "cells": {
+        "21,8": [
+          "premium_tilesets_building_parts_mailbox_animation_frames",
+          11
+        ],
+        "21,9": [
+          "premium_tilesets_building_parts_mailbox_animation_frames",
+          22
+        ],
+        "11,14": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          3
+        ],
+        "10,14": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          3
+        ],
+        "16,8": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          1
+        ],
+        "17,8": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          2
+        ],
+        "16,9": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          4
+        ],
+        "17,9": [
+          "premium_tilesets_building_parts_animal_structures_barn_structures",
+          5
+        ],
+        "14,3": [
+          "premium_objects_mushrooms_flowers_stones",
+          17
+        ],
+        "16,6": [
+          "premium_objects_mushrooms_flowers_stones",
+          16
+        ],
+        "8,15": [
+          "premium_objects_mushrooms_flowers_stones",
+          18
+        ],
+        "9,15": [
+          "premium_objects_mushrooms_flowers_stones",
+          19
+        ],
+        "8,16": [
+          "premium_objects_mushrooms_flowers_stones",
+          30
+        ],
+        "9,16": [
+          "premium_objects_mushrooms_flowers_stones",
+          31
+        ],
+        "18,11": [
+          "premium_objects_mushrooms_flowers_stones",
+          3
+        ],
+        "12,4": [
+          "premium_objects_mushrooms_flowers_stones",
+          2
+        ],
+        "20,18": [
+          "premium_objects_mushrooms_flowers_stones",
+          45
+        ],
+        "19,8": [
+          "premium_objects_signs_sides",
+          11
+        ],
+        "13,6": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          67
+        ],
+        "10,3": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          67
+        ],
+        "23,10": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          67
+        ],
+        "15,11": [
+          "premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2",
+          67
+        ],
+        "13,11": [
+          "premium_objects_mushrooms_flowers_stones",
+          27
+        ],
+        "16,4": [
+          "premium_objects_mushrooms_flowers_stones",
+          27
+        ]
+      }
+    },
+    {
+      "name": "Layer 5",
+      "visible": true,
+      "cells": {}
+    }
+  ]
+}

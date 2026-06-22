@@ -1,21 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { bus } from '../game/EventBus';
 import { getWalletAuth } from './walletAuth';
-import { joinIsland, leaveIsland } from './multiplayer';
+import { joinHub, leaveIsland } from './multiplayer';
 import { useUsername } from './username';
 
 // Mounted INSIDE <WalletProvider> (renders nothing). Bridges the connected
 // Solana wallet to real-time multiplayer:
 //   1. Reuse the SHARED signed wallet-auth (same one cloud-save uses, so the
 //      user signs only ONCE per session).
-//   2. POST it to /api/join to get a STABLE { island, plot } seat.
-//   3. Emit 'mp:assigned' + 'mp:status' (and a toast), then connect to the
-//      island's Realtime channel via joinIsland().
+//   2. POST it to /api/join to get a STABLE { island, plot } seat (recorded in
+//      the save via 'mp:assigned'; the seat is single-player bookkeeping now).
+//   3. Connect to the SHARED hub channel via joinHub() — but ONLY while the
+//      player is standing on the social hub. The home island is PRIVATE: it
+//      opens no channel, so peers never appear there. HubScene drives this with
+//      'mp:enterHub'/'mp:exitHub' as the player sails in and out.
 //
-// On wallet change / disconnect / unmount it calls leaveIsland(). Everything is
-// best-effort: any failure silently disables multiplayer (single-player keeps
-// working).
+// On wallet change / disconnect / unmount it calls leaveIsland() (the universal
+// channel teardown). Everything is best-effort: any failure silently disables
+// multiplayer (single-player keeps working).
 //
 // HEARTBEAT: while connected, we re-POST /api/join every HEARTBEAT_MS with the
 // SAME cached auth (+ preferIsland = our assigned island). The server's
@@ -38,6 +41,20 @@ export function MultiplayerSync() {
   // peers see). Changing it re-runs the effect → re-joins → re-tracks presence.
   const username = useUsername(publicKey ? publicKey.toBase58() : null);
 
+  // Whether the player is currently standing on the shared hub. Tracked in a ref
+  // (independent of wallet state) so connecting a wallet WHILE already on the hub
+  // still joins the channel, and so the flag survives the join effect re-running
+  // (e.g. on a mid-session rename). Always listening, regardless of wallet.
+  const onHubRef = useRef(false);
+  useEffect(() => {
+    const offEnter = bus.on('mp:enterHub', () => { onHubRef.current = true; });
+    const offExit = bus.on('mp:exitHub', () => { onHubRef.current = false; });
+    return () => {
+      offEnter();
+      offExit();
+    };
+  }, []);
+
   useEffect(() => {
     // Not connected (or no signing support): make sure we're disconnected.
     if (!connected || !publicKey || !signMessage) {
@@ -49,11 +66,35 @@ export function MultiplayerSync() {
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let onVisible: (() => void) | null = null;
     let offReverify: (() => void) | null = null;
+    // Our hub identity, resolved once wallet-auth returns. The hub channel needs
+    // only a stable id (the wallet) + a display name — it does NOT depend on
+    // /api/join, so the hub still works even if that endpoint is unavailable.
+    let identity: { id: string; name: string; plot: number } | null = null;
+    // Connect to the shared hub channel, but only while the player is on the hub.
+    const connectHub = () => {
+      if (identity && onHubRef.current) joinHub(identity);
+    };
+    // Enter/exit the hub: connect/tear down the shared channel. (The always-on
+    // effect above also tracks onHubRef; here we additionally act on it.)
+    const offEnter = bus.on('mp:enterHub', () => {
+      onHubRef.current = true;
+      connectHub();
+    });
+    const offExit = bus.on('mp:exitHub', () => {
+      onHubRef.current = false;
+      leaveIsland();
+    });
 
     (async () => {
       // Reuse the shared, cached signature (single prompt across features).
       const auth = await getWalletAuth(publicKey, signMessage);
       if (cancelled || !auth) return;
+
+      // The wallet id + display name are all the shared hub needs. Record our
+      // identity and, if the player already sailed onto the hub while auth was
+      // resolving, connect to the channel now.
+      identity = { id: auth.wallet, name: username || auth.wallet.slice(0, 4), plot: 0 };
+      connectHub();
 
       // An invite link (?island=N) wins; otherwise resume our last seat from the
       // save (island + plot) so a returning player lands back on their own spot if
@@ -115,18 +156,10 @@ export function MultiplayerSync() {
         seat = next;
         if (!first && !moved) return; // unchanged seat (normal heartbeat) -> no-op
 
+        // The home island is PRIVATE — we open no realtime channel here, so this
+        // is just bookkeeping: record the server-assigned seat so the save keeps a
+        // stable plot id. Multiplayer itself connects only on the shared hub.
         bus.emit('mp:assigned', { id: auth.wallet, island: next.island, plot: next.plot });
-        const status = `Joined island ${next.island} · plot ${next.plot}`;
-        bus.emit('mp:status', status);
-        bus.emit(
-          'toast',
-          moved
-            ? `Your old plot was claimed — moved to island ${next.island} · plot ${next.plot}`
-            : status,
-        );
-        // (Re)connect to the island's realtime channel; re-tracks presence with
-        // the current plot so peers see us on the right one.
-        joinIsland(next.island, { id: auth.wallet, name: next.name, plot: next.plot });
       };
 
       const initial = await postJoin(initialIsland, initialPlot);
@@ -169,6 +202,8 @@ export function MultiplayerSync() {
         offReverify();
         offReverify = null;
       }
+      offEnter();
+      offExit();
       leaveIsland();
     };
     // publicKey identity changes when the wallet switches. `username` is included

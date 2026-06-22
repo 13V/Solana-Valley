@@ -69,7 +69,6 @@ import {
   bandRect,
   PLAZA,
   homesteadPlot,
-  isInPlot,
   homesteadGateTile,
   plazaCenterTile,
   MAX_PLOT_EXPANSION,
@@ -114,6 +113,7 @@ import {
 import { pickForage, forageXp, type Forage } from '../forage';
 import { bus, type GameEvents } from '../EventBus';
 import { sfx } from '../audio';
+import { map as islandMap, classify, isBoatKey } from '../mapLoader';
 import { virtualMove, getKeyBinds, onKeyBindsChange, type MoveAction } from '../input';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
@@ -149,9 +149,12 @@ type RemotePlayer = {
   targetY: number;
   facing: Dir;
   name: string;
-  // Present while this peer is casting: their bobber on the water + the line we
-  // draw to it. The avatar plays the rod-hold (`pfish-wait`) anim meanwhile.
-  casting?: { tx: number; ty: number; bobber: Phaser.GameObjects.Sprite; line: Phaser.GameObjects.Graphics } | null;
+  // A one-shot pose (hoe/water/catch) holds the avatar until this time, so the
+  // walk/idle fallback in updateRemotes doesn't stomp it; `casting` holds the
+  // fishing pose until a 'fish-end'/'fish-catch' arrives. Both mirror how the
+  // local player's update() guards its own action/cast animations.
+  actingUntil?: number;
+  casting?: boolean;
 };
 
 // A single remote crop drawn in another player's plot. Visual only — it reuses
@@ -190,6 +193,15 @@ type RemoteFarm = {
 // appear on the plot you actually own — not a fixed one.
 const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
 
+// The world is the hand-authored startIsland.json map (40×30). The player's
+// spawn and the animal pens/orchard are fixed open-grass rectangles chosen to sit
+// on this island's clear ground (near the dock, the coop, the barn and the treed
+// headland respectively). The procedural 20-plot valley is no longer built.
+const ISLAND_SPAWN = { x: 23, y: 13 };
+const CHICKEN_PEN = px({ x0: 18, y0: 9, x1: 22, y1: 12 });
+const COW_PEN = px({ x0: 8, y0: 13, x1: 12, y1: 17 });
+const ORCHARD = px({ x0: 7, y0: 2, x1: 12, y1: 5 });
+
 // Hard cap on how many of each producer (chickens / cows / each tree type) a
 // player may own, via buying or breeding.
 const MAX_PRODUCERS = 50;
@@ -219,6 +231,7 @@ type Animal = {
   color: string; // texture/anim key of the chosen palette swap
   layAt: number;
   nextWander: number;
+  nextFidget?: number; // when this adult next plays its idle fidget (peck/graze)
   product?: Phaser.GameObjects.Image;
   baby?: boolean; // a young animal that grows into an adult
   growUpAt?: number; // when a baby becomes an adult
@@ -226,7 +239,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'farm-lands:save';
-const SAVE_VERSION = 16; // bumped: added claimedGoals (rewarded goal-ladder); defaults preserve older saves (legacy saves retro-claim satisfied goals without payout)
+const SAVE_VERSION = 18; // farm-lands rename + new hand-authored island (tiles/spawn/pens reset for prior-island saves); additive content fields (claimedGoals, daily, family) preserved via ?? defaults
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -375,6 +388,8 @@ export class FarmScene extends Phaser.Scene {
   private animals: Animal[] = [];
   private gate?: Phaser.GameObjects.Sprite;
   private gateOpen = false;
+  private chest?: Phaser.GameObjects.Sprite;
+  private chestOpen = false;
   private animalCounts: Record<string, number> = {};
 
   // skill progression (xp per skill) + chosen milestone perks
@@ -398,6 +413,9 @@ export class FarmScene extends Phaser.Scene {
   private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
   private boat?: Phaser.GameObjects.Sprite; // little rowboat moored on the pond — click to open the travel UI
   private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
+  private farmTiles = new Set<string>(); // tillable/plantable tiles from the island map's dirt cells
+  private boatTiles = new Set<string>(); // rowboat tiles on the island (future hub portal)
+  private islandFarm: PlotRect = { px: 0, py: 0, pw: 0, ph: 0 }; // bounding rect of farmTiles
   private casting = false; // only one cast at a time
   private fishingCast!: FishingCast; // rod/line/bobber cast choreography
   // foraging
@@ -452,19 +470,32 @@ export class FarmScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
-    this.buildWorld();
-    this.buildTerraces(); // raise the two plot bands into plateaus (cliffs + stairs)
-    this.buildPlaza(); // sunken valley floor: cobble paths, pond + bridge, markets
-    this.buildPlots(); // fenced homesteads; fences open toward the central plaza
-    this.placeDecorations(); // scatter nature across the remaining open grass
-
-    const spawn = this.myFarmRect();
-    this.player = this.physics.add.sprite(
-      (spawn.px + spawn.pw / 2) * TILE,
-      (spawn.py + spawn.ph - 1) * TILE,
-      'pchar',
-      0,
-    );
+    // The world is now the hand-authored island. The procedural 20-plot valley
+    // builders are kept behind this flag so the old world can be restored.
+    const USE_ISLAND: boolean = true;
+    if (USE_ISLAND) {
+      this.buildFromMap(); // render the hand-authored start island (startIsland.json)
+      this.player = this.physics.add.sprite(
+        ISLAND_SPAWN.x * TILE + TILE / 2,
+        ISLAND_SPAWN.y * TILE + TILE / 2,
+        'pchar',
+        0,
+      );
+    } else {
+      this.buildWorld();
+      this.addOceanBoats();
+      this.buildTerraces();
+      this.buildPlaza();
+      this.buildPlots();
+      this.placeDecorations();
+      const spawn = this.myFarmRect();
+      this.player = this.physics.add.sprite(
+        (spawn.px + spawn.pw / 2) * TILE,
+        (spawn.py + spawn.ph - 1) * TILE,
+        'pchar',
+        0,
+      );
+    }
     this.player.setCollideWorldBounds(true);
     this.player.setOrigin(0.5, 0.72).setScale(1.85);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
@@ -632,6 +663,12 @@ export class FarmScene extends Phaser.Scene {
       if (this.tryForage(p.worldX, p.worldY)) return;
       const tx = Math.floor(p.worldX / TILE);
       const ty = Math.floor(p.worldY / TILE);
+      // Click the boat to sail to the shared social hub.
+      if (this.boatTiles.has(this.key(tx, ty))) {
+        this.toast('⛵ Sailing to the social hub…');
+        this.scene.start('Hub');
+        return;
+      }
       if (this.tryFish(tx, ty)) return;
       this.useToolAt(tx, ty);
     });
@@ -669,11 +706,11 @@ export class FarmScene extends Phaser.Scene {
       bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
       bus.on('mp:shopBought', ({ plantId }) => this.onRemoteShopBuy(plantId)),
       bus.on('mp:remoteCatch', (c) => this.onRemoteCatch(c)),
-      bus.on('mp:remoteFish', (m) => this.onRemoteFish(m)),
+      bus.on('mp:remoteAct', (a) => this.onRemoteAct(a)),
     );
     // Tear down every remote avatar + remote farm + the ground guide on shutdown.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.remotePlayers.forEach((rp) => { this.endRemoteFishFx(rp); rp.sprite.destroy(); rp.label.destroy(); });
+      this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
       this.remotePlayers.clear();
       this.remoteFarms.forEach((_, id) => this.removeRemoteFarm(id));
       this.remoteFarms.clear();
@@ -731,7 +768,7 @@ export class FarmScene extends Phaser.Scene {
   // used the old MY_PLOT constant reads this so it follows a multiplayer
   // assignment. Defaults to homestead #0 in single-player.
   private myFarmRect(): PlotRect {
-    return homesteadPlot(this.myPlotIndex);
+    return this.islandFarm; // the island map's dirt-field bounding rect
   }
 
   // The full farmable crop-bed rect: the base bed widened by however many
@@ -747,12 +784,12 @@ export class FarmScene extends Phaser.Scene {
 
   // True for any farmable tile (base bed OR a purchased expansion column).
   private isInMyFarm(tx: number, ty: number): boolean {
-    return isInPlot(this.expandedFarmRect(), tx, ty);
+    return this.farmTiles.has(this.key(tx, ty));
   }
 
   // The walkable gate tile of the player's current homestead.
   private myGateTile(): { tx: number; ty: number } {
-    return homesteadGateTile(this.myPlotIndex);
+    return { tx: ISLAND_SPAWN.x, ty: ISLAND_SPAWN.y };
   }
 
   // Debug snapshot used by the screenshot harness.
@@ -876,8 +913,10 @@ export class FarmScene extends Phaser.Scene {
     }
 
     // Fishing cast animations from the Ocean Pack character sheets (the same cat
-    // as pchar). left/right share the side sheet (right = flipX). Frame rows:
-    // cast 32–38, wait 64–80, reel 96–106, hook 128–135, catch (front) 160–191.
+    // as pchar). left/right share the side sheet (right = flipX). Each sheet has
+    // the same six rows — cast 32–38, wait 64–80, reel 96–106, hook 128–135 and
+    // the 32-frame "show off the catch" celebration 160–191 — so we build every
+    // clip per-direction (the catch used to exist front-only and went unused).
     const fishSheet: Record<Dir, string> = {
       down: 'pfish_front', up: 'pfish_back', left: 'pfish_side', right: 'pfish_side',
     };
@@ -894,13 +933,7 @@ export class FarmScene extends Phaser.Scene {
       mk('wait', 64, 80, 8, -1);
       mk('reel', 96, 106, 14, 0);
       mk('hook', 128, 135, 14, 0);
-    }
-    if (this.textures.exists('pfish_front') && !this.anims.exists('pfish-catch')) {
-      this.anims.create({
-        key: 'pfish-catch',
-        frames: this.anims.generateFrameNumbers('pfish_front', { start: 160, end: 191 }),
-        frameRate: 14, repeat: 0,
-      });
+      mk('catch', 160, 191, 20, 0);
     }
 
     // Bobber + water-splash (Ocean Pack `fishing_splash`, 48px) and the underwater
@@ -928,6 +961,29 @@ export class FarmScene extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers('fish_shadow_md', { start: 0, end: 14 }),
       });
     }
+    // Watering-can water spray (premium pack): a one-shot 9-frame pour arc,
+    // overlaid on the player while watering. Row 0 of the 3 identical rows.
+    if (this.textures.exists('watering_spray') && !this.anims.exists('watercan_spray')) {
+      this.anims.create({
+        key: 'watercan_spray', frameRate: 18, repeat: 0,
+        frames: this.anims.generateFrameNumbers('watering_spray', { start: 0, end: 8 }),
+      });
+    }
+    // Ambient pond fish: a slow 15-frame swim-wobble loop.
+    if (this.textures.exists('fish_small') && !this.anims.exists('fish_swim')) {
+      this.anims.create({ key: 'fish_swim', frames: this.anims.generateFrameNumbers('fish_small', { start: 0, end: 14 }), frameRate: 7, repeat: -1 });
+    }
+    // Gate + chest open arcs (premium building-parts; frame 0 = closed → 4 = open).
+    if (this.textures.exists('gate') && !this.anims.exists('gate-open')) {
+      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 4 }), frameRate: 14, repeat: 0 });
+    }
+    if (this.textures.exists('chest') && !this.anims.exists('chest-open')) {
+      this.anims.create({ key: 'chest-open', frames: this.anims.generateFrameNumbers('chest', { start: 0, end: 4 }), frameRate: 10, repeat: 0 });
+    }
+    // Idle boat bob (the no-rope hull frames; a slow rock).
+    if (this.textures.exists('boats') && !this.anims.exists('boat_bob')) {
+      this.anims.create({ key: 'boat_bob', frames: this.anims.generateFrameNumbers('boats', { frames: [3, 4] }), frameRate: 2, repeat: -1 });
+    }
     // Animations are keyed by sheet so every palette swap gets its own pair.
     for (const a of ANIMALS) {
       for (const sheet of a.colorways ?? [a.sheet]) {
@@ -936,6 +992,9 @@ export class FarmScene extends Phaser.Scene {
         }
         if (!this.anims.exists(`${sheet}-walk`)) {
           this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+        }
+        if (a.fidgetFrames && !this.anims.exists(`${sheet}-fidget`)) {
+          this.anims.create({ key: `${sheet}-fidget`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.fidgetFrames }), frameRate: a.fidgetRate ?? 6, repeat: 1 });
         }
       }
       // Baby palette swaps for breedable animals.
@@ -952,9 +1011,53 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  // Turn the player to face the tile they're interacting with, so the directional
+  // tool swing (and the watering-can spray) aim the right way even when the tile
+  // is clicked without first walking toward it. Clicking your own tile keeps the
+  // current facing. update() never rewrites `facing` while standing still, so this
+  // sticks for the duration of the swing.
+  private faceToward(tx: number, ty: number) {
+    const px = Math.floor(this.player.x / TILE);
+    const py = Math.floor(this.player.y / TILE);
+    const dx = tx - px;
+    const dy = ty - py;
+    if (dx === 0 && dy === 0) return;
+    if (Math.abs(dx) >= Math.abs(dy)) this.facing = dx < 0 ? 'left' : 'right';
+    else this.facing = dy < 0 ? 'up' : 'down';
+  }
+
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
     this.player.anims.play(`act-${tool}-${this.facing}`, true);
+    bus.emit('mp:act', { action: tool, facing: this.facing }); // let peers see the swing
+  }
+
+  // Overlay the premium "water out of the can" spray on a sprite for one swing.
+  // The spray sheet shares the 48px character grid, so it lines up with the can
+  // when drawn at the sprite's transform; it's purely cosmetic and self-cleans.
+  // Used for the local player AND remote avatars (so peers see the spray too).
+  private spawnSprayAt(who: Phaser.GameObjects.Sprite, dir: Dir) {
+    if (!this.anims.exists('watercan_spray')) return;
+    const spray = this.add
+      .sprite(who.x, who.y, 'watering_spray')
+      .setOrigin(who.originX, who.originY)
+      .setScale(who.scaleX, who.scaleY)
+      .setFlipX(dir === 'left')
+      .setDepth(who.depth + (dir === 'up' ? -1 : 1));
+    spray.play('watercan_spray');
+    spray.once('animationcomplete', () => spray.destroy());
+  }
+
+  private waterSpray() {
+    this.spawnSprayAt(this.player, this.facing);
+  }
+
+  // Drop the player out of a cast/celebration pose back to the resting idle.
+  private resetPlayerPose() {
+    this.actingUntil = 0;
+    this.player.setFlipX(false);
+    this.player.setTexture('pchar', 0);
+    this.player.anims.play(`idle-${this.facing}`, true);
   }
 
   private grassFrame(x: number, y: number): number {
@@ -1009,6 +1112,124 @@ export class FarmScene extends Phaser.Scene {
     if (d < SHORE) return 'ocean';
     if (d < SHORE + BEACH) return 'beach';
     return 'land';
+  }
+
+  // ---- data-driven island map --------------------------------------------
+
+  // Build the world from the hand-authored startIsland.json. The Ground layer
+  // paints base terrain (depth 0); overlay layers paint flat decals (depth 1)
+  // and tall objects (per-row depth so they y-sort with the player). Cells are
+  // classified into behaviour sets: water (solid + fishable), solidObj (solid),
+  // farm (tillable/plantable) and walkable grass/flat. Replaces the procedural
+  // valley (buildWorld/buildTerraces/buildPlaza/buildPlots/placeDecorations).
+  private buildFromMap() {
+    // Dense tile grid so farming/collisions/saves can index [y][x] freely.
+    for (let y = 0; y < GRID_H; y++) {
+      this.tiles[y] = [];
+      this.ground[y] = [];
+      this.overlay[y] = [];
+      for (let x = 0; x < GRID_W; x++) {
+        this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
+      }
+    }
+
+    // Opaque base fills under the partly-transparent authored autotiles, so a
+    // tile's transparent edges reveal matching ground, not the sea backdrop. This
+    // island's ground is the darker-grass-hills set, so the base is the matching
+    // darker-grass interior fill (frame 12, like the hub's grass base).
+    const GRASS_BASE_KEY = 'premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers';
+    const GRASS_BASE_FRAME = 12;
+    const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
+    const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
+    const dirtFrame = (x: number, y: number) => DIRT_VARIANTS[((x * 73856 + y * 19349) >>> 0) % DIRT_VARIANTS.length];
+    const hasGrass = this.textures.exists(GRASS_BASE_KEY);
+    const hasDirt = this.textures.exists(DIRT_BASE_KEY);
+
+    const ground = islandMap.layers.find((l) => l.name === 'Ground');
+    const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
+
+    // Ground layer first (depth 0).
+    if (ground && ground.visible !== false) {
+      for (const k in ground.cells) {
+        const [key, frame] = ground.cells[k];
+        const [gx, gy] = k.split(',').map(Number);
+        if (!this.inBounds(gx, gy)) continue;
+        const cx = gx * TILE + TILE / 2;
+        const cy = gy * TILE + TILE / 2;
+        const cat = classify(key);
+        if (cat === 'farm' && hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
+        else if (cat !== 'water' && hasGrass) this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
+        if (this.textures.exists(key)) this.ground[gy][gx] = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
+        if (cat === 'water') {
+          this.tiles[gy][gx].obstacle = true;
+          this.pondTiles.add(k); // fishable water
+          this.addCollider(cx, cy, TILE, TILE);
+        } else if (cat === 'farm') {
+          this.farmTiles.add(k); // tillable/plantable
+        }
+      }
+    }
+
+    // Overlay layers in array order.
+    for (const layer of overlays) {
+      if (layer.visible === false) continue;
+      for (const k in layer.cells) {
+        const [key, frame] = layer.cells[k];
+        const [lx, ly] = k.split(',').map(Number);
+        if (!this.inBounds(lx, ly) || !this.textures.exists(key)) continue;
+        const cx = lx * TILE + TILE / 2;
+        const cy = ly * TILE + TILE / 2;
+        const cat = classify(key);
+        if (cat === 'solidObj') {
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(cy);
+          this.tiles[ly][lx].obstacle = true;
+          this.addCollider(cx, cy, TILE, TILE);
+          if (isBoatKey(key)) this.boatTiles.add(k);
+        } else if (cat === 'farm') {
+          if (hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(lx, ly)).setScale(2).setDepth(0.5);
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
+          this.farmTiles.add(k);
+        } else {
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
+          if (cat === 'flat') this.pathTiles.add(k);
+        }
+      }
+    }
+
+    // A tilled-soil overlay sprite per farm tile (hidden until hoed; the existing
+    // autotile/wet logic in setGroundTexture drives these).
+    for (const k of this.farmTiles) {
+      const [fx, fy] = k.split(',').map(Number);
+      this.overlay[fy][fx] = this.add
+        .image(fx * TILE + TILE / 2, fy * TILE + TILE / 2, 'tilled', 42)
+        .setScale(2).setDepth(1).setVisible(false);
+    }
+
+    this.pond = this.waterBounds();
+    this.islandFarm = this.farmBounds();
+    this.spawnPondLife(); // a few small fish drifting under the island's water
+  }
+
+  // Bounding rect (inclusive tile coords) over all fishable water cells.
+  private waterBounds(): Rect {
+    let x0 = GRID_W, y0 = GRID_H, x1 = 0, y1 = 0;
+    for (const k of this.pondTiles) {
+      const [x, y] = k.split(',').map(Number);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    if (this.pondTiles.size === 0) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+    return { x0, y0, x1, y1 };
+  }
+
+  // The farmable area as a PlotRect (bounding box of the map's dirt cells).
+  private farmBounds(): PlotRect {
+    let x0 = GRID_W, y0 = GRID_H, x1 = 0, y1 = 0;
+    for (const k of this.farmTiles) {
+      const [x, y] = k.split(',').map(Number);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    if (this.farmTiles.size === 0) return { px: 0, py: 0, pw: 0, ph: 0 };
+    return { px: x0, py: y0, pw: x1 - x0 + 1, ph: y1 - y0 + 1 };
   }
 
   private buildWorld() {
@@ -1146,7 +1367,13 @@ export class FarmScene extends Phaser.Scene {
     }
     // Cosy props below the avenue.
     prop(cx - 16, avY + 4, 'workstation');
-    prop(cx + 16, avY + 5, 'chest', 0);
+    // Treasure chest (premium 48×48 sheet) that opens when the farmer is near.
+    {
+      const chx = (cx + 16) * TILE + TILE / 2;
+      const chy = (avY + 5) * TILE + TILE;
+      this.chest = this.add.sprite(chx, chy, 'chest', 0).setOrigin(0.5, 1).setScale(1.1).setDepth(chy);
+      this.addCollider(chx, chy - 10, TILE, 14);
+    }
     // A picnic blanket (flat on the ground) with a basket.
     this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'picnic').setScale(2).setDepth((avY + 5) * TILE - 20);
     this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'basket').setOrigin(0.5, 1).setScale(2).setDepth((avY + 5) * TILE + 10);
@@ -1314,9 +1541,9 @@ export class FarmScene extends Phaser.Scene {
     // Working front gate that swings open on approach.
     const gx = gateCx * TILE + TILE / 2;
     const gy = gateY * TILE + TILE / 2;
-    // Static closed frame (the swing is a scale tween — the spritesheet's swing
-    // frames don't slice cleanly and looked like a spin).
-    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+    // Closed frame 0 of the premium gate sheet (32×48); the open/close swing
+    // plays the real 5-frame `gate-open` animation on approach (see update()).
+    this.gate = this.add.sprite(gx, gy, 'gate', 0).setOrigin(0.5, 0.8).setScale(1.4).setDepth(gy + 6);
   }
 
   // A little staircase bridging the plateau cliff just outside a gate, so each
@@ -1381,9 +1608,8 @@ export class FarmScene extends Phaser.Scene {
   // expansion columns) AND within the level-unlocked rows. Expansion columns use
   // the SAME row gate as the base bed, so buying width never grants extra rows.
   private isUnlockedFarm(tx: number, ty: number): boolean {
-    const f = this.expandedFarmRect();
-    if (!isInPlot(f, tx, ty)) return false;
-    return ty >= f.py + f.ph - this.unlockedFarmRows();
+    // On the hand-authored island, farmable land is exactly the map's dirt cells.
+    return this.farmTiles.has(this.key(tx, ty));
   }
 
   // Player's crop bed: tint the grass so the cultivated plot reads clearly against
@@ -1481,6 +1707,7 @@ export class FarmScene extends Phaser.Scene {
 
   private useToolAt(tx: number, ty: number) {
     if (!this.inBounds(tx, ty) || !this.inRange(tx, ty)) return;
+    this.faceToward(tx, ty); // turn to the clicked tile so the swing + spray aim right
     const crop = this.crops.get(this.key(tx, ty));
     if (crop && crop.mature) {
       this.harvest(tx, ty);
@@ -1504,6 +1731,7 @@ export class FarmScene extends Phaser.Scene {
       });
       if (watered > 0) {
         this.playAction('water');
+        this.waterSpray(); // pack's water-from-the-can spray arc
         sfx.play('water'); // once per click, not per watered tile
         bus.emit('action', 'water');
         // A tiny global-XP trickle for tending crops: +1 per newly-watered tile,
@@ -2581,10 +2809,9 @@ export class FarmScene extends Phaser.Scene {
   // chickens (and any other small animal) in the chicken pen. Used both to spawn
   // a new producer and to clamp its wandering.
   private producerArea(def: AnimalDef) {
-    // Use the pens of the plot we currently own, so animals spawn where we are.
-    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
-    if (def.category === 'tree') return px(h.orchard);
-    return def.id === 'cow' ? px(h.cowPen) : px(h.chickenPen);
+    // Fixed open-grass pens/orchard near the island centre.
+    if (def.category === 'tree') return ORCHARD;
+    return def.id === 'cow' ? COW_PEN : CHICKEN_PEN;
   }
 
   // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
@@ -2618,6 +2845,7 @@ export class FarmScene extends Phaser.Scene {
       color,
       layAt: this.time.now + def.layMs / this.growthMult / m.prodSpeedMult,
       nextWander: this.time.now + 1500 + Math.random() * 3000,
+      nextFidget: this.time.now + 4000 + Math.random() * 9000,
       breedAt: def.breeding
         ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult / m.breedSpeedMult
         : undefined,
@@ -2737,6 +2965,17 @@ export class FarmScene extends Phaser.Scene {
           targets: a.sprite, x: nx, y: ny, duration: 1100, ease: 'Sine.inOut',
           onComplete: () => a.sprite.play(`${a.color}-idle`, true),
         });
+      } else if (
+        // Occasional idle fidget while standing still (chicken pecks, cow grazes).
+        !def.stationary && !a.baby && def.fidgetFrames &&
+        time > (a.nextFidget ?? 0) && !this.tweens.isTweening(a.sprite)
+      ) {
+        a.nextFidget = time + 7000 + Math.random() * 9000;
+        a.nextWander = Math.max(a.nextWander, time + 2800); // don't wander mid-fidget
+        a.sprite.play(`${a.color}-fidget`, true);
+        a.sprite.once('animationcomplete', () => {
+          if (a.sprite.active) a.sprite.play(`${a.color}-idle`, true);
+        });
       }
       if (a.baby) {
         if (a.growUpAt !== undefined && time >= a.growUpAt) grown.push(a);
@@ -2830,10 +3069,17 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    // Faint surface ripples (waterobj 12–17).
+    // Faint surface ripples (waterobj 12–17), each twinkling with a soft
+    // alpha/scale pulse so the water surface shimmers (the frames don't form a
+    // clean cycle, so we shimmer one frame rather than flip-book them).
     for (const [tx, ty] of [[cx - 2, cyc - 1], [cx + 2, cyc + 1], [cx, cyc]] as Array<[number, number]>) {
       if (this.pondTiles.has(this.key(tx, ty))) {
-        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
+        const ripple = this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
+        this.tweens.add({
+          targets: ripple, alpha: 0.2, scaleX: 2.2, scaleY: 2.2,
+          duration: 1500 + Math.random() * 800, delay: Math.random() * 1200,
+          yoyo: true, repeat: -1, ease: 'Sine.inOut',
+        });
       }
     }
 
@@ -2875,6 +3121,7 @@ export class FarmScene extends Phaser.Scene {
       this.tweens.add({ targets: boat, y: by + 3, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       this.boat = boat;
     }
+    this.spawnPondLife(); // a few small fish drifting under the surface
   }
 
   private isPondTile(tx: number, ty: number): boolean {
@@ -2940,6 +3187,70 @@ export class FarmScene extends Phaser.Scene {
     });
   }
 
+  // Ambient pond life: a handful of small fish that lazily drift between water
+  // tiles (purely cosmetic; they sit just under the surface, below the lilies).
+  private pondTileCoords(): Array<[number, number]> {
+    return [...this.pondTiles].map((k) => k.split(',').map(Number) as [number, number]);
+  }
+
+  private spawnPondLife() {
+    if (!this.anims.exists('fish_swim') || this.pondTiles.size === 0) return;
+    const tiles = this.pondTileCoords();
+    const n = Phaser.Math.Clamp(Math.floor(tiles.length / 6), 2, 4);
+    for (let i = 0; i < n; i++) {
+      const [tx, ty] = Phaser.Utils.Array.GetRandom(tiles);
+      const fish = this.add
+        .sprite(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'fish_small', 0)
+        .setScale(1.5)
+        .setAlpha(0.85)
+        .setDepth(4.1)
+        .play('fish_swim');
+      this.driftFish(fish);
+    }
+  }
+
+  private driftFish(fish: Phaser.GameObjects.Sprite) {
+    const tiles = this.pondTileCoords();
+    if (tiles.length === 0) return;
+    const [tx, ty] = Phaser.Utils.Array.GetRandom(tiles);
+    const nx = tx * TILE + TILE / 2 + Phaser.Math.Between(-6, 6);
+    const ny = ty * TILE + TILE / 2 + Phaser.Math.Between(-6, 6);
+    fish.setFlipX(nx < fish.x);
+    const dist = Phaser.Math.Distance.Between(fish.x, fish.y, nx, ny);
+    this.tweens.add({
+      targets: fish, x: nx, y: ny,
+      duration: 1600 + dist * 14, delay: Math.random() * 1400, ease: 'Sine.inOut',
+      onComplete: () => { if (fish.active) this.driftFish(fish); },
+    });
+  }
+
+  // A few idle boats bobbing just off the island's shore (cosmetic ambiance).
+  // Boats had no placement before — only a (mis-sized) loader — so they were
+  // never visible; this puts them on ocean tiles that touch the beach.
+  private addOceanBoats() {
+    if (!this.anims.exists('boat_bob')) return;
+    const shore: Array<[number, number]> = [];
+    for (let y = 1; y < GRID_H - 1; y++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        if (this.tileZone(x, y) !== 'ocean') continue;
+        if (
+          this.tileZone(x + 1, y) === 'beach' || this.tileZone(x - 1, y) === 'beach' ||
+          this.tileZone(x, y + 1) === 'beach' || this.tileZone(x, y - 1) === 'beach'
+        ) shore.push([x, y]);
+      }
+    }
+    if (shore.length === 0) return;
+    Phaser.Utils.Array.Shuffle(shore);
+    const n = Math.min(3, shore.length);
+    for (let i = 0; i < n; i++) {
+      const [tx, ty] = shore[Math.floor((i / n) * shore.length)];
+      const px = tx * TILE + TILE / 2, py = ty * TILE + TILE / 2;
+      const boat = this.add.sprite(px, py, 'boats', 3).setOrigin(0.5, 0.6).setScale(2).setDepth(py).play('boat_bob');
+      boat.setFlipX(Math.random() < 0.5);
+      this.tweens.add({ targets: boat, y: py + 3, duration: 1700 + Math.random() * 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
+  }
+
   // Click a water tile within reach → cast. Works on the inland pond and on the
   // surrounding ocean (cast from the beach). Returns true if the click was a
   // fishing attempt (so it doesn't fall through to the tool logic).
@@ -2975,10 +3286,8 @@ export class FarmScene extends Phaser.Scene {
         ? cx < this.player.x ? 'left' : 'right'
         : cy < this.player.y ? 'up' : 'down';
 
-    // Tell island peers we've started a cast so they render us holding the rod.
-    // x/y is the bobber target on the water; px/py is where we stand (so a peer
-    // who hasn't seen us move places the avatar on land, not on the water).
-    bus.emit('mp:fish', { casting: true, x: cx, y: cy, px: this.player.x, py: this.player.y, facing: this.facing });
+    // Tell island peers we've started a cast so they render the rod-hold pose.
+    bus.emit('mp:act', { action: 'fish-cast', facing: this.facing });
 
     // Rod-tip offset per facing — the player visibly holds the rod, so the line
     // emanates from roughly the rod tip rather than dead-centre. Tunable.
@@ -2993,19 +3302,33 @@ export class FarmScene extends Phaser.Scene {
       hookWindowMult: m.fishHookWindowMult, // Steady Hands widens the click window
       onPhase: (phase) => this.playCastAnim(phase),
       onResolve: (o) => {
+        this.casting = false;
+        const dir = this.facing;
         if (o.hooked) {
           this.landCatch(o.at.x, o.at.y, ocean);
+          // Celebrate with the pack's 32-frame "show off the catch" clip, then
+          // settle back to idle. actingUntil stops update()'s idle from cutting
+          // it short; the per-clip complete event restores the resting pose.
+          const catchKey = `pfish-catch-${dir}`;
+          if (this.anims.exists(catchKey)) {
+            this.player.setFlipX(dir === 'right');
+            this.player.anims.play(catchKey, true);
+            this.actingUntil = this.time.now + 1800;
+            this.player.once(`animationcomplete-${catchKey}`, () => {
+              if (!this.casting) this.resetPlayerPose(); // don't stomp a fresh cast
+            });
+            bus.emit('mp:act', { action: 'fish-catch', facing: dir }); // peers celebrate too
+            this.emitState();
+            return;
+          }
         } else if (o.reason === 'early') {
           this.toast('🎣 Reeled in early — nothing was biting yet.');
         } else {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
-        this.casting = false;
-        bus.emit('mp:fish', { casting: false, x: cx, y: cy, px: this.player.x, py: this.player.y, facing: this.facing });
-        // Return the player from the cast pose to the normal idle.
-        this.player.setFlipX(false);
-        this.player.setTexture('pchar', 0);
-        this.player.anims.play(`idle-${this.facing}`, true);
+        // A miss (or the catch art is missing): straight back to idle.
+        bus.emit('mp:act', { action: 'fish-end', facing: this.facing }); // tell peers the cast ended
+        this.resetPlayerPose();
         this.emitState();
       },
     });
@@ -3029,6 +3352,13 @@ export class FarmScene extends Phaser.Scene {
       case 'reeling': play(`pfish-reel-${dir}`); break;
       // 'bite' keeps the waiting hold — the bobber dunk + "!" is the cue.
     }
+    // Mirror the cast pose to peers (the matching pfish-* clip on our avatar).
+    const act =
+      phase === 'casting' ? 'fish-cast'
+      : phase === 'waiting' || phase === 'ready' ? 'fish-wait'
+      : phase === 'reeling' ? 'fish-reel'
+      : null;
+    if (act) bus.emit('mp:act', { action: act, facing: dir });
   }
 
   // Roll what's actually on the line. Treasure Hunter can swap the fish for a
@@ -3713,51 +4043,72 @@ export class FarmScene extends Phaser.Scene {
     rp.facing = dir;
   }
 
+  // A remote player performed a tool/fishing action — play the matching pose on
+  // their avatar (cosmetic). The actingUntil/casting flags keep updateRemotes'
+  // walk/idle fallback from stomping it (mirroring the local player's guards).
+  // We snap the avatar to its target first so the lerp doesn't read as "moving"
+  // and cancel the pose. pfish-* clips flip on 'right' like the local cast.
+  private onRemoteAct({ id, action, facing }: { id: string; action: string; facing: string }) {
+    const rp = this.remotePlayers.get(id);
+    if (!rp) return;
+    const dir = this.toDir(facing);
+    rp.facing = dir;
+    rp.sprite.x = rp.targetX;
+    rp.sprite.y = rp.targetY;
+    const flip = dir === 'right';
+    const play = (key: string, sideFlip = false) => {
+      if (!this.anims.exists(key)) return;
+      rp.sprite.setFlipX(sideFlip);
+      rp.sprite.play(key, true);
+    };
+    switch (action) {
+      case 'hoe':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 440;
+        play(`act-hoe-${dir}`);
+        break;
+      case 'water':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 440;
+        play(`act-water-${dir}`);
+        this.spawnSprayAt(rp.sprite, dir);
+        break;
+      case 'fish-cast':
+        rp.casting = true;
+        rp.actingUntil = 0;
+        play(`pfish-cast-${dir}`, flip);
+        break;
+      case 'fish-wait':
+        rp.casting = true;
+        play(`pfish-wait-${dir}`, flip);
+        break;
+      case 'fish-reel':
+        rp.casting = true;
+        play(`pfish-reel-${dir}`, flip);
+        break;
+      case 'fish-catch':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 1800;
+        play(`pfish-catch-${dir}`, flip);
+        break;
+      case 'fish-end':
+        rp.casting = false;
+        rp.actingUntil = 0;
+        rp.sprite.setFlipX(false);
+        rp.sprite.setTexture('pchar', 0);
+        play(`idle-${dir}`);
+        break;
+    }
+  }
+
   private removeRemote(id: string) {
     // Drop the avatar AND any crops they were showing (a leaver vanishes whole).
     this.removeRemoteFarm(id);
     const rp = this.remotePlayers.get(id);
     if (!rp) return;
-    this.endRemoteFishFx(rp);
     rp.sprite.destroy();
     rp.label.destroy();
     this.remotePlayers.delete(id);
-  }
-
-  // A remote player started/ended a cast (broadcast over the island channel).
-  // Cosmetic only: show them holding the rod over the water with a bobber + line.
-  private onRemoteFish({ id, casting, x, y, px, py, facing }: GameEvents['mp:remoteFish']) {
-    let rp = this.remotePlayers.get(id);
-    if (casting) {
-      // The avatar stands at px/py (foot position); the bobber goes at x/y (the
-      // water target). Pin the avatar to px/py so a peer we've never seen move
-      // appears on land holding the rod, not floating on the water.
-      if (!rp) rp = this.createRemote(id, id.slice(0, 4), px, py, this.toDir(facing));
-      rp.targetX = px;
-      rp.targetY = py;
-      rp.facing = this.toDir(facing);
-      this.endRemoteFishFx(rp); // clear any stale bobber/line first
-      const bobber = this.anims.exists('bobber_idle')
-        ? this.add.sprite(x, y, 'fishing_splash').setScale(1.4).play('bobber_idle')
-        : this.add.sprite(x, y, 'p_droplet').setScale(2);
-      bobber.setOrigin(0.5, 0.5).setDepth(99985);
-      const line = this.add.graphics().setDepth(99975);
-      rp.casting = { tx: x, ty: y, bobber, line };
-      rp.sprite.setFlipX(rp.facing === 'right'); // right reuses the side sheet flipped
-      if (this.anims.exists(`pfish-wait-${rp.facing}`)) rp.sprite.play(`pfish-wait-${rp.facing}`, true);
-    } else if (rp) {
-      this.endRemoteFishFx(rp);
-      rp.sprite.setFlipX(false);
-      rp.sprite.play(`idle-${rp.facing}`, true);
-    }
-  }
-
-  // Destroy a remote caster's bobber + line (if any) and clear the flag.
-  private endRemoteFishFx(rp: RemotePlayer) {
-    if (!rp.casting) return;
-    rp.casting.bobber.destroy();
-    rp.casting.line.destroy();
-    rp.casting = null;
   }
 
   // Presence sync: the roster is the full list of who's on the island. SPAWN an
@@ -3907,33 +4258,8 @@ export class FarmScene extends Phaser.Scene {
     if (!this.remotePlayers.size) return;
     // Frame-rate-independent smoothing factor.
     const t = 1 - Math.pow(0.001, delta / 1000);
+    const now = this.time.now;
     for (const rp of this.remotePlayers.values()) {
-      // A casting peer holds the rod-wait pose; pin them in place, draw their
-      // line to the gently-bobbing bobber, and skip walk/idle so it isn't
-      // overridden. (Casters don't move — local movement is locked mid-cast.)
-      if (rp.casting) {
-        rp.sprite.x = rp.targetX;
-        rp.sprite.y = rp.targetY;
-        // Re-assert the rod-hold each frame (key-resolution + flip identical to
-        // the local cast) so a stray idle/walk play or anim reset can never drop
-        // the pose mid-cast — it holds for the whole cast. `play(..., true)` is a
-        // no-op once it's already running, so this is cheap.
-        const wait = `pfish-wait-${rp.facing}`;
-        if (this.anims.exists(wait)) {
-          rp.sprite.setFlipX(rp.facing === 'right');
-          rp.sprite.play(wait, true);
-        }
-        const c = rp.casting;
-        c.bobber.y = c.ty + Math.sin(this.time.now / 300) * 2;
-        c.line.clear();
-        c.line.lineStyle(1, 0xf2efe6, 0.8);
-        c.line.beginPath();
-        c.line.moveTo(rp.sprite.x, rp.sprite.y - 16);
-        c.line.lineTo(c.bobber.x, c.bobber.y);
-        c.line.strokePath();
-        this.depthSortRemote(rp);
-        continue;
-      }
       const dx = rp.targetX - rp.sprite.x;
       const dy = rp.targetY - rp.sprite.y;
       const dist = Math.hypot(dx, dy);
@@ -3945,11 +4271,22 @@ export class FarmScene extends Phaser.Scene {
         rp.sprite.x = rp.targetX;
         rp.sprite.y = rp.targetY;
       }
-      // Play walk while closing distance, idle once arrived — keyed exactly like
-      // the local player so remote avatars animate identically. `play(..., true)`
-      // ignores the call if that exact key is already running, so re-issuing each
-      // frame is cheap and naturally handles a facing change mid-walk.
-      rp.sprite.play(`${moving ? 'walk' : 'idle'}-${rp.facing}`, true);
+      // Walking cancels any held pose (and self-heals a dropped 'fish-end'); while
+      // a cast / tool-use / catch pose owns the avatar, leave its animation alone.
+      // Otherwise re-issue walk/idle each frame — keyed exactly like the local
+      // player so remotes animate identically. `play(..., true)` is a no-op if the
+      // key is already running, so re-issuing is cheap. Mirrors update()'s guard.
+      if (moving) {
+        rp.casting = false;
+        rp.actingUntil = 0;
+        rp.sprite.setFlipX(false);
+        rp.sprite.play(`walk-${rp.facing}`, true);
+      } else if (rp.casting || (rp.actingUntil && now < rp.actingUntil)) {
+        // a fishing cast / tool-use / catch pose is playing — don't stomp it
+      } else {
+        rp.sprite.setFlipX(false);
+        rp.sprite.play(`idle-${rp.facing}`, true);
+      }
       this.depthSortRemote(rp);
     }
   }
@@ -4298,7 +4635,7 @@ export class FarmScene extends Phaser.Scene {
     const gx = tx * TILE + TILE / 2;
     const gy = ty * TILE + TILE / 2;
     if (!this.gate) {
-      this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+      this.gate = this.add.sprite(gx, gy, 'gate', 0).setOrigin(0.5, 0.8).setScale(1.4).setDepth(gy + 6);
     } else {
       this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0).setScale(2);
     }
@@ -4420,17 +4757,24 @@ export class FarmScene extends Phaser.Scene {
       if (vy === 0) vy = pad.y;
     }
     const len = Math.hypot(vx, vy) || 1;
-    this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
-    if (vx !== 0 || vy !== 0) {
-      this.actingUntil = 0; // moving cancels the tool pose
-      if (vx < 0) this.facing = 'left';
-      else if (vx > 0) this.facing = 'right';
-      else this.facing = vy < 0 ? 'up' : 'down';
-      this.player.anims.play(`walk-${this.facing}`, true);
-    } else if (time < this.actingUntil) {
-      // let the tool-use animation play out
+    if (this.casting) {
+      // A live fishing cast owns the player's pose (driven by playCastAnim) and
+      // pins them in place — otherwise the idle fallback below would stomp the
+      // cast/wait/reel/catch frames every tick and you'd never see them.
+      this.player.setVelocity(0, 0);
     } else {
-      this.player.anims.play(`idle-${this.facing}`, true);
+      this.player.setVelocity((vx / len) * PLAYER_SPEED, (vy / len) * PLAYER_SPEED);
+      if (vx !== 0 || vy !== 0) {
+        this.actingUntil = 0; // moving cancels the tool pose
+        if (vx < 0) this.facing = 'left';
+        else if (vx > 0) this.facing = 'right';
+        else this.facing = vy < 0 ? 'up' : 'down';
+        this.player.anims.play(`walk-${this.facing}`, true);
+      } else if (time < this.actingUntil) {
+        // let the tool-use animation play out
+      } else {
+        this.player.anims.play(`idle-${this.facing}`, true);
+      }
     }
     this.player.setDepth(this.player.y + 18);
 
@@ -4446,16 +4790,28 @@ export class FarmScene extends Phaser.Scene {
     this.updateRemoteFarms(delta); // smoothly simulate peers' crop growth
     this.updateGuide();
 
-    // Swing the gate open when the farmer is near — a quick scaleX tween (gate
-    // turns edge-on) instead of the goofy spritesheet spin.
+    // Swing the gate open when the farmer is near, playing the pack's real
+    // 5-frame open arc (and reversing it to close).
     if (this.gate) {
       const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.gate.x, this.gate.y) < 56;
       if (near && !this.gateOpen) {
         this.gateOpen = true;
-        this.tweens.add({ targets: this.gate, scaleX: 0.4, duration: 220, ease: 'Quad.easeOut' });
+        this.gate.play('gate-open');
       } else if (!near && this.gateOpen) {
         this.gateOpen = false;
-        this.tweens.add({ targets: this.gate, scaleX: 2, duration: 220, ease: 'Quad.easeIn' });
+        this.gate.playReverse('gate-open');
+      }
+    }
+
+    // Pop the treasure chest open when the farmer stands near it (cosmetic).
+    if (this.chest) {
+      const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.chest.x, this.chest.y) < 48;
+      if (near && !this.chestOpen) {
+        this.chestOpen = true;
+        this.chest.play('chest-open');
+      } else if (!near && this.chestOpen) {
+        this.chestOpen = false;
+        this.chest.playReverse('chest-open');
       }
     }
 

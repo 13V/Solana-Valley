@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
+import { allTilesetKeys } from '../mapLoader';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -36,6 +37,19 @@ export class BootScene extends Phaser.Scene {
     }
     this.load.spritesheet('fishing_splash', `${A}fishing_splash.png`, { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('fish_shadow_md', `${A}fish_shadow_md.png`, { frameWidth: 16, frameHeight: 16 });
+    // Watering-can water spray (premium pack): 9 frames of a pour arc per row
+    // (3 identical rows). Overlaid on the player while watering.
+    this.load.spritesheet('watering_spray', `${A}watering_spray.png`, { frameWidth: 48, frameHeight: 48 });
+    // Ambient pond fish (Ocean Pack): a 15-frame swim-wobble loop (16px).
+    this.load.spritesheet('fish_small', `${A}fish_small.png`, { frameWidth: 16, frameHeight: 16 });
+    // Hand-authored start-island map tilesets (startIsland.json). Each PNG in
+    // public/assets/tilesets/ is a 16×16 spritesheet keyed by its filename (sans
+    // .png); the map's frame indices already match these sheets. Auto-synced to
+    // whatever the map references (mapLoader.usedTilesetKeys).
+    const TS = 'assets/tilesets/';
+    for (const key of allTilesetKeys) {
+      this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
     // Chickens (16px) and cows (32px) come in several palette swaps; one is
     // picked per animal for variety.
@@ -68,14 +82,14 @@ export class BootScene extends Phaser.Scene {
     this.load.image('workstation', `${A}workstation.png`);
     this.load.image('picnic', `${A}picnic.png`);
     this.load.image('basket', `${A}basket.png`);
-    this.load.spritesheet('chest', `${A}chest.png`, { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('gate', `${A}gate.png`, { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('chest', `${A}chest.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('gate', `${A}gate.png`, { frameWidth: 32, frameHeight: 48 });
     this.load.spritesheet('hay', `${A}hay.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('waterobj', `${A}waterobj.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('signs', `${A}signs.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('nature', `${A}nature.png`, { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('furniture', `${A}furniture.png`, { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('boats', `${A}boats.png`, { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('boats', `${A}boats.png`, { frameWidth: 48, frameHeight: 32 });
     this.load.spritesheet('soil', `${A}soil.png`, { frameWidth: 16, frameHeight: 16 });
     // Elevation (grassy-plateau cliffs), a wooden bridge, and loose stone decals.
     this.load.spritesheet('hills', `${A}hills.png`, { frameWidth: 16, frameHeight: 16 });

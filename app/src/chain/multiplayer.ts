@@ -50,7 +50,7 @@ let offFarm: (() => void) | null = null;
 let offShop: (() => void) | null = null;
 let offChat: (() => void) | null = null;
 let offCatch: (() => void) | null = null;
-let offFish: (() => void) | null = null;
+let offAct: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -194,12 +194,13 @@ function onSelfCatch({ fishId, rarity, x, y }: { fishId: string; rarity: number;
   }
 }
 
-// Broadcast that we started/ended a cast so peers can show us holding the rod
-// over the water (the catch event covers only the landed fish). Best-effort.
-function onSelfFish({ casting, x, y, px, py, facing }: { casting: boolean; x: number; y: number; px: number; py: number; facing: string }): void {
-  if (!channel || !current) return;
+// Broadcast a local tool/fishing pose so peers can play the matching animation
+// on our avatar (tilling, watering, casting — not just walking). Poses are
+// infrequent and discrete, so no throttle — fire-and-forget (best effort).
+function onSelfAct({ action, facing }: { action: string; facing: string }): void {
+  if (!channel || !current || typeof action !== 'string') return;
   try {
-    void channel.send({ type: 'broadcast', event: 'fish', payload: { id: current.id, casting, x, y, px, py, facing } });
+    void channel.send({ type: 'broadcast', event: 'act', payload: { id: current.id, action, facing } });
   } catch {
     // ignore — best effort
   }
@@ -239,11 +240,13 @@ function handlePresenceSync(): void {
   knownRemote = nowRemote;
 }
 
-// Join an island channel as `self`. Idempotent-ish: any existing connection is
-// torn down first. Best-effort; never throws.
-export function joinIsland(island: number, self: Self): void {
+// Open a realtime channel (`topic`) as `self` and wire all presence/broadcast
+// handlers + the local bus listeners. Idempotent-ish: any existing connection is
+// torn down first. Best-effort; never throws. Both the per-island channels and
+// the single shared hub channel go through here so they behave identically.
+function openChannel(topic: string, self: Self): void {
   try {
-    // Drop any prior connection so switching islands is clean.
+    // Drop any prior connection so switching channels is clean.
     leaveIsland();
 
     current = self;
@@ -254,7 +257,7 @@ export function joinIsland(island: number, self: Self): void {
     lastFarmSentAt = 0;
     pendingFarm = null;
 
-    const ch = supabase.channel(`island:${island}`, {
+    const ch = supabase.channel(topic, {
       config: {
         presence: { key: self.id },
         broadcast: { self: false },
@@ -342,26 +345,14 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:remoteCatch', { id: c.id, fishId: c.fishId, rarity: c.rarity, x: c.x, y: c.y });
     });
 
-    // Remote cast state -> render the peer holding the rod over the water.
-    ch.on('broadcast', { event: 'fish' }, (msg) => {
-      const c = (msg as { payload?: unknown }).payload as
-        | { id?: unknown; casting?: unknown; x?: unknown; y?: unknown; px?: unknown; py?: unknown; facing?: unknown }
+    // Remote tool/fishing poses -> animate that peer's avatar (cosmetic only).
+    ch.on('broadcast', { event: 'act' }, (msg) => {
+      const a = (msg as { payload?: unknown }).payload as
+        | { id?: unknown; action?: unknown; facing?: unknown }
         | undefined;
-      if (!c || typeof c.id !== 'string' || typeof c.casting !== 'boolean') return;
-      if (current && c.id === current.id) return; // ignore our own echo
-      // x/y = bobber target on the water; px/py = caster's foot position. Older
-      // clients omit px/py — fall back to the bobber target so they still render.
-      const x = typeof c.x === 'number' ? c.x : 0;
-      const y = typeof c.y === 'number' ? c.y : 0;
-      bus.emit('mp:remoteFish', {
-        id: c.id,
-        casting: c.casting,
-        x,
-        y,
-        px: typeof c.px === 'number' ? c.px : x,
-        py: typeof c.py === 'number' ? c.py : y,
-        facing: typeof c.facing === 'string' ? c.facing : 'down',
-      });
+      if (!a || typeof a.id !== 'string' || typeof a.action !== 'string' || typeof a.facing !== 'string') return;
+      if (current && a.id === current.id) return; // ignore our own echo
+      bus.emit('mp:remoteAct', { id: a.id, action: a.action, facing: a.facing });
     });
 
     ch.subscribe((status) => {
@@ -377,15 +368,36 @@ export function joinIsland(island: number, self: Self): void {
     offShop = bus.on('mp:shopBuy', onSelfShopBuy);
     offChat = bus.on('mp:chatSend', onSelfChat);
     offCatch = bus.on('mp:catch', onSelfCatch);
-    offFish = bus.on('mp:fish', onSelfFish);
+    offAct = bus.on('mp:act', onSelfAct);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
   }
 }
 
-// Leave the current island: untrack presence, remove the channel, and clear all
-// listeners/state. Safe to call when not connected.
+// The local player's id on the active channel (null when disconnected). Lets a
+// scene tell its OWN presence entry apart from peers' in the roster (presence
+// includes self, but broadcast is self:false so 'pos' never echoes back).
+export function currentSelfId(): string | null {
+  return current ? current.id : null;
+}
+
+// Join a per-island channel as `self` (the legacy shared-world path). Best-effort.
+export function joinIsland(island: number, self: Self): void {
+  openChannel(`island:${island}`, self);
+}
+
+// Join the single SHARED social-hub channel as `self`. Everyone who steps onto
+// the hub lands on the same `hub:shared` topic (plot is irrelevant here, so it's
+// ignored), so they all see each other. Best-effort.
+export function joinHub(self: Self): void {
+  openChannel('hub:shared', self);
+}
+
+// Leave whatever channel is currently open (island or hub): untrack presence,
+// remove the channel, and clear all listeners/state. Safe to call when not
+// connected. (Named `leaveIsland` for historical reasons; it's the universal
+// teardown — `leaveHub` is an alias for clarity at hub call sites.)
 export function leaveIsland(): void {
   if (offSelf) {
     try {
@@ -432,13 +444,13 @@ export function leaveIsland(): void {
     offCatch = null;
   }
 
-  if (offFish) {
+  if (offAct) {
     try {
-      offFish();
+      offAct();
     } catch {
       // ignore
     }
-    offFish = null;
+    offAct = null;
   }
 
   if (flushTimer) {
@@ -474,3 +486,6 @@ export function leaveIsland(): void {
     }
   }
 }
+
+// Alias: leaving the hub is the same universal teardown as leaving an island.
+export const leaveHub = leaveIsland;
