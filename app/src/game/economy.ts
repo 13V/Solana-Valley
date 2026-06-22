@@ -62,10 +62,13 @@ export const PLANTS: Plant[] = [
   { id: 'spinach', name: 'Spinach', rarity: 'Common', seedCost: 6, baseValue: 13, growthSeconds: 25, cropRow: 1, color: 0x6fbf3a },
   { id: 'lettuce', name: 'Lettuce', rarity: 'Common', seedCost: 8, baseValue: 16, growthSeconds: 28, cropRow: 7, color: 0x86c34a },
   { id: 'turnip', name: 'Turnip', rarity: 'Common', seedCost: 10, baseValue: 21, growthSeconds: 32, cropRow: 10, color: 0xe7dcc0 },
+  { id: 'potato', name: 'Potato', rarity: 'Common', seedCost: 7, baseValue: 12, growthSeconds: 24, cropRow: 10, color: 0xc69a6a, cropTint: 0xc99a5e },
+  { id: 'radish', name: 'Radish', rarity: 'Common', seedCost: 9, baseValue: 18, growthSeconds: 27, cropRow: 12, color: 0xff5a6a, cropTint: 0xff6a7a },
   // Uncommon
   { id: 'tomato', name: 'Tomato', rarity: 'Uncommon', seedCost: 18, baseValue: 39, growthSeconds: 42, cropRow: 4, color: 0xe2402c, regrow: 22 },
   { id: 'cauliflower', name: 'Cauliflower', rarity: 'Uncommon', seedCost: 23, baseValue: 50, growthSeconds: 47, cropRow: 3, color: 0xeae3c8 },
   { id: 'eggplant', name: 'Eggplant', rarity: 'Uncommon', seedCost: 28, baseValue: 62, growthSeconds: 52, cropRow: 5, color: 0x7a3fb0, regrow: 26 },
+  { id: 'strawberry', name: 'Strawberry', rarity: 'Uncommon', seedCost: 20, baseValue: 44, growthSeconds: 40, cropRow: 4, color: 0xff4d6d, cropTint: 0xff5d7a, regrow: 20 },
   // Rare
   { id: 'beet', name: 'Beetroot', rarity: 'Rare', seedCost: 43, baseValue: 98, growthSeconds: 64, cropRow: 12, color: 0x8e2f6a },
   { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 60, baseValue: 141, growthSeconds: 78, cropRow: 14, color: 0x4fae4a, regrow: 34 },

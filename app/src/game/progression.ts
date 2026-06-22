@@ -2,6 +2,8 @@
 // earns coins + XP; levels unlock rarer seed tiers (see RARITY_UNLOCK in
 // economy.ts); coins buy upgrades that compound the economy.
 
+import { PLANTS } from './economy';
+
 // ---- levels -------------------------------------------------------------
 
 // Cumulative XP required to *reach* a given level (level 1 = 0 XP). Steepened
@@ -207,7 +209,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_mutation', name: 'Oddity', desc: 'Find your first mutation', reward: 250, xp: achXp(250), test: (s) => s.mutationsFound >= 1 },
   { id: 'mutant', name: 'Mutation Master', desc: 'Find 25 mutations', reward: 3000, xp: achXp(3000), test: (s) => s.mutationsFound >= 25 },
   { id: 'botanist', name: 'Botanist', desc: 'Discover 8 different plants', reward: 1000, xp: achXp(1000), test: (s) => s.plantsDiscovered >= 8 },
-  { id: 'collector', name: 'Master Collector', desc: 'Discover all 19 plants', reward: 12000, xp: achXp(12000), test: (s) => s.plantsDiscovered >= 19 },
+  { id: 'collector', name: 'Master Collector', desc: `Discover all ${PLANTS.length} plants`, reward: 12000, xp: achXp(12000), test: (s) => s.plantsDiscovered >= PLANTS.length },
   { id: 'rich', name: 'Tidy Profit', desc: 'Earn 10,000 coins total', reward: 1000, xp: achXp(1000), test: (s) => s.earned >= 10000 },
   { id: 'tycoon', name: 'Valley Tycoon', desc: 'Earn 100,000 coins total', reward: 15000, xp: achXp(15000), test: (s) => s.earned >= 100000 },
   { id: 'seasoned', name: 'Seasoned Farmer', desc: 'Reach level 10', reward: 2000, xp: achXp(2000), test: (s) => s.level >= 10 },
