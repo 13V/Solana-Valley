@@ -22,15 +22,16 @@ const SPECIAL_MUTATIONS = MUTATIONS.filter((m) => m.id !== 'normal');
 
 // ---- collection bonus ---------------------------------------------------
 
-// Per-discovery sale-value buffs. Halved from the original tuning to rein in the
-// economy (the compounding multipliers were letting income run away):
-//   plants:    19 × 0.5% = +9.5%
-//   mutations:  4 × 0.5% = + 2%
-//   8 tiers   × 1.5%     = +12% (each tier fully discovered)
-//   all plants finale    = +12%
-// Maxed total ≈ +35% (×1.35) — a meaningful collection reward, not a runaway.
-const PER_PLANT = 0.005;
-const PER_MUTATION = 0.005;
+// Per-discovery sale-value buffs. Re-tuned for the expanded roster (124 plants,
+// 10 special mutations) so the *maxed* collection bonus stays a meaningful
+// reward without letting income run away:
+//   plants:    124 × 0.2% = +24.8%
+//   mutations:  10 × 0.3% = + 3%
+//   8 tiers    × 1.5%     = +12% (each tier fully discovered)
+//   all plants finale     = +12%
+// Maxed total ≈ +52% (×1.52) at full completion of every plant.
+const PER_PLANT = 0.002;
+const PER_MUTATION = 0.003;
 const PER_TIER = 0.015; // flat buff for completing a whole rarity tier
 const ALL_PLANTS_FINALE = 0.12; // chunky buff for discovering every plant
 
