@@ -1,14 +1,14 @@
-# 🌱 Launch-Night Content Drop Queue — 11 Packed Drops
+# 🌱 Launch-Night Content Drop Queue — 12 Packed Drops
 
-Eleven big, themed updates to release **one per hour**. Each drop is a **checkpoint**
+Twelve big, themed updates to release **one per hour**. Each drop is a **checkpoint**
 bundling a batch of additive commits — releasing one is a single fast-forward of
-your deploy branch to that drop's SHA, in order (1 → 11). Everything **typechecks
+your deploy branch to that drop's SHA, in order (1 → 12). Everything **typechecks
 clean** (`npm run typecheck`) and is additive: no save migrations, no chain code.
 
 ## What this queue delivers
 **196 plants · 15 mutations · 62 fish · 22 forageables · 34 achievements · 50-rung
 quest ladder (with Divine+ seed milestones) · 280 item descriptions · 14 rotating
-festivals · Shop/Seeds filters · plant-family set bonuses · a Lv18 perk tier for all
+festivals (with live gameplay buffs) · Shop/Seeds filters · plant-family set bonuses · a Lv18 perk tier for all
 5 skills.** Crops & mutations are art-free (existing sprite rows recolored via
 `cropTint`); no item was added without a real sprite.
 
@@ -25,7 +25,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 
 ---
 
-## The 11 drops
+## The 12 drops
 
 | Hr | Drop | Deploy SHA | What lands |
 |----|------|-----------|-----------|
@@ -40,10 +40,11 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 | 9 | **The Compendium** | `833069f` | **280 item flavor descriptions** (plant tooltips + Almanac Fish Bestiary & Forage Field Guide) + **rarity/search filters** on Shop & Seeds |
 | 10 | **Quests & Festivals** | `ccb518d` | **Questline 18 → 50 goals** + **goal-set milestones** (every 10 goals cleared → a guaranteed Divine+ seed, up to Celestial) + **14 rotating seasonal festivals** (daily banner) |
 | 11 | **Collection Power** | `8220261` | **Plant-family set bonuses** — discover every plant in a family (23 families) and that family's crops permanently sell **+12%**. New Almanac "Plant Families" grid + a "🌾 family complete!" toast. Makes the 196-plant Almanac economically load-bearing. |
+| 12 | **Living Festivals** | `bcd3ecb` | The 14 rotating festivals now **buff gameplay** during their day — ×3 mutation odds (Mutation Moon), +20–50% crop sale value, +20–40% growth, ×2 fishing/foraging luck. The banner shows the active buff; recurs on the calendar so nothing's missable. |
 
 > Each SHA bundles several commits — that's what makes them "packed." Releasing in
 > order applies cleanly. Drops 1–6 are the collectible waves; 7–8 are the big
-> expansion; 9–11 are the depth layer (lore, filters, quests, events, collection power).
+> expansion; 9–12 are the depth layer (lore, filters, quests, events, collection power, festival buffs).
 
 ---
 
@@ -60,6 +61,7 @@ git push origin <SHA>:<deploy-branch>   # each push = one deploy = one drop
 9. **📖 THE COMPENDIUM!** Every one of the 280 crops, fish & forageables now has its own flavor description — explore the new Fish Bestiary & Field Guide. Plus rarity & search filters so the shop's a breeze. 
 10. **🎯 QUESTS & FESTIVALS!** A 50-rung quest ladder — and every 10 goals you clear now drops a guaranteed **Divine-or-better seed** (clear them all for a Celestial!). Plus 14 rotating seasonal festivals. The grand finale! 🎉
 11. **🌾 COLLECTION POWER!** Finishing a plant family now permanently boosts that family's crop prices by **+12%** — 23 families to complete, from Root Veg to Cosmic Harvest. Your Almanac just became your money-maker. Gotta grow 'em all! 📖
+12. **🎉 LIVING FESTIVALS!** Every festival now actually *does* something — Mutation Moon triples mutation odds, Frost Fair pays +50% for crops, Fisher's Frenzy doubles rare catches, Spring Bloom speeds growth & more. Check the banner and plan your day around it!
 
 ---
 
