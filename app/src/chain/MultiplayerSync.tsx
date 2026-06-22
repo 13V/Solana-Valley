@@ -65,7 +65,7 @@ export function MultiplayerSync() {
       let savedIsland: number | undefined;
       let savedPlot: number | undefined;
       try {
-        const s = JSON.parse(localStorage.getItem('solana-valley:save') || 'null');
+        const s = JSON.parse(localStorage.getItem('farm-lands:save') || 'null');
         if (s && Number.isInteger(s.island)) savedIsland = s.island;
         if (s && Number.isInteger(s.plotIndex)) savedPlot = s.plotIndex;
       } catch {

@@ -64,7 +64,7 @@ of Cup Nooble and are credited here as such.
 > limited by that restriction — commercial projects must use only the Premium
 > pack's tiles.
 
-> ⚠️ **Project note:** Solana Valley is a blockchain game. The current build uses
+> ⚠️ **Project note:** Farm Lands is a blockchain game. The current build uses
 > wallet connect + off-chain coins (no NFTs), which is fine. However, the license
 > forbids use **"for anything to do with NFTs."** Any future feature that turns
 > land or items into **NFTs** (see `docs/ROADMAP.md` M2/M3) would **not** be

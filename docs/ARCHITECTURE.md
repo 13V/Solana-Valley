@@ -1,6 +1,6 @@
 # Architecture
 
-Solana Valley is a browser game with an on-chain ownership/economy layer. This
+Farm Lands is a browser game with an on-chain ownership/economy layer. This
 doc explains the on-chain/off-chain split, the client architecture, and how the
 pieces talk to each other.
 

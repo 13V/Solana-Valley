@@ -12,11 +12,11 @@ import { buildAuthMessage, type WalletAuth } from './walletAuth';
 
 // Must match SAVE_KEY in app/src/game/scenes/FarmScene.ts (the localStorage key
 // the game reads/writes). Kept in sync manually since that const isn't exported.
-export const SAVE_KEY = 'solana-valley:save';
+export const SAVE_KEY = 'farm-lands:save';
 
 // sessionStorage guard so a cloud->local restore that triggers location.reload()
 // can't loop forever within one tab session.
-const RELOAD_GUARD_KEY = 'solana-valley:cloud-reloaded';
+const RELOAD_GUARD_KEY = 'farm-lands:cloud-reloaded';
 
 // A signed auth triple. Structurally identical to (and aliased from) the shared
 // WalletAuth so cloud-save and multiplayer can pass the SAME signed session

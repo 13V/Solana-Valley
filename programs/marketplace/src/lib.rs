@@ -1,4 +1,4 @@
-// Solana Valley — player-to-player marketplace (Phase B of docs/MARKETPLACE.md).
+// Farm Lands — player-to-player marketplace (Phase B of docs/MARKETPLACE.md).
 //
 // An escrow program: a seller lists `qty` of an item SPL token at a fixed total
 // price in $SPROUT; the item is held in a program-owned escrow account until a

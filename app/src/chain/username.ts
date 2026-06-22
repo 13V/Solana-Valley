@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react';
 
 // localStorage key for a wallet's chosen username.
 function storageKey(wallet: string): string {
-  return `solana-valley:username:${wallet}`;
+  return `farm-lands:username:${wallet}`;
 }
 
 // Sanitize a raw username: strip control chars, collapse internal whitespace,

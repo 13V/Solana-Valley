@@ -1,4 +1,4 @@
-// Solana Valley world: a terraced valley. TWO raised plateau BANDS of fenced
+// Farm Lands world: a terraced valley. TWO raised plateau BANDS of fenced
 // homesteads — 10 across the top, 10 across the bottom — face each other across
 // a wide sunken central PLAZA (the valley floor) full of stone paths, a pond,
 // markets and decorations. Every homestead's fence opens toward the plaza.

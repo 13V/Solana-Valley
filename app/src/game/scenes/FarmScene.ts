@@ -224,7 +224,7 @@ type Animal = {
   breedAt?: number; // when an adult next tries to produce a baby
 };
 
-const SAVE_KEY = 'solana-valley:save';
+const SAVE_KEY = 'farm-lands:save';
 const SAVE_VERSION = 16; // bumped: added claimedGoals (rewarded goal-ladder); defaults preserve older saves (legacy saves retro-claim satisfied goals without payout)
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
@@ -573,6 +573,9 @@ export class FarmScene extends Phaser.Scene {
       kb.on(`keydown-${key}`, () => this.setTool((['hoe', 'can', 'seed'] as const)[i]));
     });
     kb.on('keydown-FOUR', () => this.setTool('rod'));
+    // `M` opens the standalone walkable Map Editor scene (Explore mode). It only
+    // renders an editor-built map for walking around; it doesn't touch farm state.
+    kb.on('keydown-M', () => this.scene.start('Map', { url: 'maps/sample-map.json' }));
 
     // The rod/line/bobber cast choreography. Torn down on shutdown.
     this.fishingCast = new FishingCast(this);
@@ -1623,7 +1626,7 @@ export class FarmScene extends Phaser.Scene {
   // Withering is ON unless the toggle (owned by the UI) is explicitly set to '0'.
   private witherEnabled(): boolean {
     try {
-      return localStorage.getItem('solana-valley:crop-wither') !== '0';
+      return localStorage.getItem('farm-lands:crop-wither') !== '0';
     } catch {
       return true;
     }

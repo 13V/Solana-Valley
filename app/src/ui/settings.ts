@@ -10,11 +10,11 @@
 import { useEffect, useState } from 'react';
 import { sfx } from '../game/audio';
 
-const SETTINGS_KEY = 'solana-valley:settings';
-const REDUCE_MOTION_KEY = 'solana-valley:reduce-motion';
+const SETTINGS_KEY = 'farm-lands:settings';
+const REDUCE_MOTION_KEY = 'farm-lands:reduce-motion';
 // Standalone key the game core reads directly to decide if ripe crops wilt.
 // Default ON: only '0' disables withering.
-const CROP_WITHER_KEY = 'solana-valley:crop-wither';
+const CROP_WITHER_KEY = 'farm-lands:crop-wither';
 const FILTER_DEFS_ID = 'cb-filter-defs';
 
 export type TextSize = 'sm' | 'md' | 'lg';

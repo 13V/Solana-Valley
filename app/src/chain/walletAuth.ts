@@ -25,7 +25,7 @@ export type WalletAuth = {
 // undefined when the connected wallet doesn't support message signing.
 export type SignMessageFn = (message: Uint8Array) => Promise<Uint8Array>;
 
-const MESSAGE_PREFIX = 'Solana Valley';
+const MESSAGE_PREFIX = 'Farm Lands';
 
 // Build the canonical message the wallet signs. Embeds the wallet address and a
 // fresh ISO timestamp so the server can bind the signature to this wallet and
@@ -44,7 +44,7 @@ const cache = new Map<string, WalletAuth>();
 // existing valid signature instead of re-prompting the SAME user on their own
 // device. Server verification is unchanged — a stale stored sig is simply not
 // reused (it would be rejected anyway).
-const storageKey = (wallet: string) => `solana-valley:auth:${wallet}`;
+const storageKey = (wallet: string) => `farm-lands:auth:${wallet}`;
 
 // Server accepts signatures up to 24h old; leave ~1h of margin so a reused sig
 // doesn't age out mid-request. Below this, treat a stored auth as expired.
@@ -161,7 +161,7 @@ export function clearWalletAuth(wallet?: string): void {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('solana-valley:auth:')) localStorage.removeItem(k);
+        if (k && k.startsWith('farm-lands:auth:')) localStorage.removeItem(k);
       }
     } catch { /* ignore */ }
     cache.clear();

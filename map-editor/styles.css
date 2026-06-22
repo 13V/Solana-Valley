@@ -1,5 +1,5 @@
 /* ============================================================
-   Sprout Valley Map Editor — styles
+   Farm Lands Map Editor — styles
    ============================================================ */
 :root {
   --bg:        #1a1c1a;
@@ -235,9 +235,81 @@ input:focus { outline: none; border-color: var(--accent); }
 }
 .toast[hidden] { display: none; }
 
-/* ---------------- Responsive ---------------- */
+/* ---------------- Mobile chrome (hidden on desktop) ---------------- */
+.mobile-only { display: none; }
+.fab { display: none; }
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30; }
+.scrim[hidden] { display: none; }
+
+/* Bigger hit targets on any touch device */
+@media (pointer: coarse) {
+  .tool, .btn { height: 40px; min-width: 40px; }
+  .mini { height: 30px; min-width: 30px; }
+  button { touch-action: manipulation; }
+  .swatch { width: 44px; height: 44px; }
+  .swatch canvas { width: 42px; height: 42px; }
+  .swatches { grid-template-columns: repeat(auto-fill, 44px); }
+  .layer .vis { width: 30px; height: 30px; }
+  .layer .lbtn { width: 28px; height: 28px; font-size: 13px; }
+  .group > summary { padding: 9px 8px; }
+}
+
+/* ---------------- Phone / small-tablet layout ---------------- */
 @media (max-width: 900px) {
-  :root { --rail-w: 0px; }
-  .rail { display: none; }
-  .layout { grid-template-columns: 1fr var(--side-w); }
+  :root { --top-h: 56px; }
+  html, body { height: 100%; }
+  body { position: fixed; inset: 0; overscroll-behavior: none; }
+
+  .mobile-only { display: inline-flex; }
+
+  /* Top bar → single scrolling row; drop the brand text; pin the menu button. */
+  .topbar { height: var(--top-h); gap: 8px; padding: 0 8px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+  .topbar::-webkit-scrollbar { display: none; }
+  .brand-name { display: none; }
+  .topbar .spacer { display: none; }
+  #railToggle { position: sticky; left: 0; z-index: 1; }
+
+  /* Stage fills the screen; the rail + tile palette become overlays. */
+  .layout { grid-template-columns: 1fr; height: calc(100% - var(--top-h)); }
+
+  /* Left rail → slide-in drawer */
+  .rail {
+    position: fixed; top: var(--top-h); bottom: 0; left: 0; width: min(290px, 86vw);
+    z-index: 40; transform: translateX(-100%); transition: transform .22s ease;
+    border-right: 1px solid var(--line-2); box-shadow: var(--shadow);
+  }
+  body.rail-open .rail { transform: none; }
+
+  /* Right sidebar (tiles) → bottom sheet */
+  .sidebar {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; height: 64vh;
+    z-index: 40; transform: translateY(100%); transition: transform .22s ease;
+    border-left: none; border-top: 1px solid var(--line-2);
+    border-radius: 16px 16px 0 0; box-shadow: var(--shadow);
+  }
+  body.tiles-open .sidebar { transform: none; }
+  .sidebar::before {
+    content: ""; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; border-radius: 2px; background: var(--line-2); z-index: 3;
+  }
+  .sidebar-head { padding-top: 16px; }
+
+  /* Tiles opener */
+  .fab {
+    display: inline-flex; align-items: center; gap: 7px;
+    position: fixed; right: 14px; bottom: 14px; z-index: 35;
+    height: 50px; padding: 0 18px; border-radius: 25px;
+    background: var(--accent); color: var(--accent-ink);
+    border: 1px solid var(--accent-2); font-weight: 700; font-size: 15px;
+    box-shadow: var(--shadow);
+  }
+  body.tiles-open .fab { display: none; }
+
+  /* Relocated zoom + file groups inside the rail drawer */
+  .rail-extra { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rail-extra .toolgroup { border: none !important; padding: 0; gap: 6px; flex-wrap: wrap; }
+  .rail-extra .zoom-label { min-width: 44px; }
+
+  /* Near-full-screen modal on phones */
+  .modal-card { width: 96vw; max-height: 90vh; }
 }

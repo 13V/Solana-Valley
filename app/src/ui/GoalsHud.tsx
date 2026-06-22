@@ -5,7 +5,7 @@ import { GOALS, GOAL_MILESTONES, goalStatsFromUi, rewardLabel } from '../game/go
 import { PLANT_BY_ID, RARITY } from '../game/economy';
 import './goals.css';
 
-const COLLAPSED_KEY = 'solana-valley:goals-collapsed';
+const COLLAPSED_KEY = 'farm-lands:goals-collapsed';
 
 // A compact, collapsible "What next?" questline pinned to the left edge. The
 // goal ladder + rewards live in game/goals.ts; the game grants the rewards
