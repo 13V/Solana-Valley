@@ -50,6 +50,7 @@ let offFarm: (() => void) | null = null;
 let offShop: (() => void) | null = null;
 let offChat: (() => void) | null = null;
 let offCatch: (() => void) | null = null;
+let offAct: (() => void) | null = null;
 
 // Throttle state for outgoing position broadcasts.
 let lastSentAt = 0;
@@ -193,6 +194,18 @@ function onSelfCatch({ fishId, rarity, x, y }: { fishId: string; rarity: number;
   }
 }
 
+// Broadcast a local tool/fishing pose so peers can play the matching animation
+// on our avatar (tilling, watering, casting — not just walking). Poses are
+// infrequent and discrete, so no throttle — fire-and-forget (best effort).
+function onSelfAct({ action, facing }: { action: string; facing: string }): void {
+  if (!channel || !current || typeof action !== 'string') return;
+  try {
+    void channel.send({ type: 'broadcast', event: 'act', payload: { id: current.id, action, facing } });
+  } catch {
+    // ignore — best effort
+  }
+}
+
 // Rebuild the roster from presence state and emit it, plus 'mp:leave' for any
 // remote peer that disappeared since the last sync.
 function handlePresenceSync(): void {
@@ -330,6 +343,16 @@ export function joinIsland(island: number, self: Self): void {
       bus.emit('mp:remoteCatch', { id: c.id, fishId: c.fishId, rarity: c.rarity, x: c.x, y: c.y });
     });
 
+    // Remote tool/fishing poses -> animate that peer's avatar (cosmetic only).
+    ch.on('broadcast', { event: 'act' }, (msg) => {
+      const a = (msg as { payload?: unknown }).payload as
+        | { id?: unknown; action?: unknown; facing?: unknown }
+        | undefined;
+      if (!a || typeof a.id !== 'string' || typeof a.action !== 'string' || typeof a.facing !== 'string') return;
+      if (current && a.id === current.id) return; // ignore our own echo
+      bus.emit('mp:remoteAct', { id: a.id, action: a.action, facing: a.facing });
+    });
+
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         // Announce our presence once the channel is live.
@@ -343,6 +366,7 @@ export function joinIsland(island: number, self: Self): void {
     offShop = bus.on('mp:shopBuy', onSelfShopBuy);
     offChat = bus.on('mp:chatSend', onSelfChat);
     offCatch = bus.on('mp:catch', onSelfCatch);
+    offAct = bus.on('mp:act', onSelfAct);
   } catch {
     // Any failure -> ensure we don't leave half-initialised state around.
     leaveIsland();
@@ -395,6 +419,15 @@ export function leaveIsland(): void {
       // ignore
     }
     offCatch = null;
+  }
+
+  if (offAct) {
+    try {
+      offAct();
+    } catch {
+      // ignore
+    }
+    offAct = null;
   }
 
   if (flushTimer) {

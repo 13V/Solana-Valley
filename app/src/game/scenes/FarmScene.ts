@@ -135,6 +135,12 @@ type RemotePlayer = {
   targetY: number;
   facing: Dir;
   name: string;
+  // A one-shot pose (hoe/water/catch) holds the avatar until this time, so the
+  // walk/idle fallback in updateRemotes doesn't stomp it; `casting` holds the
+  // fishing pose until a 'fish-end'/'fish-catch' arrives. Both mirror how the
+  // local player's update() guards its own action/cast animations.
+  actingUntil?: number;
+  casting?: boolean;
 };
 
 // A single remote crop drawn in another player's plot. Visual only — it reuses
@@ -624,6 +630,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('mp:remoteFarm', (f) => this.onRemoteFarm(f)),
       bus.on('mp:shopBought', ({ plantId }) => this.onRemoteShopBuy(plantId)),
       bus.on('mp:remoteCatch', (c) => this.onRemoteCatch(c)),
+      bus.on('mp:remoteAct', (a) => this.onRemoteAct(a)),
     );
     // Tear down every remote avatar + remote farm + the ground guide on shutdown.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -913,21 +920,27 @@ export class FarmScene extends Phaser.Scene {
   private playAction(tool: 'hoe' | 'water') {
     this.actingUntil = this.time.now + 440; // ~8 frames @ 18fps
     this.player.anims.play(`act-${tool}-${this.facing}`, true);
+    bus.emit('mp:act', { action: tool, facing: this.facing }); // let peers see the swing
   }
 
-  // Overlay the premium "water out of the can" spray on the player for one swing.
+  // Overlay the premium "water out of the can" spray on a sprite for one swing.
   // The spray sheet shares the 48px character grid, so it lines up with the can
-  // when drawn at the player's transform; it's purely cosmetic and self-cleans.
-  private waterSpray() {
+  // when drawn at the sprite's transform; it's purely cosmetic and self-cleans.
+  // Used for the local player AND remote avatars (so peers see the spray too).
+  private spawnSprayAt(who: Phaser.GameObjects.Sprite, dir: Dir) {
     if (!this.anims.exists('watercan_spray')) return;
     const spray = this.add
-      .sprite(this.player.x, this.player.y, 'watering_spray')
-      .setOrigin(this.player.originX, this.player.originY)
-      .setScale(this.player.scaleX, this.player.scaleY)
-      .setFlipX(this.facing === 'left')
-      .setDepth(this.player.depth + (this.facing === 'up' ? -1 : 1));
+      .sprite(who.x, who.y, 'watering_spray')
+      .setOrigin(who.originX, who.originY)
+      .setScale(who.scaleX, who.scaleY)
+      .setFlipX(dir === 'left')
+      .setDepth(who.depth + (dir === 'up' ? -1 : 1));
     spray.play('watercan_spray');
     spray.once('animationcomplete', () => spray.destroy());
+  }
+
+  private waterSpray() {
+    this.spawnSprayAt(this.player, this.facing);
   }
 
   // Drop the player out of a cast/celebration pose back to the resting idle.
@@ -2732,12 +2745,12 @@ export class FarmScene extends Phaser.Scene {
       onPhase: (phase) => this.playCastAnim(phase),
       onResolve: (o) => {
         this.casting = false;
+        const dir = this.facing;
         if (o.hooked) {
           this.landCatch(o.at.x, o.at.y, ocean);
           // Celebrate with the pack's 32-frame "show off the catch" clip, then
           // settle back to idle. actingUntil stops update()'s idle from cutting
           // it short; the per-clip complete event restores the resting pose.
-          const dir = this.facing;
           const catchKey = `pfish-catch-${dir}`;
           if (this.anims.exists(catchKey)) {
             this.player.setFlipX(dir === 'right');
@@ -2746,6 +2759,7 @@ export class FarmScene extends Phaser.Scene {
             this.player.once(`animationcomplete-${catchKey}`, () => {
               if (!this.casting) this.resetPlayerPose(); // don't stomp a fresh cast
             });
+            bus.emit('mp:act', { action: 'fish-catch', facing: dir }); // peers celebrate too
             this.emitState();
             return;
           }
@@ -2755,6 +2769,7 @@ export class FarmScene extends Phaser.Scene {
           this.toast('🎣 It got away! Click the moment it bites.');
         }
         // A miss (or the catch art is missing): straight back to idle.
+        bus.emit('mp:act', { action: 'fish-end', facing: dir }); // tell peers the cast ended
         this.resetPlayerPose();
         this.emitState();
       },
@@ -2779,6 +2794,13 @@ export class FarmScene extends Phaser.Scene {
       case 'reeling': play(`pfish-reel-${dir}`); break;
       // 'bite' keeps the waiting hold — the bobber dunk + "!" is the cue.
     }
+    // Mirror the cast pose to peers (the matching pfish-* clip on our avatar).
+    const act =
+      phase === 'casting' ? 'fish-cast'
+      : phase === 'waiting' || phase === 'ready' ? 'fish-wait'
+      : phase === 'reeling' ? 'fish-reel'
+      : null;
+    if (act) bus.emit('mp:act', { action: act, facing: dir });
   }
 
   // Roll what's actually on the line. Treasure Hunter can swap the fish for a
@@ -3430,6 +3452,64 @@ export class FarmScene extends Phaser.Scene {
     rp.facing = dir;
   }
 
+  // A remote player performed a tool/fishing action — play the matching pose on
+  // their avatar (cosmetic). The actingUntil/casting flags keep updateRemotes'
+  // walk/idle fallback from stomping it (mirroring the local player's guards).
+  // We snap the avatar to its target first so the lerp doesn't read as "moving"
+  // and cancel the pose. pfish-* clips flip on 'right' like the local cast.
+  private onRemoteAct({ id, action, facing }: { id: string; action: string; facing: string }) {
+    const rp = this.remotePlayers.get(id);
+    if (!rp) return;
+    const dir = this.toDir(facing);
+    rp.facing = dir;
+    rp.sprite.x = rp.targetX;
+    rp.sprite.y = rp.targetY;
+    const flip = dir === 'right';
+    const play = (key: string, sideFlip = false) => {
+      if (!this.anims.exists(key)) return;
+      rp.sprite.setFlipX(sideFlip);
+      rp.sprite.play(key, true);
+    };
+    switch (action) {
+      case 'hoe':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 440;
+        play(`act-hoe-${dir}`);
+        break;
+      case 'water':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 440;
+        play(`act-water-${dir}`);
+        this.spawnSprayAt(rp.sprite, dir);
+        break;
+      case 'fish-cast':
+        rp.casting = true;
+        rp.actingUntil = 0;
+        play(`pfish-cast-${dir}`, flip);
+        break;
+      case 'fish-wait':
+        rp.casting = true;
+        play(`pfish-wait-${dir}`, flip);
+        break;
+      case 'fish-reel':
+        rp.casting = true;
+        play(`pfish-reel-${dir}`, flip);
+        break;
+      case 'fish-catch':
+        rp.casting = false;
+        rp.actingUntil = this.time.now + 1800;
+        play(`pfish-catch-${dir}`, flip);
+        break;
+      case 'fish-end':
+        rp.casting = false;
+        rp.actingUntil = 0;
+        rp.sprite.setFlipX(false);
+        rp.sprite.setTexture('pchar', 0);
+        play(`idle-${dir}`);
+        break;
+    }
+  }
+
   private removeRemote(id: string) {
     // Drop the avatar AND any crops they were showing (a leaver vanishes whole).
     this.removeRemoteFarm(id);
@@ -3596,6 +3676,7 @@ export class FarmScene extends Phaser.Scene {
     if (!this.remotePlayers.size) return;
     // Frame-rate-independent smoothing factor.
     const t = 1 - Math.pow(0.001, delta / 1000);
+    const now = this.time.now;
     for (const rp of this.remotePlayers.values()) {
       const dx = rp.targetX - rp.sprite.x;
       const dy = rp.targetY - rp.sprite.y;
@@ -3608,11 +3689,22 @@ export class FarmScene extends Phaser.Scene {
         rp.sprite.x = rp.targetX;
         rp.sprite.y = rp.targetY;
       }
-      // Play walk while closing distance, idle once arrived — keyed exactly like
-      // the local player so remote avatars animate identically. `play(..., true)`
-      // ignores the call if that exact key is already running, so re-issuing each
-      // frame is cheap and naturally handles a facing change mid-walk.
-      rp.sprite.play(`${moving ? 'walk' : 'idle'}-${rp.facing}`, true);
+      // Walking cancels any held pose (and self-heals a dropped 'fish-end'); while
+      // a cast / tool-use / catch pose owns the avatar, leave its animation alone.
+      // Otherwise re-issue walk/idle each frame — keyed exactly like the local
+      // player so remotes animate identically. `play(..., true)` is a no-op if the
+      // key is already running, so re-issuing is cheap. Mirrors update()'s guard.
+      if (moving) {
+        rp.casting = false;
+        rp.actingUntil = 0;
+        rp.sprite.setFlipX(false);
+        rp.sprite.play(`walk-${rp.facing}`, true);
+      } else if (rp.casting || (rp.actingUntil && now < rp.actingUntil)) {
+        // a fishing cast / tool-use / catch pose is playing — don't stomp it
+      } else {
+        rp.sprite.setFlipX(false);
+        rp.sprite.play(`idle-${rp.facing}`, true);
+      }
       this.depthSortRemote(rp);
     }
   }

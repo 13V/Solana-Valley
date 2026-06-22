@@ -49,6 +49,11 @@ export interface GameEvents {
   // fish flying into our avatar (cosmetic only — no coins/XP awarded on receive).
   'mp:catch': { fishId: string; rarity: number; x: number; y: number }; // FarmScene -> network: we landed a fish (net stamps our id)
   'mp:remoteCatch': { id: string; fishId: string; rarity: number; x: number; y: number }; // network -> FarmScene: a peer landed a fish
+  // Player action/animation broadcast so peers see each other tilling, watering
+  // and fishing (not just walking/idling). `action` is 'hoe' | 'water' |
+  // 'fish-cast' | 'fish-wait' | 'fish-reel' | 'fish-catch' | 'fish-end'.
+  'mp:act': { action: string; facing: string }; // FarmScene -> network: a local tool/fishing pose (net stamps our id)
+  'mp:remoteAct': { id: string; action: string; facing: string }; // network -> FarmScene: a peer's pose to animate
 }
 
 type Handler<T> = (payload: T) => void;
