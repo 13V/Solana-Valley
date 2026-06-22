@@ -52,7 +52,7 @@ import {
   type UpgradeForks,
 } from '../progression';
 import { collectionBonus } from '../collection';
-import { GOALS, rewardLabel, type GoalStats } from '../goals';
+import { GOALS, GOAL_MILESTONES, rewardLabel, type GoalStats } from '../goals';
 import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
 import {
@@ -2292,6 +2292,22 @@ export class FarmScene extends Phaser.Scene {
         sfx.play('achievement');
         this.toast(`🎯 Goal complete: ${g.label}!  ${rewardLabel(g.reward)}`);
         if (g.reward.xp) this.gainXp(g.reward.xp); // may level up → loop re-checks
+        progressed = true;
+      }
+      // Goal-set milestones: completing a SET of goals grants a guaranteed RARE
+      // (Divine+) seed plus a coin/XP bonus. Tracked with synthetic `m:<count>`
+      // ids in claimedGoals so it persists without a save-format bump.
+      const doneCount = GOALS.reduce((n, gg) => n + (this.claimedGoals.has(gg.id) ? 1 : 0), 0);
+      for (const m of GOAL_MILESTONES) {
+        if (this.claimedGoals.has(`m:${m.count}`) || doneCount < m.count) continue;
+        this.claimedGoals.add(`m:${m.count}`);
+        this.coins += m.coins;
+        const plant = PLANTS.find((p) => p.id === m.seed.id);
+        if (plant) this.seeds[m.seed.id] = (this.seeds[m.seed.id] ?? 0) + m.seed.count;
+        sfx.play('achievement');
+        const seedLabel = plant ? `${m.seed.count}× ${plant.name} (${plant.rarity}) seed` : 'a rare seed';
+        this.toast(`🎁 ${m.label} cleared! ${seedLabel} · +${m.coins.toLocaleString()}🪙`);
+        if (m.xp) this.gainXp(m.xp);
         progressed = true;
       }
     }

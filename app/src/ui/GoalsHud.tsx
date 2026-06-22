@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useGameState } from './useGameState';
 import { masterGardenerPct } from '../game/collection';
-import { GOALS, goalStatsFromUi, rewardLabel } from '../game/goals';
+import { GOALS, GOAL_MILESTONES, goalStatsFromUi, rewardLabel } from '../game/goals';
+import { PLANT_BY_ID, RARITY } from '../game/economy';
 import './goals.css';
 
 const COLLAPSED_KEY = 'solana-valley:goals-collapsed';
@@ -41,6 +42,9 @@ export function GoalsHud() {
   // With a long ladder (50+ rungs), only surface the next few actionable goals.
   const upcoming = GOALS.filter((g) => !(claimed.has(g.id) || g.test(stats)));
   const shown = upcoming.slice(0, 6);
+  // Next goal-set milestone (every 10 goals → a guaranteed Divine+ seed).
+  const nextMs = GOAL_MILESTONES.find((m) => completed < m.count);
+  const nextMsSeed = nextMs ? PLANT_BY_ID[nextMs.seed.id] : undefined;
 
   // North-star completion meter — the rolled-up long-term goal (see Almanac for
   // the full breakdown).
@@ -71,6 +75,15 @@ export function GoalsHud() {
         {!collapsed && (
           <>
             <div className="goals-master">🌱 Master Gardener: {masterPct}%</div>
+            {nextMs && (
+              <div className="goals-master" style={{ opacity: 0.92 }}>
+                🎁 {nextMs.count - completed} more {nextMs.count - completed === 1 ? 'goal' : 'goals'} → a{' '}
+                <strong style={{ color: nextMsSeed ? RARITY[nextMsSeed.rarity].css : undefined }}>
+                  {nextMsSeed ? nextMsSeed.rarity : 'rare'}
+                </strong>{' '}
+                seed
+              </div>
+            )}
             <ul className="goals-list">
               {shown.map((g) => (
                 <li key={g.id} className="goals-item">

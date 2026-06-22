@@ -108,6 +108,28 @@ const GOAL_LIST: Goal[] = [
 // ordering never affects what's already been completed.
 export const GOALS: Goal[] = [...GOAL_LIST].sort((a, b) => a.reward.coins - b.reward.coins);
 
+// ---- goal-set milestones ------------------------------------------------
+// Completing a SET of goals (every 10 rungs) hands out a guaranteed RARE seed —
+// Divine or above — on top of the per-goal rewards, plus a coin/XP bonus. Seeds
+// get rarer the deeper you go; clearing the whole ladder yields a Celestial.
+// FarmScene grants these once each (tracked via synthetic `m:<count>` ids in the
+// already-persisted claimedGoals set, so no save-format change is needed).
+export type GoalMilestone = {
+  count: number; // how many goals must be claimed to unlock it
+  label: string; // shown in the reward toast / HUD
+  seed: { id: string; count: number }; // a Divine+ plant id (guarded in FarmScene)
+  coins: number;
+  xp: number;
+};
+
+export const GOAL_MILESTONES: GoalMilestone[] = [
+  { count: 10, label: 'Goal Set I — 10 goals', seed: { id: 'bluerose', count: 2 }, coins: 5000, xp: 300 },
+  { count: 20, label: 'Goal Set II — 20 goals', seed: { id: 'sunpetal', count: 2 }, coins: 15000, xp: 700 },
+  { count: 30, label: 'Goal Set III — 30 goals', seed: { id: 'starfruit', count: 2 }, coins: 40000, xp: 1500 },
+  { count: 40, label: 'Goal Set IV — 40 goals', seed: { id: 'moonpetal', count: 1 }, coins: 100000, xp: 3000 },
+  { count: 50, label: 'Goal Master — every goal', seed: { id: 'voidbloom', count: 1 }, coins: 300000, xp: 8000 },
+];
+
 // Build the predicate snapshot from the UI state the game pushes up.
 export function goalStatsFromUi(s: UiState): GoalStats {
   return {
