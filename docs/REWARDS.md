@@ -174,8 +174,10 @@ trade it for real $LANDS on demand. Each qualifying tier pays a **flat USD value
 | Prismatic | Star Fruit, Moonpetal | **$5** |
 | Celestial | Galaxy Fruit, Voidbloom | **$10** |
 
-Everything below Divine (and fish) stays coins-only. **Special variants** add a
-**capped** multiplier on top (`CLAIM_MUT_MULT`): Shiny **1.25×**, Frosted **1.5×**,
+Everything below Divine (and fish) stays coins-only. **Divine and above can't be
+sold for coins at all — the only way to cash them in is trading for $LANDS** (the
+coin "Sell" button is hidden for them, and `sellStack`/`sellAll` refuse them).
+**Special variants** add a **capped** multiplier on top (`CLAIM_MUT_MULT`): Shiny **1.25×**, Frosted **1.5×**,
 Gold **1.75×**, Rainbow **2×** — so a Rainbow Celestial pays ~$20, not the ×25 its
 in-game value implies. (Quality stars don't affect the token payout.) To keep this
 from draining the treasury, payouts are clamped to a **capped daily pool**

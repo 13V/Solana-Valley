@@ -26,6 +26,7 @@ import {
   rollQuality,
   QUALITY,
   MUTATION_BY_ID,
+  isTokenTradeable,
   type Plant,
   type Mutation,
   type Quality,
@@ -1940,6 +1941,13 @@ export class FarmScene extends Phaser.Scene {
     }
     // Tolerant parse: legacy 3-/4-part keys default quality 'none', withered '0'.
     const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+    const plant = PLANT_BY_ID[plantId];
+    // Divine+ crops are NOT sellable for coins — they can only be traded for
+    // $LANDS (the 🌱 button). Refuse a coin sale here as a backstop to the UI.
+    if (plant && isTokenTradeable(plant)) {
+      this.toast(`${plant.name} can only be traded for $LANDS (🌱)`);
+      return;
+    }
     const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const value = Math.round(
       this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
@@ -1996,6 +2004,7 @@ export class FarmScene extends Phaser.Scene {
     let cropTotal = 0;
     let fishTotal = 0;
     const fishValueMult = this.mods().fishValueMult;
+    const soldKeys: string[] = [];
     for (const [key, count] of Object.entries(this.harvestInv)) {
       // Fish stacks are valued on their own track (species value × Fishing mult),
       // outside the crop market/collection multipliers. Branch BEFORE the crop
@@ -2003,11 +2012,16 @@ export class FarmScene extends Phaser.Scene {
       if (key.startsWith('fish|')) {
         const fish = FISH_BY_ID[key.slice(5)];
         if (fish) fishTotal += fish.value * count * fishValueMult;
+        soldKeys.push(key);
         continue;
       }
       const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+      const plant = PLANT_BY_ID[plantId];
+      // Divine+ crops are $LANDS-only — never swept into a coin sale. Leave them.
+      if (plant && isTokenTradeable(plant)) continue;
       const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
-      cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
+      cropTotal += this.cropSaleUnit(plant, MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
+      soldKeys.push(key);
     }
     const total = Math.round(
       cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() + fishTotal,
@@ -2016,7 +2030,7 @@ export class FarmScene extends Phaser.Scene {
       this.toast('Nothing to sell');
       return;
     }
-    this.harvestInv = {};
+    for (const key of soldKeys) delete this.harvestInv[key];
     this.coins += total;
     this.earned += total;
     sfx.play('sell');

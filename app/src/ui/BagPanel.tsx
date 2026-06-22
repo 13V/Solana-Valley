@@ -132,7 +132,8 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
     const quality = q as Quality;
     const withered = wth === '1';
     const unit = cropValue(plant, mutation, isWet, quality, withered);
-    total += unit * count;
+    // Divine+ crops aren't coin-sellable, so they don't count toward "Sell all".
+    if (!isTokenTradeable(plant)) total += unit * count;
     rows.push({ kind: 'crop', k, plant, mutation, wet: isWet, quality, withered, count, unit });
   }
 
@@ -196,12 +197,15 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   <span className="row-meta">{unit.toLocaleString()}🪙 ea</span>
                 </Tooltip>
                 <span className="stock">×{count}</span>
-                <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
-                {connected && isTokenTradeable(plant) && (
+                {/* Divine+ crops are $LANDS-only — no coin "Sell" button for them. */}
+                {!isTokenTradeable(plant) && (
+                  <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
+                )}
+                {isTokenTradeable(plant) && (
                   <button
                     className="btn sm gold"
                     disabled={redeemingKey !== null}
-                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ~$${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)} of $LANDS`}
+                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ~$${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)} of $LANDS (can't be sold for coins)`}
                     onClick={() => redeem(k, plant.id, mutation.id, count, plant.name)}
                   >
                     🌱 ~${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)}
