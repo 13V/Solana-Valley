@@ -274,6 +274,35 @@ export const PLANTS: Plant[] = [
   { id: 'stf_celestial_date', name: 'Date Palm', rarity: 'Mythical', seedCost: 310, baseValue: 920, growthSeconds: 165, cropRow: 7, color: 0x8a5a2e, cropTint: 0xb5793e, regrow: 82 },
 ];
 
+// ---- growth-time tuning -------------------------------------------------
+// Applied once at module load over the roster above:
+//   • Every crop below Divine grows 30% slower than its base tuning.
+//   • Divine is pinned to 15 minutes, and each rarity above it doubles
+//     (Prismatic 30 min, Celestial 60 min) — the apex chase crops are a real
+//     time investment, not a quick flip.
+// (A full day/night cycle is 8 min, so Divine ≈ 2 days, Celestial ≈ 7.5 days.)
+const GROWTH_SLOWDOWN = 1.3;
+const FIXED_GROWTH_BY_RARITY: Partial<Record<Rarity, number>> = (() => {
+  const out: Partial<Record<Rarity, number>> = {};
+  const divineIdx = RARITY_ORDER.indexOf('Divine');
+  for (let i = divineIdx; i < RARITY_ORDER.length; i++) {
+    out[RARITY_ORDER[i]] = 15 * 60 * 2 ** (i - divineIdx); // 900s, 1800s, 3600s, …
+  }
+  return out;
+})();
+
+for (const p of PLANTS) {
+  const fixed = FIXED_GROWTH_BY_RARITY[p.rarity];
+  if (fixed !== undefined) {
+    // Pin Divine+ to the fixed per-tier time, preserving any regrow:growth ratio.
+    if (p.regrow !== undefined) p.regrow = Math.round(p.regrow * (fixed / p.growthSeconds));
+    p.growthSeconds = fixed;
+  } else {
+    p.growthSeconds = Math.round(p.growthSeconds * GROWTH_SLOWDOWN);
+    if (p.regrow !== undefined) p.regrow = Math.round(p.regrow * GROWTH_SLOWDOWN);
+  }
+}
+
 export const PLANT_BY_ID: Record<string, Plant> = Object.fromEntries(
   PLANTS.map((p) => [p.id, p]),
 );
