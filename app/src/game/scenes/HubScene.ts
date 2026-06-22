@@ -196,7 +196,10 @@ export class HubScene extends Phaser.Scene {
         if (base && cat !== 'water' && hasGrass) this.add.image(cx, cy, HUB_GRASS, 12).setScale(2).setDepth(-1);
         const depth = base ? (layer.name === 'sea' ? -2 : 0) : tall ? cy : 1;
         this.add.image(cx, cy, key, frame).setScale(2).setDepth(depth);
-        if (cat === 'water' || tall) {
+        // Social hub is a free-roam space: ONLY fences block movement. Trees,
+        // houses, water, etc. are walkable (still y-sorted via `tall` so overlap
+        // reads right). Keeps the hub from feeling like a maze of invisible walls.
+        if (key.includes('fences')) {
           this.addCollider(cx, cy, TILE, TILE);
           blocked.add(k);
         }

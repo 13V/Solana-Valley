@@ -1199,6 +1199,29 @@ export class FarmScene extends Phaser.Scene {
         .setScale(2).setDepth(1).setVisible(false);
     }
 
+    // Confine the player to the island. The surrounding sea is just a decorative
+    // backdrop (no map tiles), so without a barrier you can walk straight out onto
+    // open water. Ring the landmass: every sea tile (no ground / not farm / not a
+    // path) that touches walkable land — in any of the 8 directions, so convex
+    // corners stay sealed — gets an invisible collider. Interior ocean needs none.
+    const isLand = (x: number, y: number): boolean => {
+      if (x < 0 || y < 0 || x >= GRID_W || y >= GRID_H) return false;
+      const k = this.key(x, y);
+      return this.ground[y]?.[x] !== undefined || this.farmTiles.has(k) || this.pathTiles.has(k);
+    };
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        if (isLand(x, y) || this.tiles[y][x].obstacle) continue;
+        const touchesLand =
+          isLand(x - 1, y) || isLand(x + 1, y) || isLand(x, y - 1) || isLand(x, y + 1) ||
+          isLand(x - 1, y - 1) || isLand(x + 1, y - 1) || isLand(x - 1, y + 1) || isLand(x + 1, y + 1);
+        if (touchesLand) {
+          this.tiles[y][x].obstacle = true;
+          this.addCollider(x * TILE + TILE / 2, y * TILE + TILE / 2, TILE, TILE);
+        }
+      }
+    }
+
     this.pond = this.waterBounds();
     this.islandFarm = this.farmBounds();
     this.spawnPondLife(); // a few small fish drifting under the island's water
