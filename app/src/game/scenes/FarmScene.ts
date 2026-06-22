@@ -293,6 +293,7 @@ type SaveData = {
   perks: ChosenPerks;
   fishNodes?: string[]; // Angler's Tree: unlocked node ids (optional — older saves predate it)
   fishPts?: number; // lifetime fishing points earned
+  fishPtProgress?: number; // sub-point fishing progress (additive; ~20 casts/point)
   respecs?: number; // v12+: perk respecs done. Optional so older saves still load.
   plotExpansion?: number; // v14+: purchased crop-bed expansion columns. Optional so older saves default to 0.
   // v15+: where the player was standing (rounded world pixels) and which homestead
@@ -405,6 +406,10 @@ export class FarmScene extends Phaser.Scene {
   // Angler's Tree: unlocked node ids + lifetime fishing points earned.
   private fishNodes = new Set<string>();
   private fishPts = 0;
+  // Fractional fishing-point progress that carries between catches. A baseline
+  // (Common) catch is worth 1/CASTS_PER_POINT of a point, so it takes ~20 casts
+  // to earn one Angler's Tree point; rarer fish, doubles & treasure go faster.
+  private fishPtProgress = 0;
   // Aggregated multipliers/flags from skills + perks + the Angler's Tree;
   // recomputed on any change.
   private modCache: Modifiers = applyFishTree(activeModifiers(this.skills, this.perks), this.fishNodes);
@@ -3322,7 +3327,7 @@ export class FarmScene extends Phaser.Scene {
       const coins = Math.round(Phaser.Math.Between(200, 1200) * oceanValue);
       this.coins += coins;
       this.earned += coins;
-      this.fishPts += Math.max(1, Math.round(3 * m.fishPtMult)); // treasure funds the Angler's Tree
+      this.awardFishPts(3 * m.fishPtMult); // treasure funds the Angler's Tree
       this.addSkillXp('fishing', 12);
       this.gainXp(harvestXp(coins)); // treasure feeds the global level
       sfx.play('achievement');
@@ -3352,7 +3357,7 @@ export class FarmScene extends Phaser.Scene {
     // Fishing points fund the Angler's Tree — rarer fish (and doubles) pay more.
     let pts = fishPointsForCatch(f.rarity) + (legendary ? 5 : 0);
     if (doubled) pts *= 2;
-    this.fishPts += Math.max(1, Math.round(pts * m.fishPtMult));
+    this.awardFishPts(pts * m.fishPtMult);
     sfx.play(legendary ? 'achievement' : 'sell');
 
     // PAYOUT → BAG: the fish rides in harvestInv as a `fish|<id>` stack so it can
@@ -3395,7 +3400,7 @@ export class FarmScene extends Phaser.Scene {
       this.harvestInv[`fish|${f.id}`] = (this.harvestInv[`fish|${f.id}`] ?? 0) + 1;
       this.addSkillXp('fishing', fishXp(f));
       this.gainXp(harvestXp(f.value));
-      this.fishPts += Math.max(1, Math.round(fishPointsForCatch(f.rarity) * m.fishPtMult));
+      this.awardFishPts(fishPointsForCatch(f.rarity) * m.fishPtMult);
       this.bumpDaily('fish');
       banked++;
     }
@@ -3404,6 +3409,20 @@ export class FarmScene extends Phaser.Scene {
       this.checkAchievements();
       this.saveState();
       this.emitState();
+    }
+  }
+
+  // Accrue fishing points slowly. `raw` is the old per-catch point value (1 for a
+  // Common fish, more for rarer/doubles/treasure); dividing by CASTS_PER_POINT
+  // means a baseline catch is 1/20 of a point — ~20 casts per Angler's Tree
+  // point. Sub-point progress carries over (and persists) so nothing's wasted.
+  private static readonly CASTS_PER_POINT = 20;
+  private awardFishPts(raw: number) {
+    this.fishPtProgress += raw / FarmScene.CASTS_PER_POINT;
+    if (this.fishPtProgress >= 1) {
+      const whole = Math.floor(this.fishPtProgress);
+      this.fishPts += whole;
+      this.fishPtProgress -= whole;
     }
   }
 
@@ -3637,6 +3656,7 @@ export class FarmScene extends Phaser.Scene {
       perks: this.perks,
       fishNodes: [...this.fishNodes],
       fishPts: this.fishPts,
+      fishPtProgress: this.fishPtProgress,
       respecs: this.respecs,
       plotExpansion: this.plotExpansion,
       // Restore the player exactly where they were on the next load (rounded to
@@ -3708,6 +3728,7 @@ export class FarmScene extends Phaser.Scene {
     this.perks = { ...EMPTY_PERKS, ...(data.perks ?? {}) };
     this.fishNodes = new Set(data.fishNodes ?? []);
     this.fishPts = data.fishPts ?? 0;
+    this.fishPtProgress = data.fishPtProgress ?? 0;
     this.respecs = data.respecs ?? 0; // additive v12 field; v11 saves default to 0
     // Purchased crop-bed expansion (additive v14 field; older saves default to 0).
     // Clamp to the cap so a corrupt/forward save can't widen past the free band.
