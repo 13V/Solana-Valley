@@ -217,4 +217,13 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'harvest_king', name: 'Harvest King', desc: 'Harvest 1,000 crops', reward: 8000, xp: achXp(8000), test: (s) => s.harvested >= 1000 },
   { id: 'mutation_hoarder', name: 'Mutation Hoarder', desc: 'Find 100 mutations', reward: 10000, xp: achXp(10000), test: (s) => s.mutationsFound >= 100 },
   { id: 'millionaire', name: 'Valley Millionaire', desc: 'Earn 1,000,000 coins total', reward: 50000, xp: achXp(50000), test: (s) => s.earned >= 1000000 },
+  // --- Drop 17: Achievement Pack ---
+  { id: 'ach_harvest_500', name: 'Bumper Crop', desc: 'Harvest 500 crops', reward: 750, xp: achXp(750), test: (s) => s.harvested >= 500 },
+  { id: 'ach_harvest_5000', name: 'Valley Legend', desc: 'Harvest 5,000 crops', reward: 5000, xp: achXp(5000), test: (s) => s.harvested >= 5000 },
+  { id: 'ach_mutations_10', name: 'Curious Cultivator', desc: 'Find 10 mutations', reward: 500, xp: achXp(500), test: (s) => s.mutationsFound >= 10 },
+  { id: 'ach_mutations_50', name: 'Mutation Maven', desc: 'Find 50 mutations', reward: 2000, xp: achXp(2000), test: (s) => s.mutationsFound >= 50 },
+  { id: 'ach_mutations_250', name: 'Aberrant Arborist', desc: 'Find 250 mutations', reward: 10000, xp: achXp(10000), test: (s) => s.mutationsFound >= 250 },
+  { id: 'ach_plants_15', name: 'Diverse Harvester', desc: 'Discover 15 different plants', reward: 1500, xp: achXp(1500), test: (s) => s.plantsDiscovered >= 15 },
+  { id: 'ach_earned_500k', name: 'Half a Million', desc: 'Earn 500,000 coins total', reward: 8000, xp: achXp(8000), test: (s) => s.earned >= 500000 },
+  { id: 'ach_level_25', name: 'Valley Master', desc: 'Reach level 25', reward: 3000, xp: achXp(3000), test: (s) => s.level >= 25 },
 ];
