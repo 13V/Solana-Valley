@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
-import { usedTilesetKeys } from '../mapLoader';
+import { allTilesetKeys } from '../mapLoader';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -47,7 +47,7 @@ export class BootScene extends Phaser.Scene {
     // .png); the map's frame indices already match these sheets. Auto-synced to
     // whatever the map references (mapLoader.usedTilesetKeys).
     const TS = 'assets/tilesets/';
-    for (const key of usedTilesetKeys) {
+    for (const key of allTilesetKeys) {
       this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
     }
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });

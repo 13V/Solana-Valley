@@ -624,6 +624,12 @@ export class FarmScene extends Phaser.Scene {
       if (this.tryForage(p.worldX, p.worldY)) return;
       const tx = Math.floor(p.worldX / TILE);
       const ty = Math.floor(p.worldY / TILE);
+      // Click the boat to sail to the shared social hub.
+      if (this.boatTiles.has(this.key(tx, ty))) {
+        this.toast('⛵ Sailing to the social hub…');
+        this.scene.start('Hub');
+        return;
+      }
       if (this.tryFish(tx, ty)) return;
       this.useToolAt(tx, ty);
     });

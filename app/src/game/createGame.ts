@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './constants';
 import { BootScene } from './scenes/BootScene';
 import { FarmScene } from './scenes/FarmScene';
+import { HubScene } from './scenes/HubScene';
 
 // Creates the Phaser game and mounts it into the given DOM element.
 export function createGame(parent: HTMLElement): Phaser.Game {
@@ -17,6 +18,6 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     // Enable Phaser's gamepad plugin (FarmScene also polls navigator directly).
     input: { gamepad: true },
     physics: { default: 'arcade', arcade: { debug: false } },
-    scene: [BootScene, FarmScene],
+    scene: [BootScene, FarmScene, HubScene],
   });
 }

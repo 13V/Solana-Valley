@@ -10,6 +10,7 @@
 // row = frame // cols. Phaser's spritesheet loader already numbers frames that
 // way, so the index can be handed straight to `add.image(x, y, key, frame)`.
 import startIsland from './startIsland.json';
+import socialHub from './socialHub.json';
 
 export type MapCell = [string, number]; // [tilesetKey, frameIndex]
 
@@ -30,20 +31,24 @@ export type SproutMap = {
   layers: MapLayer[];
 };
 
-// The parsed map. Consumers read w/h/tile/layers off this. The JSON's inferred
-// type widens each cell to (string | number)[]; cast through `unknown` to the
-// declared tuple shape (the data is validated by the authoring tool).
+// The player's private home island (single-player farming).
 export const map = startIsland as unknown as SproutMap;
+// The shared social hub island (reached by the boat; multiplayer).
+export const hubMap = socialHub as unknown as SproutMap;
 
-// Every distinct tileset key referenced by the map (handy for asset preloading
-// / sanity checks).
-export const usedTilesetKeys: string[] = (() => {
+// Every distinct tileset key a map references (for BootScene preloading).
+export function tilesetKeysFor(m: SproutMap): string[] {
   const keys = new Set<string>();
-  for (const layer of map.layers) {
+  for (const layer of m.layers) {
     for (const k in layer.cells) keys.add(layer.cells[k][0]);
   }
   return [...keys].sort();
-})();
+}
+
+// The island's keys (kept for compatibility) and the union across both maps so
+// BootScene loads every tileset either map needs.
+export const usedTilesetKeys: string[] = tilesetKeysFor(map);
+export const allTilesetKeys: string[] = [...new Set([...tilesetKeysFor(map), ...tilesetKeysFor(hubMap)])].sort();
 
 // A coarse gameplay category for a tileset key. Drives how a cell is rendered
 // and which behaviour set it joins (water = fishable + solid, solidObj = solid,
