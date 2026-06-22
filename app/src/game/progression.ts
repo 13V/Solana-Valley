@@ -226,4 +226,17 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ach_plants_15', name: 'Diverse Harvester', desc: 'Discover 15 different plants', reward: 1500, xp: achXp(1500), test: (s) => s.plantsDiscovered >= 15 },
   { id: 'ach_earned_500k', name: 'Half a Million', desc: 'Earn 500,000 coins total', reward: 8000, xp: achXp(8000), test: (s) => s.earned >= 500000 },
   { id: 'ach_level_25', name: 'Valley Master', desc: 'Reach level 25', reward: 3000, xp: achXp(3000), test: (s) => s.level >= 25 },
+  // --- Wave 2: deep-progression achievements ---
+  { id: 'ach2_harvest_10k', name: 'Bumper Season', desc: 'Harvest 10,000 crops', reward: 5000, xp: achXp(5000), test: (s) => s.harvested >= 10000 },
+  { id: 'ach2_harvest_25k', name: 'Legendary Yield', desc: 'Harvest 25,000 crops', reward: 15000, xp: achXp(15000), test: (s) => s.harvested >= 25000 },
+  { id: 'ach2_mutations_500', name: 'Twisted Naturalist', desc: 'Find 500 mutations', reward: 20000, xp: achXp(20000), test: (s) => s.mutationsFound >= 500 },
+  { id: 'ach2_mutations_1k', name: 'Master of Chaos', desc: 'Find 1,000 mutations', reward: 50000, xp: achXp(50000), test: (s) => s.mutationsFound >= 1000 },
+  { id: 'ach2_plants_30', name: 'Botanical Scholar', desc: 'Discover 30 plants', reward: 8000, xp: achXp(8000), test: (s) => s.plantsDiscovered >= 30 },
+  { id: 'ach2_plants_50', name: 'Verdant Encyclopedist', desc: 'Discover 50 plants', reward: 25000, xp: achXp(25000), test: (s) => s.plantsDiscovered >= 50 },
+  { id: 'ach2_plants_100', name: 'Flora Omnia', desc: 'Discover 100 plant species', reward: 100000, xp: achXp(100000), test: (s) => s.plantsDiscovered >= 100 },
+  { id: 'ach2_earned_5m', name: 'Coin Magnate', desc: 'Earn 5,000,000 coins total', reward: 30000, xp: achXp(30000), test: (s) => s.earned >= 5000000 },
+  { id: 'ach2_earned_25m', name: 'Solana Baron', desc: 'Earn 25,000,000 coins total', reward: 100000, xp: achXp(100000), test: (s) => s.earned >= 25000000 },
+  { id: 'ach2_earned_100m', name: 'The Golden Harvest', desc: 'Earn 100,000,000 coins total', reward: 250000, xp: achXp(250000), test: (s) => s.earned >= 100000000 },
+  { id: 'ach2_level_30', name: 'Seasoned Grower', desc: 'Reach level 30', reward: 12000, xp: achXp(12000), test: (s) => s.level >= 30 },
+  { id: 'ach2_level_40', name: 'Valley Elder', desc: 'Reach level 40', reward: 40000, xp: achXp(40000), test: (s) => s.level >= 40 },
 ];
