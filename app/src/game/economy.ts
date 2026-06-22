@@ -72,9 +72,11 @@ export const PLANTS: Plant[] = [
   // Rare
   { id: 'beet', name: 'Beetroot', rarity: 'Rare', seedCost: 43, baseValue: 98, growthSeconds: 64, cropRow: 12, color: 0x8e2f6a },
   { id: 'cucumber', name: 'Cucumber', rarity: 'Rare', seedCost: 60, baseValue: 141, growthSeconds: 78, cropRow: 14, color: 0x4fae4a, regrow: 34 },
+  { id: 'watermelon', name: 'Watermelon', rarity: 'Rare', seedCost: 50, baseValue: 125, growthSeconds: 72, cropRow: 14, color: 0x3aa54a, cropTint: 0x4caf50, regrow: 36 },
   // Legendary
   { id: 'corn', name: 'Corn', rarity: 'Legendary', seedCost: 105, baseValue: 280, growthSeconds: 104, cropRow: 8, color: 0xf4c948 },
   { id: 'pumpkin', name: 'Pumpkin', rarity: 'Legendary', seedCost: 150, baseValue: 410, growthSeconds: 124, cropRow: 9, color: 0xe8862b },
+  { id: 'dragonfruit', name: 'Dragonfruit', rarity: 'Legendary', seedCost: 125, baseValue: 320, growthSeconds: 110, cropRow: 11, color: 0xff3d7f, cropTint: 0xff4d8f },
   // Mythical
   { id: 'pinkcabbage', name: 'Pink Cabbage', rarity: 'Mythical', seedCost: 280, baseValue: 825, growthSeconds: 158, cropRow: 11, color: 0xe06aa0 },
   { id: 'goldencorn', name: 'Golden Corn', rarity: 'Mythical', seedCost: 410, baseValue: 1250, growthSeconds: 172, cropRow: 8, color: 0xffd84a, cropTint: 0xffc400 },
