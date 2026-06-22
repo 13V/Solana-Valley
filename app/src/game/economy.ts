@@ -91,6 +91,21 @@ export const PLANTS: Plant[] = [
   // Celestial
   { id: 'galaxyfruit', name: 'Galaxy Fruit', rarity: 'Celestial', seedCost: 6500, baseValue: 32000, growthSeconds: 330, cropRow: 13, color: 0xb98aff, cropTint: 0xc6a3ff },
   { id: 'voidbloom', name: 'Voidbloom', rarity: 'Celestial', seedCost: 13000, baseValue: 72500, growthSeconds: 400, cropRow: 11, color: 0x8a4fd0, cropTint: 0x9a6ad0 },
+  // --- Drop 9: Orchard & Stone Fruits ---
+  { id: 'orch_honeycrisp', name: 'Honeycrisp Apple', rarity: 'Common', seedCost: 8, baseValue: 15, growthSeconds: 28, cropRow: 3, color: 0xff6b35, cropTint: 0xff5a3a, regrow: 14 },
+  { id: 'orch_golden_pear', name: 'Golden Pear', rarity: 'Common', seedCost: 9, baseValue: 18, growthSeconds: 30, cropRow: 4, color: 0xf4d03f, cropTint: 0xffe135 },
+  { id: 'orch_damson_plum', name: 'Damson Plum', rarity: 'Uncommon', seedCost: 22, baseValue: 52, growthSeconds: 47, cropRow: 5, color: 0x4b0082, cropTint: 0x663399, regrow: 24 },
+  { id: 'orch_adriatic_fig', name: 'Adriatic Fig', rarity: 'Uncommon', seedCost: 18, baseValue: 48, growthSeconds: 43, cropRow: 6, color: 0x8b4513, cropTint: 0xa0522d },
+  { id: 'orch_royal_apricot', name: 'Royal Apricot', rarity: 'Rare', seedCost: 55, baseValue: 118, growthSeconds: 71, cropRow: 7, color: 0xff8c00, cropTint: 0xffb347, regrow: 36 },
+  { id: 'orch_mulberry_midnight', name: 'Midnight Mulberry', rarity: 'Rare', seedCost: 48, baseValue: 105, growthSeconds: 68, cropRow: 8, color: 0x2c1b47, cropTint: 0x5d3a7a },
+  { id: 'orch_quince_celestial', name: 'Celestial Quince', rarity: 'Legendary', seedCost: 130, baseValue: 340, growthSeconds: 114, cropRow: 9, color: 0xffd700, cropTint: 0xfff1a8, regrow: 57 },
+  { id: 'stf_golden_peach', name: 'Golden Peach', rarity: 'Uncommon', seedCost: 22, baseValue: 52, growthSeconds: 46, cropRow: 3, color: 0xffd700, cropTint: 0xffb347, regrow: 23 },
+  { id: 'stf_crimson_nectarine', name: 'Crimson Nectarine', rarity: 'Uncommon', seedCost: 18, baseValue: 44, growthSeconds: 42, cropRow: 4, color: 0xff6b6b, cropTint: 0xdc143c, regrow: 21 },
+  { id: 'stf_ruby_cherry', name: 'Ruby Cherry', rarity: 'Rare', seedCost: 48, baseValue: 118, growthSeconds: 68, cropRow: 2, color: 0xff1744, cropTint: 0xc41e3a, regrow: 34 },
+  { id: 'stf_twilight_plum', name: 'Twilight Plum', rarity: 'Rare', seedCost: 56, baseValue: 135, growthSeconds: 76, cropRow: 5, color: 0x663399, cropTint: 0x7a4bb0, regrow: 38 },
+  { id: 'stf_jade_olive', name: 'Jade Olive', rarity: 'Legendary', seedCost: 128, baseValue: 340, growthSeconds: 114, cropRow: 6, color: 0x6b8e23, cropTint: 0x556b2f, regrow: 57 },
+  { id: 'stf_sunset_lychee', name: 'Sunset Lychee', rarity: 'Legendary', seedCost: 142, baseValue: 395, growthSeconds: 120, cropRow: 3, color: 0xff4500, cropTint: 0xff6347, regrow: 60 },
+  { id: 'stf_celestial_date', name: 'Date Palm', rarity: 'Mythical', seedCost: 310, baseValue: 920, growthSeconds: 165, cropRow: 7, color: 0x8a5a2e, cropTint: 0xb5793e, regrow: 82 },
 ];
 
 export const PLANT_BY_ID: Record<string, Plant> = Object.fromEntries(
