@@ -385,6 +385,9 @@ export class FarmScene extends Phaser.Scene {
   // id -> remote avatar. Visual only (no collision); spawned from the presence
   // roster and updated on `mp:move`.
   private remotePlayers = new Map<string, RemotePlayer>();
+  // Ambient NPC "cat villagers" that mill around the central hub/plaza so it
+  // feels alive even when you're playing solo (real players still render too).
+  private npcs: Phaser.GameObjects.Sprite[] = [];
   // id -> remote player's farm (their crops, drawn in their own plot). Visual
   // only; upserted on `mp:remoteFarm`, diffed in place, cleaned up on leave.
   private remoteFarms = new Map<string, RemoteFarm>();
@@ -607,6 +610,9 @@ export class FarmScene extends Phaser.Scene {
     // Scatter forage nodes across the open world (after any save load so they
     // never land on restored crops).
     this.spawnForageNodes(Phaser.Math.Between(8, 12));
+
+    // Populate the hub with a few wandering cat villagers.
+    this.spawnHubNpcs(6);
 
     this.unsubs.push(
       bus.on('ui:selectTool', (id) => this.setTool(id)),
@@ -2739,6 +2745,66 @@ export class FarmScene extends Phaser.Scene {
     cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       arrive();
       cam.fadeIn(300, 18, 42, 64);
+    });
+  }
+
+  // ---- hub villagers ------------------------------------------------------
+
+  // A random walkable point inside the plaza (avoids the pond so villagers don't
+  // stroll on water). Falls back to the plaza centre.
+  private randomPlazaPoint(): { x: number; y: number } {
+    for (let i = 0; i < 24; i++) {
+      const tx = Phaser.Math.Between(PLAZA.x0 + 1, PLAZA.x1 - 1);
+      const ty = Phaser.Math.Between(PLAZA.y0 + 1, PLAZA.y1 - 1);
+      if (this.isPondTile(tx, ty)) continue;
+      return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+    }
+    const c = plazaCenterTile();
+    return { x: c.tx * TILE + TILE / 2, y: c.ty * TILE + TILE / 2 };
+  }
+
+  // Spawn ambient cat villagers (the same animated 'pchar' cat, tinted) that
+  // wander the hub so it never feels empty.
+  private spawnHubNpcs(n: number) {
+    const tints = [0xffffff, 0xffd9a8, 0xbfe3ff, 0xffc9e0, 0xd6f0b0, 0xe6d2ff, 0xfff0a8];
+    for (let i = 0; i < n; i++) {
+      const p = this.randomPlazaPoint();
+      const s = this.add
+        .sprite(p.x, p.y, 'pchar', FarmScene.IDLE_ROW.down)
+        .setOrigin(0.5, 0.72)
+        .setScale(1.7)
+        .setDepth(p.y + 16)
+        .setTint(tints[i % tints.length]);
+      s.play('idle-down');
+      this.npcs.push(s);
+      this.time.delayedCall(Math.random() * 1800, () => this.wanderNpc(s));
+    }
+  }
+
+  // Walk a villager to a new random plaza point, then idle a beat and repeat.
+  private wanderNpc(s: Phaser.GameObjects.Sprite) {
+    if (!s.active) return;
+    const target = this.randomPlazaPoint();
+    const dx = target.x - s.x, dy = target.y - s.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 8) {
+      this.time.delayedCall(700 + Math.random() * 2000, () => this.wanderNpc(s));
+      return;
+    }
+    const dir: Dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+    s.play(`walk-${dir}`, true);
+    this.tweens.add({
+      targets: s,
+      x: target.x,
+      y: target.y,
+      duration: (dist / 26) * 1000, // ~26 px/s, a gentle stroll
+      ease: 'Linear',
+      onUpdate: () => s.setDepth(s.y + 16),
+      onComplete: () => {
+        if (!s.active) return;
+        s.play(`idle-${dir}`, true);
+        this.time.delayedCall(700 + Math.random() * 2300, () => this.wanderNpc(s));
+      },
     });
   }
 
