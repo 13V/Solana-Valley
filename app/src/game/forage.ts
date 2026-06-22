@@ -18,9 +18,11 @@ export type Forage = {
 export const FORAGE: Forage[] = [
   { id: 'mushroom', name: 'Wild Mushroom', value: 18, weight: 100, sheet: 'mfs', frame: 0, css: '#d6a06a' },
   { id: 'berries', name: 'Wild Berries', value: 40, weight: 60, sheet: 'nature', frame: 37, css: '#e2402c' },
+  { id: 'snowdrop', name: 'Snowdrop', value: 60, weight: 22, sheet: 'mfs', frame: 6, css: '#dff0ff' },
   { id: 'herb', name: 'Healing Herb', value: 85, weight: 30, sheet: 'mfs', frame: 12, css: '#86c34a' },
   { id: 'blueberries', name: 'Moonberries', value: 180, weight: 13, sheet: 'nature', frame: 40, css: '#4ea1ff' },
   { id: 'crystal', name: 'Crystal Shard', value: 420, weight: 5, sheet: 'mfs', frame: 25, css: '#b56bff' },
+  { id: 'geode', name: 'Amber Geode', value: 650, weight: 3.5, sheet: 'mfs', frame: 15, css: '#ffb347' },
   { id: 'goldcap', name: 'Golden Truffle', value: 1100, weight: 1.5, sheet: 'mfs', frame: 3, css: '#ffd21a' },
 ];
 
