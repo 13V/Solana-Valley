@@ -5,7 +5,7 @@ import {
   PLANT_BY_ID,
   MUTATION_BY_ID,
   isTokenTradeable,
-  claimUsd,
+  claimUsdFor,
   type Quality,
 } from '../game/economy';
 import { FISH_BY_ID, fishCss } from '../game/fishing';
@@ -65,7 +65,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
   // from the `plantId`; `key` is the stack we remove locally AFTER the credit
   // lands. `count` is the whole stack.
   const redeem = useCallback(
-    async (key: string, plantId: string, count: number, name: string) => {
+    async (key: string, plantId: string, mutationId: string, count: number, name: string) => {
       if (!connected || !publicKey || !signMessage) {
         bus.emit('toast', 'Connect your wallet to trade for $LANDS');
         return;
@@ -83,7 +83,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
         return;
       }
       bus.emit('toast', '🌱 Trading…');
-      const result = await redeemPlant(session, plantId, count);
+      const result = await redeemPlant(session, plantId, mutationId, count);
       if (!result) {
         bus.emit('toast', 'Trade failed — try again');
         return;
@@ -191,10 +191,10 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                 {connected && isTokenTradeable(plant) && (
                   <button
                     className="btn sm gold"
-                    title={`Trade this ${plant.rarity} crop for ~$${claimUsd(plant)} of $LANDS`}
-                    onClick={() => redeem(k, plant.id, count, plant.name)}
+                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ~$${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)} of $LANDS`}
+                    onClick={() => redeem(k, plant.id, mutation.id, count, plant.name)}
                   >
-                    🌱 ~${claimUsd(plant)}
+                    🌱 ~${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)}
                   </button>
                 )}
               </div>

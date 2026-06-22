@@ -23,6 +23,7 @@ export type RedeemResult = {
 export async function redeemPlant(
   session: WalletAuth,
   plantId: string,
+  mutationId: string,
   count: number,
 ): Promise<RedeemResult | null> {
   let resp: Response;
@@ -30,7 +31,7 @@ export async function redeemPlant(
     resp = await fetch('/api/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...session, plantId, count }),
+      body: JSON.stringify({ ...session, plantId, mutationId, count }),
     });
   } catch {
     return null;

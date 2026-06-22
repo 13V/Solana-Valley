@@ -174,9 +174,11 @@ trade it for real $LANDS on demand. Each qualifying tier pays a **flat USD value
 | Prismatic | Star Fruit, Moonpetal | **$5** |
 | Celestial | Galaxy Fruit, Voidbloom | **$10** |
 
-Everything below Divine (and fish) stays coins-only. Mutations/quality do **not**
-multiply the token payout (they still boost coin sales). To keep this from
-draining the treasury, payouts are clamped to a **capped daily pool**
+Everything below Divine (and fish) stays coins-only. **Special variants** add a
+**capped** multiplier on top (`CLAIM_MUT_MULT`): Shiny **1.25×**, Frosted **1.5×**,
+Gold **1.75×**, Rainbow **2×** — so a Rainbow Celestial pays ~$20, not the ×25 its
+in-game value implies. (Quality stars don't affect the token payout.) To keep this
+from draining the treasury, payouts are clamped to a **capped daily pool**
 (`supabase/redemption.sql`):
 
 - **`daily_budget`** — most $LANDS payable per UTC day (the hard cap).
@@ -184,9 +186,10 @@ draining the treasury, payouts are clamped to a **capped daily pool**
 - **`base_rate = 1`** — the redeem API already computes the $LANDS amount
   (USD ÷ price), so the RPC just clamps it to the caps. Keep `rate_floor_bps = 10000`.
 
-Flow: 🌱 → `POST /api/redeem {plantId, count}` → the API looks up the tier's USD
-value, divides by the **$LANDS price** (`LANDS_USD_PRICE`, else Jupiter), and calls
-`redeem_items` to clamp + credit `claimable`. The crop leaves the bag; the player
+Flow: 🌱 → `POST /api/redeem {plantId, mutationId, count}` → the API takes the
+tier's USD value × the variant multiplier, divides by the **$LANDS price**
+(`LANDS_USD_PRICE`, else Jupiter), and calls `redeem_items` to clamp + credit
+`claimable`. The crop leaves the bag; the player
 withdraws via the same claim widget — **no new payout path**.
 
 > ⚠️ Items are client-authoritative, so which crop is redeemed is the client's

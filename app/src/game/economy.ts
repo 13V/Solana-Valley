@@ -96,9 +96,9 @@ export function rarityRank(r: Rarity): number {
 
 // Crops tradeable for real $LANDS, and the flat USD value each qualifying tier
 // pays out (converted to $LANDS at the live price by app/api/redeem.ts). ONLY
-// these tiers qualify — Divine ($2.50), Prismatic ($5), Celestial ($10).
-// Mutations/quality do NOT multiply the token payout (they still boost coin
-// sales). The redeem API keeps a matching plant→USD copy; keep them in sync.
+// these tiers qualify — Divine ($2.50), Prismatic ($5), Celestial ($10). A capped
+// special-variant multiplier (CLAIM_MUT_MULT) applies on top; quality stars do
+// NOT. The redeem API keeps a matching plant→USD copy; keep them in sync.
 export const CLAIM_USD: Partial<Record<Rarity, number>> = {
   Divine: 2.5,
   Prismatic: 5,
@@ -111,6 +111,29 @@ export function claimUsd(plant: Plant): number | null {
 
 export function isTokenTradeable(plant: Plant): boolean {
   return claimUsd(plant) !== null;
+}
+
+// Token-payout multiplier for the special variants (mutations), CAPPED at 2× so
+// real-money payouts stay sane — deliberately separate from the in-game value
+// multipliers in MUTATIONS (which run up to ×25 for Rainbow). Normal pays the
+// flat tier value. The redeem API keeps a matching copy; keep them in sync.
+export const CLAIM_MUT_MULT: Record<string, number> = {
+  normal: 1,
+  shiny: 1.25,
+  frosted: 1.5,
+  gold: 1.75,
+  rainbow: 2,
+};
+
+export function claimMult(mutationId: string): number {
+  return CLAIM_MUT_MULT[mutationId] ?? 1;
+}
+
+// Effective USD payout for a stack: flat tier value × variant multiplier, or null
+// if the plant isn't tradeable for tokens.
+export function claimUsdFor(plant: Plant, mutationId: string): number | null {
+  const base = claimUsd(plant);
+  return base === null ? null : base * claimMult(mutationId);
 }
 
 // Player level at which each rarity tier becomes available in the shop. Re-tuned

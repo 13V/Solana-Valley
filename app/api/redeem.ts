@@ -2,13 +2,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth.js';
 
 // POST /api/redeem
-// Body: { wallet, message, signature, plantId, count }
+// Body: { wallet, message, signature, plantId, mutationId, count }
 // Trades a TOP-TIER crop (Divine/Prismatic/Celestial only) for real $LANDS, on
 // demand. Payout is a FLAT USD value per tier (Divine $2.50, Prismatic $5,
-// Celestial $10), converted to $LANDS at the current price, then CLAMPED to a
-// daily budget + per-wallet cap by the redeem_items RPC (so it can never drain
-// the treasury). Credits `claimable`; the player withdraws via /api/claim.
-// Responds: { credited, decimals, symbol }.
+// Celestial $10) × a capped special-variant multiplier (1×–2×), converted to
+// $LANDS at the current price, then CLAMPED to a daily budget + per-wallet cap by
+// the redeem_items RPC (so it can never drain the treasury). Credits `claimable`;
+// the player withdraws via /api/claim. Responds: { credited, decimals, symbol }.
 //
 // IMPORTANT: set `base_rate = 1` in redemption_config — this route already
 // computes the $LANDS base-unit amount, and the RPC passes it through (× base_rate
@@ -23,6 +23,16 @@ const PLANT_USD: Record<string, number> = {
   moonpetal: 5,
   galaxyfruit: 10,
   voidbloom: 10,
+};
+
+// Capped special-variant multiplier (mutations). KEEP IN SYNC with CLAIM_MUT_MULT
+// in app/src/game/economy.ts. Unknown/missing → 1×.
+const MUT_MULT: Record<string, number> = {
+  normal: 1,
+  shiny: 1.25,
+  frosted: 1.5,
+  gold: 1.75,
+  rainbow: 2,
 };
 
 // $LANDS price in USD. A manual override (LANDS_USD_PRICE) wins — recommended for
@@ -72,6 +82,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: 'count must be a positive integer' });
     return;
   }
+  // Capped special-variant bonus (1×–2×); unknown mutation → 1×.
+  const mutationId = String((body as { mutationId?: unknown }).mutationId ?? 'normal');
+  const mult = MUT_MULT[mutationId] ?? 1;
 
   const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
   const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
@@ -83,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // USD value → $LANDS base units at the current price.
-  const usd = usdEach * count;
+  const usd = usdEach * mult * count;
   const tokenBaseUnits = Math.round((usd / price) * 10 ** decimals);
   if (!Number.isFinite(tokenBaseUnits) || tokenBaseUnits <= 0) {
     res.status(400).json({ error: 'computed payout is zero' });
