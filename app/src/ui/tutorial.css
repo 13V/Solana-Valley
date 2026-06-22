@@ -49,20 +49,23 @@
 
 /* Cozy skin: reuse the wooden ui_frame as a 9-slice border-image, exactly
    like .panel / .goals-hud (slice 28). We ship our own copy (tut_frame.png)
-   so the coach owns its asset. */
+   so the coach owns its asset. A warm ambient shadow lifts the card off the
+   farm, matching the panels' premium float. */
 .ui-skin .tut-card {
   background: none;
   color: var(--ink, #4a3526);
-  border: 20px solid transparent;
+  border: 22px solid transparent;
   border-image: url('/assets/sprout-ui/tut_frame.png') 28 fill stretch;
   border-radius: 0;
   padding: 0;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
+  filter: drop-shadow(0 12px 26px rgba(40, 24, 8, 0.5));
 }
 
-/* When skinned the frame border IS the padding, so inset the content a touch. */
+/* When skinned the frame border IS the padding, so inset the content a touch.
+   A little extra bottom room keeps the footer buttons off the wooden edge. */
 .ui-skin .tut-card .tut-inner {
-  padding: 2px 4px 4px;
+  padding: 1px 6px 6px;
 }
 
 .tut-inner {
@@ -96,14 +99,29 @@
   margin-bottom: 4px;
 }
 
+/* Skinned: the header becomes a raised parchment NAMEPLATE banner (the same
+   9-slice the panels use, slice 3/7/5) that floats just inside the wooden
+   frame, carrying the step counter + title. */
+.ui-skin .tut-head {
+  background: none;
+  border: solid transparent;
+  border-width: 3px 7px 5px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  border-radius: 0;
+  margin: 3px 2px 6px;
+  padding: 3px 10px 2px;
+  filter: drop-shadow(0 3px 2px rgba(60, 36, 12, 0.22));
+}
+
 .tut-step {
   font-size: 11px;
   opacity: 0.8;
   white-space: nowrap;
 }
 .ui-skin .tut-step {
-  color: var(--ink-soft, #5c4226);
-  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.4);
+  color: #6a4a22;
+  opacity: 0.95;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.55);
 }
 
 .tut-title {
@@ -112,8 +130,8 @@
   white-space: nowrap;
 }
 .ui-skin .tut-title {
-  color: #4a3015;
-  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.5);
+  color: #5a3a18;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.55);
 }
 
 /* ---- body: the one-line instruction ------------------------------- */
@@ -141,6 +159,27 @@
   color: #2f7d2e;
 }
 
+/* Skinned: render the hint as a little WOOD KEYCAP — the same 9-slice button
+   frame the toolbar/HUD use, shrunk down, with a monospace-ish bump so a "1"
+   or "WASD" reads like a physical key. Emoji glyphs (🛒/🎒) sit on the same
+   cap so the two hint kinds match. */
+.ui-skin .tut-key {
+  background: none;
+  border: 8px solid transparent;
+  border-image: var(--ui-btn, url('/assets/sprout-ui/btn_pk.png')) 8 fill stretch;
+  border-radius: 0;
+  image-rendering: pixelated;
+  padding: 0 2px;
+  margin: 0 2px;
+  color: #5a3a18;
+  font-family: var(--pixel-font, ui-monospace, monospace);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.5);
+  vertical-align: baseline;
+}
+
 /* ---- footer: actions --------------------------------------------- */
 .tut-foot {
   display: flex;
@@ -154,6 +193,19 @@
    inherits the wooden button skin under .ui-skin automatically. */
 .tut-card .btn.tut-btn {
   font-size: 13px;
+}
+
+/* Skinned: warm the parchment button toward gold + add a soft glow so the
+   "Got it" / "Done" action pops, mirroring the shared .btn.gold primary CTA. */
+.ui-skin .tut-card .btn.tut-btn {
+  filter: saturate(1.55) brightness(1.06) hue-rotate(-14deg)
+    drop-shadow(0 0 5px rgba(255, 196, 80, 0.55));
+  color: #6a3f06;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, 0.5);
+}
+.ui-skin .tut-card .btn.tut-btn:hover {
+  filter: saturate(1.75) brightness(1.13) hue-rotate(-14deg)
+    drop-shadow(0 0 9px rgba(255, 206, 92, 0.75));
 }
 
 /* "Skip tutorial" — a quiet text link, not a button. */
@@ -176,6 +228,14 @@
 }
 .ui-skin .tut-skip {
   color: var(--ink-soft, #5c4226);
+  text-decoration-color: rgba(110, 74, 43, 0.45);
+  text-underline-offset: 2px;
+  opacity: 0.8;
+}
+.ui-skin .tut-skip:hover {
+  color: var(--ink, #4a3526);
+  text-decoration-color: rgba(110, 74, 43, 0.75);
+  opacity: 1;
 }
 
 /* ---- bouncing arrow hint ------------------------------------------ */
@@ -205,11 +265,16 @@
   border-bottom: 12px solid var(--accent, #7bd66a);
   animation: tut-bob-up 0.9s ease-in-out infinite;
 }
+/* Wood-tinted pointers + a warmer drop-shadow so they read as a little carved
+   nudge rather than a neon triangle. */
+.ui-skin .tut-arrow {
+  filter: drop-shadow(0 2px 1px rgba(60, 36, 12, 0.45));
+}
 .ui-skin .tut-arrow--down {
-  border-top-color: #c98a3a;
+  border-top-color: #b97a34;
 }
 .ui-skin .tut-arrow--up {
-  border-bottom-color: #c98a3a;
+  border-bottom-color: #b97a34;
 }
 @keyframes tut-bob-down {
   0%, 100% { transform: translate(-50%, 0); }

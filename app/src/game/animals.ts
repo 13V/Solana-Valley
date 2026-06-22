@@ -17,6 +17,7 @@ export type AnimalDef = {
   // rendering
   sheet: string;
   idleFrames: number[];
+  idleFrameRate?: number; // fps for the idle loop (defaults to 3)
   walkFrames: number[];
   scale: number;
   originY: number; // sprite origin Y (trees anchor near their base)
@@ -73,7 +74,10 @@ export const ANIMALS: AnimalDef[] = [
   {
     id: 'cow', name: 'Cow', category: 'animal', cost: 25_000, unlockLevel: 6,
     productName: 'Milk', productValue: 500, layMs: 60_000, xp: 16,
-    sheet: 'cow_light', idleFrames: [0, 1, 2], walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
+    // Idle = a gentle graze: stand (0-2), lower the head and munch the grass
+    // (48-51), then raise back up — so cows read as alive, not frozen.
+    sheet: 'cow_light', idleFrames: [0, 1, 2, 48, 49, 50, 51, 50, 49, 48], idleFrameRate: 5,
+    walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
     scale: 1.7, originY: 0.78, stationary: false,
     productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
     icon: 'assets/sprout-ui/icon_cow.png',

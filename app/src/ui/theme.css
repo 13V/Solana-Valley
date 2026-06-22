@@ -22,14 +22,68 @@
   src: url('/assets/fonts/minecraft.ttf') format('truetype');
 }
 
+/* The OFFICIAL Sprout Lands pixel font (Cup Nooble, from the premium UI pack).
+   Used as a DISPLAY face for titles/buttons/labels so the chrome reads as one
+   cohesive cozy set; body copy stays on Minecraft for dense legibility. Its
+   lowercase glyphs render as small-caps, which is exactly the look we want on
+   headers ("SEED SHOP") and chunky buttons. */
+@font-face {
+  font-family: 'SproutLands';
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url('/assets/fonts/sprout-lands.ttf') format('truetype');
+}
+
 :root {
-  /* Reusable font stack: pixel face first, readable fallbacks after. */
-  --pixel-font: 'Minecraft', ui-monospace, 'Segoe UI', system-ui, sans-serif;
+  /* Reusable font stack: the official Sprout Lands pixel face everywhere, with
+     the Minecraft pixel face + system fonts as fallbacks. */
+  --pixel-font: 'SproutLands', 'Minecraft', ui-monospace, 'Segoe UI', system-ui, sans-serif;
+  /* Display face for titles, buttons and short labels (same family). */
+  --display-font: 'SproutLands', var(--pixel-font);
   /* Wood / parchment tones used by the toast + scrollbar theming. */
   --wood-dark: #6e4a2b;
   --wood-mid: #8a5a32;
   --wood-light: #c9a06a;
   --parchment: #efe6cf;
+  --ink: #4a3526;
+}
+
+/* ---------------------------------------------------------------------
+   DISPLAY FONT  — apply the Sprout Lands pixel face to the "chrome" type:
+   panel + section titles, buttons, badges and short pixel labels. Tracked a
+   touch wider so the chunky glyphs breathe. Body text keeps Minecraft.
+   --------------------------------------------------------------------- */
+.panel-head h3,
+.help-body h4,
+.alm-body h4,
+.btn,
+.iconbtn,
+.badge,
+.stock,
+.lvltag,
+.rarity,
+.slot-label,
+.slot-key,
+.goals-title,
+.goals-master,
+.tut-title,
+.tut-step,
+.set-label,
+.dn-date,
+.wallet-adapter-button {
+  font-family: var(--display-font);
+  letter-spacing: 0.04em;
+}
+
+/* The Sprout Lands face already reads bold; drop the faux-bold so strokes stay
+   crisp and evenly weighted instead of smearing. */
+.panel-head h3,
+.help-body h4,
+.alm-body h4,
+.tut-title,
+.goals-title {
+  font-weight: normal;
 }
 
 /* Apply the pixel font everywhere the UI chrome lives. Pixelify Sans
@@ -68,7 +122,9 @@ button,
 h3,
 h4 {
   font-family: var(--pixel-font);
-  font-weight: 700; /* bold the whole pixel UI for a chunkier, more legible look */
+  /* The Sprout Lands face is already chunky — keep it at normal weight so the
+     pixel strokes stay crisp instead of smearing under a faux-bold. */
+  font-weight: normal;
   letter-spacing: 0.02em;
 }
 

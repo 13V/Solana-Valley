@@ -18,7 +18,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'fishtree' | 'almanac' | 'help' | 'settings' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'fishtree' | 'almanac' | 'help' | 'settings' | 'travel' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).
@@ -84,7 +84,7 @@ export function Hud({
         </span>
         <div className="hud-stats">
           <span className="badge coins">
-            <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
+            <i className="coin-spin" aria-hidden="true" />
             {coins.toLocaleString()}
           </span>
           <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
@@ -122,6 +122,13 @@ export function Hud({
             </button>
           );
         })}
+        <button
+          className={`iconbtn ${panel === 'travel' ? 'active' : ''}`}
+          title="Travel by boat"
+          onClick={() => (panel === 'travel' ? onToggle('travel') : bus.emit('ui:openTravel', undefined))}
+        >
+          <img className="btn-ico" src="assets/sprout-ui/ic_boat.png" alt="⛵" />
+        </button>
         <button
           className="iconbtn"
           title={muted ? 'Unmute' : 'Mute'}

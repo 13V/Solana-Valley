@@ -349,7 +349,7 @@ function Toggle({
     >
       <img
         className="set-toggle-ico"
-        src={`assets/sprout-ui/${on ? 'set_on' : 'set_off'}.png`}
+        src={`assets/sprout-ui/${on ? 'check' : 'cross'}.png`}
         alt={on ? '✓' : '✕'}
       />
       <span className="set-toggle-state">{on ? onLabel : offLabel}</span>

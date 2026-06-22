@@ -867,26 +867,40 @@ body {
   padding: 0;
 }
 
+/* Header = a raised parchment NAMEPLATE banner (9-slice from the pack) that
+   floats just inside the wooden frame, instead of a flat tinted strip. The
+   title + optional subtitle + close button all sit on the banner. */
 .ui-skin .panel-head {
-  background: rgba(120, 82, 45, 0.1);
-  border-bottom: 3px solid rgba(108, 74, 43, 0.45);
-  color: #3a2a1c;
+  background: none;
+  border: solid transparent;
+  border-width: 3px 7px 5px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  border-radius: 0;
+  margin: 11px 13px 4px;
+  padding: 5px 10px 4px;
+  color: #4a2f15;
+  filter: drop-shadow(0 3px 2px rgba(60, 36, 12, 0.22));
 }
 
 .ui-skin .panel-head h3 {
-  color: #4a3015;
-  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.5);
+  color: #5a3a18;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.55);
 }
 
-/* Close button: the pack's chunky X, sized up with a soft hover pop. */
+/* Close button: the pack's framed wooden X tile, with a soft hover pop +
+   press dip so it reads as a real button. */
 .ui-skin .x {
-  opacity: 0.9;
-  padding: 2px;
-  transition: transform 0.08s ease;
+  opacity: 1;
+  padding: 0;
+  margin-left: 2px;
+  transition: transform 0.08s ease, filter 0.08s ease;
+  filter: drop-shadow(0 2px 1px rgba(60, 36, 12, 0.28));
 }
 .ui-skin .x:hover {
-  opacity: 1;
-  transform: scale(1.14);
+  transform: translateY(-1px) scale(1.08);
+}
+.ui-skin .x:active {
+  transform: translateY(1px) scale(0.96);
 }
 
 /* Progress / XP bars: recessed wood track with a green→gold fill. */
@@ -1030,6 +1044,20 @@ body {
   border-image: var(--ui-btn-press) 8 fill stretch;
 }
 
+/* Primary CTA (Buy / Sell all / Confirm): warm the parchment button toward
+   gold and add a soft glow so the key action pops on the panel. */
+.ui-skin .btn.gold {
+  filter: saturate(1.55) brightness(1.06) hue-rotate(-14deg)
+    drop-shadow(0 0 5px rgba(255, 196, 80, 0.55));
+  color: #6a3f06;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, 0.5);
+}
+.ui-skin .btn.gold:hover {
+  border-image: var(--ui-btn) 8 fill stretch;
+  filter: saturate(1.75) brightness(1.13) hue-rotate(-14deg)
+    drop-shadow(0 0 9px rgba(255, 206, 92, 0.75));
+}
+
 .ui-skin .slot {
   border-image: var(--slot) 8 fill stretch;
   border-width: 9px;
@@ -1051,6 +1079,89 @@ body {
   opacity: 0.55;
 }
 
+/* Island chat + contract-address pill: pull them into the wood/parchment skin
+   so the secondary surfaces match the rest of the chrome. */
+.ui-skin .chat-toggle {
+  background: none;
+  border: 9px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  filter: drop-shadow(0 3px 4px rgba(40, 24, 8, 0.35));
+}
+.ui-skin .chat-toggle:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+.ui-skin .chat-panel {
+  background: none;
+  border: 16px solid transparent;
+  border-image: var(--ui-frame) 28 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+.ui-skin .chat-head {
+  background: rgba(120, 82, 45, 0.14);
+  border-bottom: 2px solid rgba(108, 74, 43, 0.4);
+  color: #5a3a18;
+  font-family: var(--display-font);
+}
+.ui-skin .chat-x {
+  color: var(--ink);
+}
+.ui-skin .chat-empty,
+.ui-skin .chat-msg {
+  color: var(--ink);
+}
+.ui-skin .chat-name {
+  color: #2f7d2e;
+}
+.ui-skin .chat-msg.is-self .chat-name {
+  color: #7a4a06;
+}
+.ui-skin .chat-input-row {
+  border-top: 2px solid rgba(108, 74, 43, 0.3);
+}
+.ui-skin .chat-input {
+  background: var(--parchment);
+  border: 2px solid var(--wood-mid);
+  border-radius: 4px;
+  color: var(--ink);
+  box-shadow: inset 0 1px 2px rgba(74, 53, 38, 0.35);
+}
+.ui-skin .chat-input:focus {
+  border-color: var(--wood-dark);
+}
+.ui-skin .chat-send {
+  background: none;
+  border: 9px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  font-family: var(--display-font);
+}
+.ui-skin .chat-send:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+
+.ui-skin .ca-pill {
+  background: none;
+  border: 8px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  filter: drop-shadow(0 3px 4px rgba(40, 24, 8, 0.3));
+}
+.ui-skin .ca-pill:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+.ui-skin .ca-label {
+  color: #7a4a06;
+}
+.ui-skin .ca-copy {
+  color: var(--ink-soft);
+}
+
 .hud-icon {
   width: 16px;
   height: 16px;
@@ -1063,4 +1174,122 @@ body {
 @keyframes valley-update-pop {
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ===================================================================== */
+/* Boat travel — island destination cards (TravelPanel)                   */
+/* ===================================================================== */
+/* Center the travel panel as a modal so it's always fully on-screen
+   (the default top-anchored panel could be missed / clipped on short views). */
+.panel.travel {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.travel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.island-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.island-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.island-thumb {
+  width: 100%;
+  height: 84px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.island-thumb img {
+  /* Uniform render height so small sprites (cow/well) and big ones (cottage/
+     coop) read at a balanced size; nearest-neighbour keeps the upscale crisp. */
+  height: 72px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.3));
+}
+
+.island-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.island-blurb {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.25;
+  min-height: 26px;
+}
+.island-go {
+  margin-top: 7px;
+  pointer-events: none; /* the whole card is the button */
+}
+
+/* Premium skin: each card is a raised parchment tile that lifts on hover. */
+.ui-skin .island-card {
+  background: none;
+  border: 13px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+}
+.ui-skin .island-card:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+  background: none;
+}
+.ui-skin .island-card:active {
+  border-image: var(--ui-btn-press) 8 fill stretch;
+}
+.ui-skin .island-name {
+  color: #4a3015;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.45);
+}
+.ui-skin .island-blurb {
+  color: var(--ink-soft);
+  opacity: 0.95;
+}
+
+/* "You're here" — the current zone reads as a recessed, non-actionable tile. */
+.island-card.here {
+  cursor: default;
+}
+.island-card.here:hover {
+  transform: none;
+}
+.island-here {
+  pointer-events: none;
+  margin-top: 7px;
+  color: #2f7d2e;
+}
+.ui-skin .island-card.here {
+  border-image: var(--slot-active) 8 fill stretch;
+}
+.ui-skin .island-card.here:hover {
+  border-image: var(--slot-active) 8 fill stretch;
+}
+.ui-skin .island-here {
+  color: #2f7d2e;
+  font-weight: 700;
 }
