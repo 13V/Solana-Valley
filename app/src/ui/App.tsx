@@ -13,6 +13,7 @@ import { AlmanacPanel } from './AlmanacPanel';
 import { HelpPanel } from './HelpPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { GoalsHud } from './GoalsHud';
+import { EventBanner } from './EventBanner';
 import { TutorialCoach } from './TutorialCoach';
 import { TouchControls } from './TouchControls';
 import { CloudSaveSync } from '../chain/CloudSaveSync';
@@ -81,6 +82,7 @@ export function App() {
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           {panel === 'settings' && <SettingsPanel onClose={close} />}
           {helpSeen && <GoalsHud />}
+          {helpSeen && <EventBanner />}
           <Hotbar />
           <TouchControls />
           {helpSeen && <TutorialCoach />}
