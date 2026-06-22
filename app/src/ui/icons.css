@@ -71,20 +71,25 @@
 }
 
 /* Spinning gold coin — an 8-frame sprite strip (coin_spin.png, 8×24px cells)
-   played with steps(). Static by default; it spins when you hover the coin
-   badge so the HUD gets a little life without being a constant distraction. */
+   played with steps(). It spins gently and continuously, speeding up when you
+   hover the coin badge. Respects reduced-motion (OS pref + the in-app toggle,
+   which forces iteration-count 1 app-wide). */
 .coin-spin {
   display: inline-block;
   width: 16px;
   height: 16px;
   margin-right: 3px;
   vertical-align: -3px;
-  /* Default to the front-facing frame (frame 4 of 8); spin reveals the rest. */
+  /* Front-facing frame (frame 4 of 8) when motion is off; spin reveals the rest. */
   background: url('/assets/sprout-ui/coin_spin.png') -64px 0 / 800% 100% no-repeat;
   image-rendering: pixelated;
+  animation: coin-spin 1.4s steps(8) infinite;
 }
 .badge.coins:hover .coin-spin {
-  animation: coin-spin 0.7s steps(8) infinite;
+  animation-duration: 0.6s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .coin-spin { animation: none; }
 }
 @keyframes coin-spin {
   from { background-position-x: 0; }
