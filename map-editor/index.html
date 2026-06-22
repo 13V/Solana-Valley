@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Farm Lands · Map Editor</title>
   <meta name="description" content="Drag-and-drop tile map editor built with the Sprout Lands tilesets by Cup Nooble." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,7 @@
 <body>
   <!-- ============================ TOP BAR ============================ -->
   <header class="topbar">
+    <button id="railToggle" class="btn mobile-only" aria-label="Panels" title="Layers, brush &amp; settings">☰</button>
     <div class="brand">
       <span class="brand-mark"></span>
       <span class="brand-name">Farm Lands <b>Map Editor</b></span>
@@ -31,7 +32,7 @@
       <button id="redo" class="btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
     </div>
 
-    <div class="toolgroup">
+    <div class="toolgroup" id="zoomGroup">
       <button id="zoomOut" class="btn" title="Zoom out ([)">−</button>
       <span id="zoomLabel" class="zoom-label" title="Zoom">100%</span>
       <button id="zoomIn" class="btn" title="Zoom in (])">+</button>
@@ -41,7 +42,7 @@
 
     <div class="spacer"></div>
 
-    <div class="toolgroup">
+    <div class="toolgroup" id="fileGroup">
       <button id="newMap"    class="btn">New</button>
       <button id="resizeMap" class="btn">Resize</button>
       <button id="saveProj"  class="btn">Save</button>
@@ -84,6 +85,12 @@
         <label class="check"><input id="bgCheck" type="checkbox" checked /> Checkerboard background</label>
         <div id="statusLine" class="status-line">—</div>
       </section>
+
+      <!-- On phones the zoom + file button groups are moved in here. -->
+      <section class="panel mobile-only">
+        <header class="panel-head"><h2>View &amp; file</h2></header>
+        <div id="railExtra" class="rail-extra"></div>
+      </section>
     </aside>
 
     <!-- CENTER: the grid canvas -->
@@ -105,6 +112,10 @@
       <div id="tileList" class="tilelist"></div>
     </aside>
   </main>
+
+  <!-- Mobile overlays: dim backdrop (tap to close) + the tiles bottom-sheet opener -->
+  <div id="scrim" class="scrim" hidden></div>
+  <button id="tilesToggle" class="fab mobile-only" aria-label="Open tile palette">🧱 Tiles</button>
 
   <!-- ============================ SHEET / STAMP MODAL ============================ -->
   <div id="sheetModal" class="modal" hidden>

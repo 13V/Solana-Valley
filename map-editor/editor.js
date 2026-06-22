@@ -100,6 +100,8 @@
     var strokeChanges = null;       // accumulator during a paint/erase stroke
     var strokeTouched = null;       // Set of keys already recorded this stroke
     var lastPanScreen = null;       // {x,y} last pointer screen pos during pan
+    var pointers = new Map();        // active TOUCH pointers (id -> {x,y}) for pinch
+    var pinchBase = null;            // {dist,zoom,worldX,worldY} baseline during a pinch
 
     // Lazy swatch rendering
     var swatchObserver = null;      // IntersectionObserver for .sheet
@@ -499,6 +501,29 @@
       strokeChanges = null;
       strokeTouched = null;
     }
+    // Abort an in-progress paint/erase/rect/pan WITHOUT committing it (used when
+    // a second finger lands to start a pinch).
+    function cancelActiveStroke() {
+      if ((dragMode === "paint" || dragMode === "erase") && strokeChanges) {
+        var layer = map.layers[map.active];
+        if (layer) {
+          for (var i = strokeChanges.length - 1; i >= 0; i--) {
+            var ch = strokeChanges[i];
+            if (ch.before === undefined) layer.cells.delete(ch.key);
+            else layer.cells.set(ch.key, { s: ch.before.s, i: ch.before.i });
+          }
+        }
+        strokeChanges = null; strokeTouched = null;
+      }
+      if (dragMode === "rect") { rectStart = null; rectEnd = null; }
+      if (elStage) elStage.classList.remove("panning");
+      if (activePointerId !== null) {
+        try { elGrid.releasePointerCapture(activePointerId); } catch (e) {}
+      }
+      activePointerId = null;
+      lastPanScreen = null;
+      dirty = true;
+    }
 
     /* ======================================================================
      * TOOL OPERATIONS
@@ -751,12 +776,77 @@
       elGrid.addEventListener("drop", onGridDrop);
     }
 
+    /* ======================================================================
+     * MOBILE CHROME — rail drawer + tiles bottom-sheet + responsive relocation
+     * ====================================================================*/
+    var mqMobile = window.matchMedia("(max-width: 900px)");
+    function isMobile() { return mqMobile.matches; }
+    var elScrim = $("scrim");
+
+    function syncScrim() {
+      if (!elScrim) return;
+      var open = document.body.classList.contains("rail-open") ||
+                 document.body.classList.contains("tiles-open");
+      elScrim.hidden = !open;
+    }
+    function closeOverlays() {
+      document.body.classList.remove("rail-open");
+      document.body.classList.remove("tiles-open");
+      syncScrim();
+    }
+    function toggleOverlay(name) {
+      var cls = name === "rail" ? "rail-open" : "tiles-open";
+      var willOpen = !document.body.classList.contains(cls);
+      closeOverlays();                 // only one overlay open at a time
+      if (willOpen) document.body.classList.add(cls);
+      syncScrim();
+    }
+    var elRailToggle = $("railToggle"), elTilesToggle = $("tilesToggle");
+    if (elRailToggle) elRailToggle.addEventListener("click", function () { toggleOverlay("rail"); });
+    if (elTilesToggle) elTilesToggle.addEventListener("click", function () { toggleOverlay("tiles"); });
+    if (elScrim) elScrim.addEventListener("click", closeOverlays);
+
+    // Move the zoom + file button groups into the rail drawer on phones (and
+    // back to the top bar on wide screens) — keeps the mobile top bar compact.
+    var elRailExtra = $("railExtra");
+    var movableHomes = [];
+    ["zoomGroup", "fileGroup"].forEach(function (id) {
+      var el = $(id);
+      if (el) movableHomes.push({ el: el, parent: el.parentNode, next: el.nextSibling });
+    });
+    function applyResponsiveChrome() {
+      var mobile = isMobile();
+      movableHomes.forEach(function (h) {
+        if (mobile) {
+          if (elRailExtra && h.el.parentNode !== elRailExtra) elRailExtra.appendChild(h.el);
+        } else if (h.el.parentNode !== h.parent) {
+          h.parent.insertBefore(h.el, h.next);
+        }
+      });
+      if (!mobile) closeOverlays();
+    }
+    if (mqMobile.addEventListener) mqMobile.addEventListener("change", applyResponsiveChrome);
+    else if (mqMobile.addListener) mqMobile.addListener(applyResponsiveChrome);
+    applyResponsiveChrome();
+
     function isPanInput(ev) {
       return spaceHeld || ev.button === 1 || tool === "pan";
     }
 
     function onPointerDown(ev) {
       if (!ready) return;
+      // Touch: track every finger; a second finger starts a pinch (zoom + pan).
+      if (ev.pointerType === "touch") {
+        pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+        try { elGrid.setPointerCapture(ev.pointerId); } catch (e) {}
+        if (pointers.size >= 2) {
+          cancelActiveStroke();      // a pinch must not leave a stray painted tile
+          dragMode = "pinch";
+          startPinch();
+          ev.preventDefault();
+          return;
+        }
+      }
       // Only react to the primary/middle buttons for drawing/pan.
       if (ev.button !== 0 && ev.button !== 1) return;
       try { elGrid.setPointerCapture(ev.pointerId); } catch (e) {}
@@ -798,6 +888,15 @@
 
     function onPointerMove(ev) {
       if (!ready) return;
+      if (ev.pointerType === "touch" && pointers.has(ev.pointerId)) {
+        pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      }
+      if (dragMode === "pinch") {
+        if (pointers.size >= 2) updatePinch();
+        ev.preventDefault();
+        return;
+      }
+      if (dragMode === "lockout") { ev.preventDefault(); return; }
       var cell = screenToCell(ev);
       var moved = !hoverCell || hoverCell.x !== cell.x || hoverCell.y !== cell.y;
       hoverCell = cell;
@@ -827,6 +926,18 @@
     }
 
     function onPointerUp(ev) {
+      if (ev && ev.pointerType === "touch") {
+        pointers.delete(ev.pointerId);
+        try { elGrid.releasePointerCapture(ev.pointerId); } catch (e) {}
+        if (dragMode === "pinch" || dragMode === "lockout") {
+          pinchBase = null;
+          // After a pinch, ignore the remaining finger until it also lifts, so
+          // releasing one finger doesn't suddenly start painting.
+          dragMode = pointers.size >= 1 ? "lockout" : null;
+          dirty = true;
+          return;
+        }
+      }
       if (activePointerId !== null) {
         try { elGrid.releasePointerCapture(activePointerId); } catch (e) {}
       }
@@ -868,6 +979,40 @@
       zoom = newZoom;
       panX = mx - worldX * TILE * zoom;
       panY = my - worldY * TILE * zoom;
+      updateZoomLabel();
+      dirty = true;
+    }
+
+    // ---- Two-finger pinch: zoom about the gesture's midpoint + pan with it ----
+    function pinchMid() {
+      var pts = [];
+      pointers.forEach(function (p) { pts.push(p); });
+      var a = pts[0], b = pts[1];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      return { dist: Math.hypot(dx, dy) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    function startPinch() {
+      if (pointers.size < 2 || !elStage) return;
+      var m = pinchMid();
+      var r = elStage.getBoundingClientRect();
+      var mx = m.x - r.left, my = m.y - r.top;
+      pinchBase = {
+        dist: m.dist,
+        zoom: zoom,
+        worldX: (mx - panX) / (TILE * zoom),
+        worldY: (my - panY) / (TILE * zoom)
+      };
+    }
+    function updatePinch() {
+      if (!pinchBase || !elStage) return;
+      var m = pinchMid();
+      var r = elStage.getBoundingClientRect();
+      var mx = m.x - r.left, my = m.y - r.top;
+      zoom = clamp(pinchBase.zoom * (m.dist / pinchBase.dist), 0.25, 16);
+      // Re-anchor the originally-grabbed world point under the moving midpoint,
+      // which gives simultaneous zoom + two-finger pan.
+      panX = mx - pinchBase.worldX * TILE * zoom;
+      panY = my - pinchBase.worldY * TILE * zoom;
       updateZoomLabel();
       dirty = true;
     }
@@ -1148,6 +1293,7 @@
           button.addEventListener("click", function () {
             setBrushTile(s, ii);
             highlightSwatch(s, ii);
+            if (isMobile()) closeOverlays(); // tap a tile → close the sheet to paint
           });
           button.addEventListener("dragstart", function (ev) {
             try { ev.dataTransfer.setData("text/tile", s + ":" + ii); } catch (e) {}
