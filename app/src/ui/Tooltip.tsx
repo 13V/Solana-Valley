@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { QUALITY, type Plant } from '../game/economy';
+import { loreFor } from '../game/lore';
 import type { Progress } from '../game/types';
 import {
   formatDuration,
@@ -206,6 +207,7 @@ export function PlantTipBody({
   showBuy?: boolean;
 }) {
   const s = plantStats(plant, progress);
+  const lore = loreFor(plant.id);
   return (
     <>
       <div className="ui-tip-title">
@@ -214,6 +216,12 @@ export function PlantTipBody({
           {s.rarity}
         </span>
       </div>
+
+      {lore && (
+        <div style={{ fontStyle: 'italic', opacity: 0.85, margin: '1px 0 6px', lineHeight: 1.3 }}>
+          {lore}
+        </div>
+      )}
 
       {showBuy && (
         <div className="ui-tip-line">
