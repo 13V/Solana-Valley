@@ -134,6 +134,7 @@ export const MUTATIONS: Mutation[] = [
   { id: 'aurora', name: 'Aurora', mult: 6, weight: 3, tint: 0x66ffcc, css: '#66ffcc' },
   { id: 'gold', name: 'Gold', mult: 10, weight: 2, tint: 0xffd21a, css: '#ffd21a' },
   { id: 'rainbow', name: 'Rainbow', mult: 25, weight: 0.5, tint: 0xffffff, rainbow: true, css: '#ff7ad0' },
+  { id: 'celestial', name: 'Celestial', mult: 50, weight: 0.2, tint: 0x9fe8ff, css: '#9fe8ff' },
 ];
 
 export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
@@ -143,7 +144,7 @@ export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
 const MUT_TOTAL = MUTATIONS.reduce((s, m) => s + m.weight, 0);
 
 // Top-tier mutations the Fortune "Jackpot" fork specifically biases toward.
-const TOP_MUTATIONS = new Set(['gold', 'rainbow']);
+const TOP_MUTATIONS = new Set(['gold', 'rainbow', 'celestial']);
 
 // `luck` (>=1) scales up the odds of non-normal mutations (the Fortune upgrade).
 // `topLuck` (>=1) applies an EXTRA multiplier to just the top mutations
