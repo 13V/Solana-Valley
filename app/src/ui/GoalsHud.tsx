@@ -38,6 +38,9 @@ export function GoalsHud() {
   const statuses = GOALS.map((g) => claimed.has(g.id) || g.test(stats));
   const completed = statuses.filter(Boolean).length;
   const allDone = completed === GOALS.length;
+  // With a long ladder (50+ rungs), only surface the next few actionable goals.
+  const upcoming = GOALS.filter((g) => !(claimed.has(g.id) || g.test(stats)));
+  const shown = upcoming.slice(0, 6);
 
   // North-star completion meter — the rolled-up long-term goal (see Almanac for
   // the full breakdown).
@@ -69,25 +72,21 @@ export function GoalsHud() {
           <>
             <div className="goals-master">🌱 Master Gardener: {masterPct}%</div>
             <ul className="goals-list">
-              {GOALS.map((g, i) => (
-                <li key={g.id} className={`goals-item${statuses[i] ? ' is-done' : ''}`}>
+              {shown.map((g) => (
+                <li key={g.id} className="goals-item">
                   <span className="goals-mark">
-                    {statuses[i] ? (
-                      <img src="assets/sprout-ui/goals_check.png" alt="done" />
-                    ) : (
-                      <span className="goals-dot" aria-hidden="true" />
-                    )}
+                    <span className="goals-dot" aria-hidden="true" />
                   </span>
                   <span className="goals-text">
                     <span className="goals-label">{g.label}</span>
-                    {/* Show the reward as a carrot for the rungs still to earn. */}
-                    {!statuses[i] && (
-                      <span className="goals-reward">{rewardLabel(g.reward)}</span>
-                    )}
+                    <span className="goals-reward">{rewardLabel(g.reward)}</span>
                   </span>
                 </li>
               ))}
             </ul>
+            {upcoming.length > shown.length && (
+              <div className="goals-more muted">+{upcoming.length - shown.length} more goals to chase…</div>
+            )}
             {allDone && <div className="goals-alldone">All goals cleared! 🎉</div>}
           </>
         )}
