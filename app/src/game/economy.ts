@@ -313,14 +313,18 @@ export const MUTATIONS: Mutation[] = [
   { id: 'normal', name: 'Normal', mult: 1, weight: 100, tint: null, css: '#cfd6dd' },
   { id: 'shiny', name: 'Shiny', mult: 1.5, weight: 12, tint: 0xfff6c2, css: '#ffe98a' },
   { id: 'verdant', name: 'Verdant', mult: 2.5, weight: 7, tint: 0x4caf50, css: '#4caf50' },
+  { id: 'crystalline', name: 'Crystalline', mult: 3.2, weight: 5, tint: 0x88ccff, css: '#88ccff' },
   { id: 'frosted', name: 'Frosted', mult: 4, weight: 4, tint: 0xbdecff, css: '#bdecff' },
   { id: 'aurora', name: 'Aurora', mult: 6, weight: 3, tint: 0x66ffcc, css: '#66ffcc' },
   { id: 'molten', name: 'Molten', mult: 8, weight: 2.5, tint: 0xff6f00, css: '#ff6f00' },
   { id: 'gold', name: 'Gold', mult: 10, weight: 2, tint: 0xffd21a, css: '#ffd21a' },
   { id: 'glacial', name: 'Glacial', mult: 15, weight: 1, tint: 0x80deea, css: '#80deea' },
+  { id: 'umbral', name: 'Umbral', mult: 20, weight: 0.7, tint: 0x7744cc, css: '#7744cc' },
   { id: 'rainbow', name: 'Rainbow', mult: 25, weight: 0.5, tint: 0xffffff, rainbow: true, css: '#ff7ad0' },
   { id: 'spectral', name: 'Spectral', mult: 35, weight: 0.3, tint: 0xce93d8, css: '#ce93d8' },
   { id: 'celestial', name: 'Celestial', mult: 50, weight: 0.2, tint: 0x9fe8ff, css: '#9fe8ff' },
+  { id: 'primordial', name: 'Primordial', mult: 75, weight: 0.12, tint: 0xff6600, css: '#ff6600' },
+  { id: 'abyssal', name: 'Abyssal', mult: 150, weight: 0.05, tint: 0x5a2a8a, css: '#5a2a8a' },
 ];
 
 export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
@@ -330,7 +334,7 @@ export const MUTATION_BY_ID: Record<string, Mutation> = Object.fromEntries(
 const MUT_TOTAL = MUTATIONS.reduce((s, m) => s + m.weight, 0);
 
 // Top-tier mutations the Fortune "Jackpot" fork specifically biases toward.
-const TOP_MUTATIONS = new Set(['gold', 'rainbow', 'celestial']);
+const TOP_MUTATIONS = new Set(['gold', 'rainbow', 'celestial', 'primordial', 'abyssal']);
 
 // `luck` (>=1) scales up the odds of non-normal mutations (the Fortune upgrade).
 // `topLuck` (>=1) applies an EXTRA multiplier to just the top mutations
