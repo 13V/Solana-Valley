@@ -22,8 +22,11 @@ create table if not exists public.rewards (
   claimed    numeric     not null default 0,  -- base units already paid out (lifetime)
   pending    numeric     not null default 0,  -- base units reserved by an in-flight claim
   pending_at timestamptz,                     -- when `pending` was reserved (stuck-claim visibility)
+  pending_sig text,                           -- the in-flight tx signature (set after send; for reconciliation)
   updated_at timestamptz not null default now()
 );
+-- Additive for existing installs (the create above is a no-op once the table exists).
+alter table public.rewards add column if not exists pending_sig text;
 
 -- Append-only audit of every successful payout (one row per finalized claim).
 create table if not exists public.reward_claims (
@@ -33,6 +36,9 @@ create table if not exists public.reward_claims (
   signature  text        not null,            -- the Solana tx signature
   created_at timestamptz not null default now()
 );
+-- Defensive: one log row per on-chain signature, so a tx can never be double-logged
+-- even if finalize is somehow called twice.
+create unique index if not exists reward_claims_signature_key on public.reward_claims (signature);
 
 -- RLS on, NO policies: only the service role (which bypasses RLS, used by the
 -- /api functions) may read or write. The browser never touches these tables
@@ -62,36 +68,53 @@ begin
 end; $$;
 
 -- Reserve the whole claimable balance for an in-flight payout. Returns the
--- reserved amount (base units) on success, 0 if there's nothing to claim, or -1
--- if a claim is already in progress for this wallet.
+-- reserved amount (base units, as a plain integer STRING) on success, '0' if
+-- there's nothing to claim, or '-1' if a claim is already in progress. (Returns
+-- text, not numeric, so a large balance can't come back as exponential JSON that
+-- would break BigInt parsing on the caller.)
+-- NOTE: dropped first because create-or-replace can't change a function's return
+-- type; harmless on a fresh DB and keeps this file re-runnable.
+drop function if exists public.reserve_claim(text);
 create or replace function public.reserve_claim(p_wallet text)
-returns numeric language plpgsql security definer set search_path = public as $$
+returns text language plpgsql security definer set search_path = public as $$
 declare amount numeric;
 begin
   update public.rewards
-    set pending = claimable, claimable = 0, pending_at = now(), updated_at = now()
+    set pending = claimable, claimable = 0, pending_at = now(), pending_sig = null, updated_at = now()
     where wallet = p_wallet and claimable > 0 and pending = 0
   returning pending into amount;
-  if amount is not null then return amount; end if;
+  if amount is not null then return amount::text; end if;
   -- Distinguish "already in progress" (pending>0) from "nothing to claim".
   if exists (select 1 from public.rewards where wallet = p_wallet and pending > 0) then
-    return -1;
+    return '-1';
   end if;
-  return 0;
+  return '0';
+end; $$;
+
+-- Record the in-flight tx signature on a reserved claim (called by /api/claim
+-- right after broadcast) so a stuck `pending` can be reconciled against the chain.
+create or replace function public.stamp_claim_sig(p_wallet text, p_signature text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.rewards set pending_sig = p_signature, updated_at = now()
+    where wallet = p_wallet and pending > 0;
 end; $$;
 
 -- Finalize a reserved claim after the on-chain transfer confirmed: move pending
 -- → claimed and append the payout to the log. Returns lifetime claimed total.
+-- Locks the row FOR UPDATE so two concurrent finalizes serialize — the second
+-- sees pending = 0 and raises instead of double-counting / double-logging (the
+-- unique index on reward_claims.signature is a second backstop).
 create or replace function public.finalize_claim(p_wallet text, p_signature text)
 returns numeric language plpgsql security definer set search_path = public as $$
 declare amount numeric; total numeric;
 begin
-  select pending into amount from public.rewards where wallet = p_wallet;
+  select pending into amount from public.rewards where wallet = p_wallet for update;
   if amount is null or amount <= 0 then
     raise exception 'no pending claim to finalize';
   end if;
   update public.rewards
-    set claimed = claimed + amount, pending = 0, pending_at = null, updated_at = now()
+    set claimed = claimed + amount, pending = 0, pending_at = null, pending_sig = null, updated_at = now()
     where wallet = p_wallet
   returning claimed into total;
   insert into public.reward_claims (wallet, amount, signature)
@@ -99,24 +122,28 @@ begin
   return total;
 end; $$;
 
--- Cancel a reserved claim (the transfer failed): refund pending → claimable.
--- Returns the restored claimable balance.
+-- Cancel a reserved claim (the transfer definitively did NOT move tokens): refund
+-- pending → claimable. Guarded by `pending > 0` so it's a no-op once a claim has
+-- been finalized — cancel can never refund a payout whose tokens already went out.
+-- (The caller must NOT call this on an ambiguous confirmation; see api/claim.ts.)
 create or replace function public.cancel_claim(p_wallet text)
 returns numeric language plpgsql security definer set search_path = public as $$
 declare restored numeric;
 begin
   update public.rewards
-    set claimable = claimable + pending, pending = 0, pending_at = null, updated_at = now()
-    where wallet = p_wallet
+    set claimable = claimable + pending, pending = 0, pending_at = null, pending_sig = null, updated_at = now()
+    where wallet = p_wallet and pending > 0
   returning claimable into restored;
   return coalesce(restored, 0);
 end; $$;
 
 revoke execute on function public.credit_reward(text, numeric)   from public;
 revoke execute on function public.reserve_claim(text)            from public;
+revoke execute on function public.stamp_claim_sig(text, text)    from public;
 revoke execute on function public.finalize_claim(text, text)     from public;
 revoke execute on function public.cancel_claim(text)             from public;
 grant  execute on function public.credit_reward(text, numeric)   to service_role;
 grant  execute on function public.reserve_claim(text)            to service_role;
+grant  execute on function public.stamp_claim_sig(text, text)    to service_role;
 grant  execute on function public.finalize_claim(text, text)     to service_role;
 grant  execute on function public.cancel_claim(text)             to service_role;

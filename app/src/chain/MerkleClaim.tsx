@@ -23,7 +23,8 @@ import {
 //
 // The custodial widget (RewardsClaim) sits bottom-left at bottom:12; this one
 // sits just above it (bottom:64) so the two never overlap if both are active.
-const REWARD_DECIMALS = 6; // $SPROUT (pump.fun standard); matches rewards backend
+// Amount decimals come from the fetched distributor (claim.decimals) so any-decimals
+// mints format correctly; the $SPROUT default of 6 is carried by fetchActiveClaim.
 const REWARD_SYMBOL = '$SPROUT';
 
 export function MerkleClaim() {
@@ -105,7 +106,7 @@ export function MerkleClaim() {
         'confirmed',
       );
       if (!mounted.current) return;
-      const amt = formatAmount(claim.amount, REWARD_DECIMALS);
+      const amt = formatAmount(claim.amount, claim.decimals);
       bus.emit('toast', `✓ Claimed ${amt} ${REWARD_SYMBOL} on-chain!`);
     } catch (err) {
       if (mounted.current) {
@@ -120,7 +121,7 @@ export function MerkleClaim() {
 
   if (!getProgramId() || !connected || !claim) return null;
 
-  const amountLabel = formatAmount(claim.amount, REWARD_DECIMALS);
+  const amountLabel = formatAmount(claim.amount, claim.decimals);
 
   return (
     <div

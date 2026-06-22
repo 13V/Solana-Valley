@@ -13,7 +13,7 @@ import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
 import { Tooltip, StackTipBody, makeStackStats } from './Tooltip';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { getWalletAuth } from '../chain/walletAuth';
 import { redeemPlant } from '../chain/redeem';
@@ -59,6 +59,9 @@ const mutationOf = (id: string) => MUTATION_BY_ID[id];
 export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest, progress } = useGameState();
   const { publicKey, signMessage, connected } = useWallet();
+  // Guards against a double-click firing two /api/redeem calls for the same
+  // stack (which would double-credit). Holds the in-flight stack key, or null.
+  const [redeemingKey, setRedeemingKey] = useState<string | null>(null);
 
   // Trade a bag stack of a top-tier crop for real $LANDS (credited to claimable,
   // withdrawn via the reward widget). The server pays a flat USD value per tier
@@ -66,6 +69,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
   // lands. `count` is the whole stack.
   const redeem = useCallback(
     async (key: string, plantId: string, mutationId: string, count: number, name: string) => {
+      if (redeemingKey) return;
       if (!connected || !publicKey || !signMessage) {
         bus.emit('toast', 'Connect your wallet to trade for $LANDS');
         return;
@@ -77,28 +81,33 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
       ) {
         return;
       }
-      const session = await getWalletAuth(publicKey, signMessage);
-      if (!session) {
-        bus.emit('toast', 'Wallet signature needed to trade');
-        return;
+      setRedeemingKey(key);
+      try {
+        const session = await getWalletAuth(publicKey, signMessage);
+        if (!session) {
+          bus.emit('toast', 'Wallet signature needed to trade');
+          return;
+        }
+        bus.emit('toast', '🌱 Trading…');
+        const result = await redeemPlant(session, plantId, mutationId, count);
+        if (!result) {
+          bus.emit('toast', 'Trade failed — try again');
+          return;
+        }
+        if (!result.credited || result.credited === '0') {
+          bus.emit('toast', "Can't trade right now (daily limit reached or not enabled yet)");
+          return;
+        }
+        bus.emit('ui:redeemStack', { key, count });
+        bus.emit(
+          'toast',
+          `✓ Traded for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
+        );
+      } finally {
+        setRedeemingKey(null);
       }
-      bus.emit('toast', '🌱 Trading…');
-      const result = await redeemPlant(session, plantId, mutationId, count);
-      if (!result) {
-        bus.emit('toast', 'Trade failed — try again');
-        return;
-      }
-      if (!result.credited || result.credited === '0') {
-        bus.emit('toast', "Can't trade right now (daily limit reached or not enabled yet)");
-        return;
-      }
-      bus.emit('ui:redeemStack', { key, count });
-      bus.emit(
-        'toast',
-        `✓ Traded for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
-      );
     },
-    [connected, publicKey, signMessage],
+    [connected, publicKey, signMessage, redeemingKey],
   );
 
   let total = 0;
@@ -191,6 +200,7 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                 {connected && isTokenTradeable(plant) && (
                   <button
                     className="btn sm gold"
+                    disabled={redeemingKey !== null}
                     title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ~$${+(claimUsdFor(plant, mutation.id) ?? 0).toFixed(2)} of $LANDS`}
                     onClick={() => redeem(k, plant.id, mutation.id, count, plant.name)}
                   >

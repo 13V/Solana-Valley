@@ -32,6 +32,10 @@ create policy "shop_buys read" on public.shop_buys
 -- Atomic buy: bump bought by 1 only while it's below the pool cap. Returns the
 -- new bought count on success, or -1 if the seed is sold out (at/over cap) or
 -- the cap is invalid. SECURITY DEFINER so it can write past the read-only RLS.
+-- This RPC is anon-callable, so it can't trust client-supplied p_win/p_cap: only
+-- the current ±1 restock window is writable (no backfilling/forward-dating junk
+-- rows) and p_cap is clamped to a sane ceiling far above real stock.
+-- (120000 = RESTOCK_MS, the 2-minute window; matches `win` = floor(epoch_ms / RESTOCK_MS).)
 create or replace function public.buy_seed(
   p_island integer,
   p_win    bigint,
@@ -44,7 +48,21 @@ set search_path = public
 as $$
 declare
   new_bought integer;
+  v_now_win  bigint;   -- the server's current restock window
 begin
+  -- Anon-callable: bound the client-supplied window and cap before writing.
+  -- Only the current ±1 restock window is writable (no junk rows in arbitrary
+  -- past/future windows). 120000 = RESTOCK_MS.
+  v_now_win := floor(extract(epoch from now()) * 1000 / 120000)::bigint;
+  if p_win < v_now_win - 1 or p_win > v_now_win + 1 then
+    return -1; -- window out of range
+  end if;
+
+  -- Clamp the cap to a sane ceiling; real per-window stock is far below this.
+  if p_cap > 100000 then
+    return -1; -- implausible cap
+  end if;
+
   if p_cap is null or p_cap < 1 then
     return -1; -- not in stock this window
   end if;

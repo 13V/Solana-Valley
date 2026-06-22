@@ -87,6 +87,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mult = MUT_MULT[mutationId] ?? 1;
 
   const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+    res.status(500).json({ error: 'server not configured' });
+    return;
+  }
   const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
 
   const price = await landsUsdPrice(mint);
@@ -94,12 +98,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(503).json({ error: 'token price unavailable — set LANDS_USD_PRICE' });
     return;
   }
+  // Reject implausibly low prices: a near-zero price would inflate the $LANDS
+  // payout enormously. Treat it like no price (fail safe).
+  const minPrice = Number(process.env.LANDS_MIN_USD_PRICE ?? 1e-9);
+  if (price < minPrice) {
+    res.status(503).json({ error: 'token price unavailable' });
+    return;
+  }
 
-  // USD value → $LANDS base units at the current price.
+  // USD value → $LANDS base units at the current price. Floor (never round up)
+  // so the payout can't exceed the USD value, and reject non-finite/overflow.
   const usd = usdEach * mult * count;
-  const tokenBaseUnits = Math.round((usd / price) * 10 ** decimals);
-  if (!Number.isFinite(tokenBaseUnits) || tokenBaseUnits <= 0) {
-    res.status(400).json({ error: 'computed payout is zero' });
+  const tokenBaseUnits = Math.floor((usd / price) * 10 ** decimals);
+  if (
+    !Number.isFinite(tokenBaseUnits) ||
+    tokenBaseUnits <= 0 ||
+    tokenBaseUnits > Number.MAX_SAFE_INTEGER
+  ) {
+    res.status(400).json({ error: 'payout out of range' });
     return;
   }
 

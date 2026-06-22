@@ -60,22 +60,46 @@ alter table public.season_scores enable row level security;
 --   [{"wallet": "...", "score": 123.4, "credited": "5000000"}, ...]
 -- where `credited` is base units (number or numeric-string both parse). The
 -- caller (scripts/reward-season.mjs) is responsible for producing allocations
--- whose credited values sum to the season pool. Returns the count applied.
+-- whose credited values sum to the season pool. The pool cap is ALSO enforced
+-- in-DB here (not just by the caller): the sum of credited across allocations
+-- may not exceed the locked season's pool, and no credited may be negative —
+-- either raises and the whole txn rolls back. Returns the count applied.
 create or replace function public.distribute_season(p_season_id bigint, p_allocations jsonb)
 returns integer language plpgsql security definer set search_path = public as $$
 declare
   s_status text;
+  v_pool   numeric;   -- the locked season's pool (the in-DB cap)
+  v_total  numeric;   -- sum of credited across all allocations
+  v_neg    integer;   -- count of allocations with negative credited
   alloc    jsonb;
   n        integer := 0;
 begin
   -- Verify the season exists and is still open. Lock the row so two concurrent
-  -- distributions of the same season can't both proceed.
-  select status into s_status from public.seasons where id = p_season_id for update;
+  -- distributions of the same season can't both proceed. Read the pool from the
+  -- locked row so the cap check below uses the row we hold.
+  select status, pool into s_status, v_pool
+    from public.seasons where id = p_season_id for update;
   if not found then
     raise exception 'season % not found', p_season_id;
   end if;
   if s_status <> 'open' then
     raise exception 'season % is not open (status=%)', p_season_id, s_status;
+  end if;
+
+  -- Enforce the pool cap in-DB (not just trusting the caller): reject any
+  -- negative credited, and reject allocations whose total exceeds the pool.
+  -- Computed BEFORE applying anything, so a bad batch rolls back untouched.
+  select count(*) into v_neg
+    from jsonb_array_elements(p_allocations) elem
+    where (elem ->> 'credited')::numeric < 0;
+  if v_neg > 0 then
+    raise exception 'allocations contain % negative credited value(s)', v_neg;
+  end if;
+
+  select coalesce(sum((elem ->> 'credited')::numeric), 0) into v_total
+    from jsonb_array_elements(p_allocations) elem;
+  if v_total > v_pool then
+    raise exception 'allocations (%) exceed season pool (%)', v_total, v_pool;
   end if;
 
   -- Apply each allocation: record it, then credit the wallet's claimable.

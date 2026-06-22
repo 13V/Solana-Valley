@@ -39,10 +39,15 @@ create table if not exists public.distributors (
   mint               text,                                  -- the $SPROUT mint these tokens are paid in
   root               text        not null,                  -- merkle root (hex) committed on-chain
   total              numeric     not null,                  -- base units across all leaves
+  decimals           smallint    not null default 6,        -- mint decimals, so clients format any-decimals mints correctly
   distributor_pubkey text,                                  -- on-chain distributor account (null until created)
   tx                 text,                                  -- the create tx signature (null until created)
   created_at         timestamptz not null default now()
 );
+
+-- Additive migration for an EXISTING install (the create-table above only runs on
+-- a fresh DB). Both are guarded so re-running this file is always safe.
+alter table public.distributors add column if not exists decimals smallint not null default 6;
 
 -- Per-wallet leaf + proof for a season. `idx` is the wallet's leaf index in the
 -- tree; `proof` is a JSON array of hex strings (sibling hashes leaf→root) that
@@ -50,12 +55,17 @@ create table if not exists public.distributors (
 create table if not exists public.distributor_claims (
   season_id  bigint      not null,
   wallet     text        not null,
-  idx        integer     not null,                          -- leaf index in the merkle tree
+  idx        bigint      not null,                          -- leaf index in the merkle tree (on-chain index is u64)
   amount     numeric     not null,                          -- base units claimable by this wallet
   proof      jsonb       not null,                          -- ["<hex>", ...] merkle proof (sibling hashes)
   created_at timestamptz default now(),
   primary key (season_id, wallet)
 );
+
+-- Additive migration for an EXISTING install where idx was created as integer
+-- (the on-chain index is u64). Widening integer -> bigint is lossless, and the
+-- alter is a no-op if idx is already bigint, so re-running this file is safe.
+alter table public.distributor_claims alter column idx type bigint;
 
 -- RLS on. Merkle proofs are PUBLIC data (they grant nothing without the wallet's
 -- own on-chain signature against the already-public root), so anyone (anon) may

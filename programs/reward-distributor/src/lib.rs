@@ -100,6 +100,11 @@ pub mod reward_distributor {
         ])
         .0;
 
+        // Defensive CU cap: a valid proof is at most tree-height siblings, so a
+        // 32-deep proof already covers 2^32 leaves. Bound it before folding so a
+        // malicious oversized proof can't burn compute.
+        require!(proof.len() <= 32, RewardError::ProofTooLong);
+
         // Fold the proof with sorted-pair hashing: node = keccak256(min ++ max).
         let mut computed = leaf;
         for p in proof.iter() {
@@ -280,6 +285,7 @@ pub struct Claim<'info> {
         bump
     )]
     pub claim_status: Account<'info, ClaimStatus>,
+    // vault is always created at the canonical bump, so a client's findProgramAddressSync(['vault', distributor]) matches stored vault_bump.
     #[account(mut, seeds = [b"vault", distributor.key().as_ref()], bump = distributor.vault_bump)]
     pub vault: Account<'info, TokenAccount>,
     #[account(
@@ -328,4 +334,6 @@ pub enum RewardError {
     WrongOwner,
     #[msg("Arithmetic overflow")]
     MathOverflow,
+    #[msg("Merkle proof too long")]
+    ProofTooLong,
 }

@@ -155,7 +155,7 @@ async function buildCmd(poolTokens, args) {
   // f. Publish: insert the distributors row (to get the season_id), then insert
   //    every non-zero wallet's leaf + proof in batched POSTs.
   const rows = await rest('POST', '/rest/v1/distributors', {
-    body: { label, mint, root: tree.root, total: tree.total },
+    body: { label, mint, root: tree.root, total: tree.total, decimals: DECIMALS },
     headers: { Prefer: 'return=representation' },
   });
   const distributor = Array.isArray(rows) ? rows[0] : rows;

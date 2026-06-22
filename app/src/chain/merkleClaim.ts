@@ -40,6 +40,7 @@ export type ActiveClaim = {
   seasonId: number;
   distributor: string;
   mint: string;
+  decimals: number; // mint decimals, for display formatting (defaults to 6)
   idx: number;
   amount: string; // base units (token × 10^decimals), integer string
   proof: string[]; // each element a 32-byte hash, hex-encoded
@@ -135,7 +136,7 @@ export async function fetchActiveClaim(wallet: string): Promise<ActiveClaim | nu
     // Latest live distributor (newest season that has been deployed on-chain).
     const { data: dist, error: distErr } = await supabase
       .from('distributors')
-      .select('season_id, mint, distributor_pubkey')
+      .select('season_id, mint, decimals, distributor_pubkey')
       .not('distributor_pubkey', 'is', null)
       .order('season_id', { ascending: false })
       .limit(1)
@@ -157,10 +158,13 @@ export async function fetchActiveClaim(wallet: string): Promise<ActiveClaim | nu
     const amount = String(row.amount ?? '0');
     if (!amount || amount === '0') return null;
 
+    const decimals = dist.decimals == null ? 6 : Number(dist.decimals);
+
     return {
       seasonId,
       distributor: String(dist.distributor_pubkey),
       mint: String(dist.mint),
+      decimals: Number.isFinite(decimals) ? decimals : 6,
       idx: Number(row.idx),
       amount,
       proof,

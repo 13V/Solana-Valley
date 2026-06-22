@@ -22,6 +22,13 @@
 --   single wallet can take more than wallet_daily_cap — the pool cannot drain
 --   the treasury.
 --
+--   PAYOUT IS ALL-OR-NOTHING (no partial fills): a redeem either credits the
+--   FULL gross value of the submitted item(s) or credits nothing. If the gross
+--   would exceed either the remaining daily budget or the wallet's remaining
+--   cap, the RPC returns 0 and credits nothing — the client keeps the items and
+--   shows "daily limit reached". This avoids consuming a whole crop stack
+--   client-side when only a fraction of its value would fit the budget.
+--
 --   This file owns the *ledger* side. A successful redeem CREDITS the wallet's
 --   claimable balance in public.rewards (exactly like credit_reward /
 --   distribute_season do); the player then withdraws through the EXISTING claim
@@ -92,7 +99,8 @@ alter table public.redemption_log         enable row level security;
 --   p_item_value — the value (in coins) of the item(s) being redeemed; the
 --                  caller (/api) is responsible for verifying this server-side.
 -- Returns the base units credited to public.rewards.claimable, or 0 when
--- disabled / nothing to credit / fully capped for the day.
+-- disabled / nothing to credit / the full gross won't fit the remaining daily or
+-- per-wallet cap (all-or-nothing — no partial fills).
 create or replace function public.redeem_items(p_wallet text, p_item_value numeric)
 returns numeric language plpgsql security definer set search_path = public as $$
 declare
@@ -103,8 +111,8 @@ declare
   v_remaining       numeric;   -- budget left globally today
   v_wallet_remaining numeric;  -- budget left for this wallet today
   v_mult            numeric;   -- floating rate multiplier in [floor, 1.0]
-  v_gross           numeric;   -- uncapped credit at the current rate
-  v_credited        numeric;   -- final credit after all caps (what we pay)
+  v_gross           numeric;   -- full credit at the current rate (all-or-nothing)
+  v_credited        numeric;   -- final credit (= v_gross when it fits, else we bail)
 begin
   -- Guard the input.
   if p_item_value is null or p_item_value <= 0 then
@@ -145,12 +153,18 @@ begin
 
   -- Gross credit at the current rate, floored to whole base units.
   v_gross := floor(p_item_value * cfg.base_rate * v_mult);
-
-  -- Never exceed either remaining cap.
-  v_credited := least(v_gross, v_remaining, v_wallet_remaining);
-  if v_credited <= 0 then
+  if v_gross <= 0 then
     return 0;
   end if;
+
+  -- All-or-nothing: if the full gross won't fit the remaining daily budget OR
+  -- the wallet's remaining cap, credit NOTHING (the client keeps the items and
+  -- shows "daily limit reached"). We never partially fill — that would consume a
+  -- whole crop stack client-side for a fraction of its value.
+  if v_gross > v_remaining or v_gross > v_wallet_remaining then
+    return 0;
+  end if;
+  v_credited := v_gross;
 
   -- Spend the budget (rows are already locked above for this txn).
   update public.redemption_days

@@ -82,12 +82,17 @@ export function formatAmount(baseUnits: string, decimals: number): string {
   } catch {
     return '0';
   }
-  if (decimals <= 0) return n.toString();
+  // Format the magnitude, then re-apply the sign — otherwise division/modulo on a
+  // negative value yields garbage like "-1.-500".
+  const neg = n < 0n;
+  if (neg) n = -n;
+  if (decimals <= 0) return (neg ? '-' : '') + n.toString();
   const denom = 10n ** BigInt(decimals);
   const whole = n / denom;
   const frac = n % denom;
-  if (frac === 0n) return whole.toLocaleString();
+  if (frac === 0n) return (neg ? '-' : '') + whole.toLocaleString();
   // Up to 4 fractional digits, trailing zeros removed.
   const fracStr = frac.toString().padStart(decimals, '0').slice(0, 4).replace(/0+$/, '');
-  return fracStr ? `${whole.toLocaleString()}.${fracStr}` : whole.toLocaleString();
+  const body = fracStr ? `${whole.toLocaleString()}.${fracStr}` : whole.toLocaleString();
+  return (neg ? '-' : '') + body;
 }
