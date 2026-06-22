@@ -1082,6 +1082,19 @@ export class FarmScene extends Phaser.Scene {
     const ground = islandMap.layers.find((l) => l.name === 'Ground');
     const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
 
+    // Pre-scan water cells so grass can tell shoreline (water-adjacent — keeps its
+    // authored autotile edge) from interior (unified to one flat blue-tint frame,
+    // so the island reads as one clean grass colour with a soft edge).
+    const waterSet = new Set<string>();
+    for (const layer of islandMap.layers) {
+      for (const c in layer.cells) {
+        if (classify(layer.cells[c][0]) === 'water') waterSet.add(c);
+      }
+    }
+    const waterAdj = (x: number, y: number) =>
+      waterSet.has(`${x - 1},${y}`) || waterSet.has(`${x + 1},${y}`) ||
+      waterSet.has(`${x},${y - 1}`) || waterSet.has(`${x},${y + 1}`);
+
     // Ground layer first (depth 0).
     if (ground && ground.visible !== false) {
       for (const k in ground.cells) {
@@ -1093,11 +1106,15 @@ export class FarmScene extends Phaser.Scene {
         const cat = classify(key);
         if (cat === 'farm' && hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
         else if (cat !== 'water' && hasGrass) this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
-        // Ground-level grass renders ONLY from the blue-tint tileset: the other
-        // grass sheets (darker hill/slope grass) share its autotile frame layout,
-        // so recolour them to blue-tint at the same frame (keeping the shapes).
-        const gkey = cat === 'grass' && !key.includes('blue_tint') && hasGrass ? GRASS_BASE_KEY : key;
-        if (this.textures.exists(gkey)) this.ground[gy][gx] = this.add.image(cx, cy, gkey, frame).setScale(2).setDepth(0);
+        // Grass renders ONLY from the blue-tint tileset, unified to one flat
+        // frame in the interior; tiles touching water keep their authored
+        // blue-tint autotile frame so the island shoreline stays soft.
+        if (cat === 'grass' && hasGrass) {
+          const edge = key.includes('blue_tint') && waterAdj(gx, gy);
+          this.ground[gy][gx] = this.add.image(cx, cy, GRASS_BASE_KEY, edge ? frame : GRASS_BASE_FRAME).setScale(2).setDepth(0);
+        } else if (this.textures.exists(key)) {
+          this.ground[gy][gx] = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
+        }
         if (cat === 'water') {
           this.tiles[gy][gx].obstacle = true;
           this.pondTiles.add(k); // fishable water
@@ -1127,10 +1144,13 @@ export class FarmScene extends Phaser.Scene {
           if (hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(lx, ly)).setScale(2).setDepth(0.5);
           this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
           this.farmTiles.add(k);
+        } else if (cat === 'grass' && hasGrass) {
+          // Overlay grass unified to the blue-tint sheet too (interior flat; the
+          // perimeter border keeps its authored shoreline frame).
+          const edge = key.includes('blue_tint') && waterAdj(lx, ly);
+          this.add.image(cx, cy, GRASS_BASE_KEY, edge ? frame : GRASS_BASE_FRAME).setScale(2).setDepth(1);
         } else {
-          // Grass decals on overlays also render only from the blue-tint sheet.
-          const okey = cat === 'grass' && !key.includes('blue_tint') && hasGrass ? GRASS_BASE_KEY : key;
-          this.add.image(cx, cy, okey, frame).setScale(2).setDepth(1);
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
           if (cat === 'flat') this.pathTiles.add(k);
         }
       }
