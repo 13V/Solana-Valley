@@ -7,7 +7,7 @@
 export type SkillId = 'farming' | 'ranching' | 'breeding' | 'fishing' | 'foraging';
 export const SKILL_IDS: SkillId[] = ['farming', 'ranching', 'breeding', 'fishing', 'foraging'];
 export const MAX_SKILL_LEVEL = 20;
-export const PERK_LEVELS = [5, 10, 15]; // milestones that grant a perk choice
+export const PERK_LEVELS = [5, 10, 15, 18]; // milestones that grant a perk choice
 
 export type Skills = Record<SkillId, number>; // xp per skill
 export const EMPTY_SKILLS: Skills = { farming: 0, ranching: 0, breeding: 0, fishing: 0, foraging: 0 };
@@ -86,6 +86,9 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
       { level: 15,
         a: { id: 'thrifty', name: 'Thrifty', desc: '30% chance not to use the seed', mods: { seedSaveChance: 0.30 } },
         b: { id: 'prodigy', name: 'Prodigy', desc: '+20% value, +10% growth', mods: { cropValueMult: 0.20, cropGrowthMult: 0.10 } } },
+      { level: 18,
+        a: { id: 'farm18a', name: 'Bumper Harvest', desc: '+50% crop value · 15% double-yield chance', mods: { cropValueMult: 0.50, cropDoubleChance: 0.15 } },
+        b: { id: 'farm18b', name: 'Rapid Rotation', desc: '+45% growth · 25% seed-save · auto-replant', mods: { cropGrowthMult: 0.45, seedSaveChance: 0.25, autoReplant: true } } },
     ],
     capstone: { id: 'master_farmer', name: 'Master Farmer', desc: '15% chance to auto-replant on harvest · +15% value', mods: { autoReplant: true, cropValueMult: 0.15 } },
   },
@@ -101,6 +104,9 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
       { level: 15,
         a: { id: 'devoted', name: 'Devoted', desc: '+35% product value', mods: { productValueMult: 0.35 } },
         b: { id: 'efficient', name: 'Efficient', desc: '+35% production speed', mods: { prodSpeedMult: 0.35 } } },
+      { level: 18,
+        a: { id: 'ranch18a', name: 'Premium Stock', desc: '+55% product value · 18% golden chance', mods: { productValueMult: 0.55, goldenProductChance: 0.18 } },
+        b: { id: 'ranch18b', name: 'Production Line', desc: '+40% production speed · 20% double product', mods: { prodSpeedMult: 0.40, productDoubleChance: 0.20 } } },
     ],
     capstone: { id: 'rancher_lord', name: 'Rancher Lord', desc: '+25% value · +6% golden chance', mods: { productValueMult: 0.25, goldenProductChance: 0.06 } },
   },
@@ -116,6 +122,9 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
       { level: 15,
         a: { id: 'bloodline', name: 'Rare Bloodline', desc: '+15% chance of a rare-colour baby', mods: { rareBabyChance: 0.15 } },
         b: { id: 'big_ranch', name: 'Big Ranch', desc: '+3 herd cap', mods: { breedCapBonus: 3 } } },
+      { level: 18,
+        a: { id: 'breed18a', name: 'Prized Lineage', desc: '+20% rare babies · +35% faster breeding', mods: { rareBabyChance: 0.20, breedSpeedMult: 0.35 } },
+        b: { id: 'breed18b', name: 'Prolific Breeder', desc: '+3 herd cap · +25% faster breeding', mods: { breedCapBonus: 3, breedSpeedMult: 0.25 } } },
     ],
     capstone: { id: 'master_breeder', name: 'Master Breeder', desc: '+25% rare babies · +20% faster', mods: { rareBabyChance: 0.25, breedSpeedMult: 0.20 } },
   },
@@ -131,6 +140,9 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
       { level: 15,
         a: { id: 'master_caster', name: 'Master Caster', desc: '+40% fish value', mods: { fishValueMult: 0.40 } },
         b: { id: 'lucky_hook', name: 'Lucky Hook', desc: '+50% luck · +5% treasure', mods: { fishLuckMult: 0.50, treasureChance: 0.05 } } },
+      { level: 18,
+        a: { id: 'fish18a', name: 'Master Angler', desc: '+55% fish value · 22% treasure chance', mods: { fishValueMult: 0.55, treasureChance: 0.22 } },
+        b: { id: 'fish18b', name: 'Deep Water Legend', desc: '+45% luck · can hook legendary fish', mods: { fishLuckMult: 0.45, legendaryFish: true } } },
     ],
     capstone: { id: 'legendary_angler', name: 'Legendary Angler', desc: 'Can hook legendary fish · +30% value', mods: { legendaryFish: true, fishValueMult: 0.30 } },
   },
@@ -146,6 +158,9 @@ export const SKILLS: { id: SkillId; name: string; icon: string; blurb: string; m
       { level: 15,
         a: { id: 'naturalist', name: 'Naturalist', desc: '+30% value · +30% luck', mods: { forageValueMult: 0.30, forageLuckMult: 0.30 } },
         b: { id: 'quick_hands', name: 'Quick Hands', desc: '+60% faster respawn', mods: { forageRespawnMult: 0.60 } } },
+      { level: 18,
+        a: { id: 'forage18a', name: 'Rare Finds', desc: '+50% forage value · 20% gem chance', mods: { forageValueMult: 0.50, gemChance: 0.20 } },
+        b: { id: 'forage18b', name: "Nature's Bounty", desc: '+40% luck · +50% faster respawn', mods: { forageLuckMult: 0.40, forageRespawnMult: 0.50 } } },
     ],
     capstone: { id: 'forest_spirit', name: 'Forest Spirit', desc: '6% chance of a gem · +30% value', mods: { gemChance: 0.06, forageValueMult: 0.30 } },
   },

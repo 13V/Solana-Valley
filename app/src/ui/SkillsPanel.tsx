@@ -18,7 +18,7 @@ export function SkillsPanel({ onClose }: { onClose: () => void }) {
     <div className="panel">
       <div className="panel-head">
         <h3>🎯 Skills</h3>
-        <span className="muted">level up by playing · choose a perk at Lv 5/10/15</span>
+        <span className="muted">level up by playing · choose a perk at Lv 5/10/15/18</span>
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 4px', justifyContent: 'flex-end' }}>
