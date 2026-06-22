@@ -1427,7 +1427,9 @@ export class FarmScene extends Phaser.Scene {
     const ov = this.overlay[y][x];
     if (!ov) return; // overlays exist only on the player's farm
     if (this.tiles[y][x].tilled) {
-      ov.setVisible(true).setFrame(this.solidTilledFrame(x, y)).setTint(this.isWet(x, y) ? 0x9b8763 : 0xffffff);
+      // Tint the (light-tan) tilled sprite to a soil brown so hoeing clearly
+      // darkens the bed; watering darkens it further (damp soil).
+      ov.setVisible(true).setFrame(this.solidTilledFrame(x, y)).setTint(this.isWet(x, y) ? 0x8a5f38 : 0xc79a6b);
     } else {
       ov.setVisible(false);
     }
@@ -3741,6 +3743,7 @@ export class FarmScene extends Phaser.Scene {
         const img = this.add
           .image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'tilled', 56)
           .setScale(2)
+          .setTint(0xc79a6b) // soil brown, matching the local tilled overlay
           .setDepth(1);
         farm.tilled.set(key, img);
       }
