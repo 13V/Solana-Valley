@@ -8,9 +8,9 @@ const ISLANDS: Array<{ id: string; name: string; img: string; blurb: string }> =
   { id: 'hub', name: 'The Hub', img: 'island_hub.png', blurb: 'Plaza, pond & market' },
 ];
 
-export function TravelPanel({ onClose }: { onClose: () => void }) {
+export function TravelPanel({ onClose, current }: { onClose: () => void; current?: string }) {
   const sail = (id: string) => {
-    bus.emit('ui:travel', id);
+    if (id !== current) bus.emit('ui:travel', id);
     onClose();
   };
 
@@ -24,16 +24,26 @@ export function TravelPanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <div className="travel-grid">
-        {ISLANDS.map((is) => (
-          <button key={is.id} className="island-card" onClick={() => sail(is.id)} title={`Sail to ${is.name}`}>
-            <span className="island-thumb">
-              <img src={`assets/sprout-ui/${is.img}`} alt="" />
-            </span>
-            <span className="island-name">{is.name}</span>
-            <span className="island-blurb">{is.blurb}</span>
-            <span className="btn sm gold island-go" aria-hidden="true">Set sail</span>
-          </button>
-        ))}
+        {ISLANDS.map((is) => {
+          const here = is.id === current;
+          return (
+            <button
+              key={is.id}
+              className={`island-card${here ? ' here' : ''}`}
+              onClick={() => sail(is.id)}
+              title={here ? `You're at ${is.name}` : `Sail to ${is.name}`}
+            >
+              <span className="island-thumb">
+                <img src={`assets/sprout-ui/${is.img}`} alt="" />
+              </span>
+              <span className="island-name">{is.name}</span>
+              <span className="island-blurb">{is.blurb}</span>
+              <span className={`btn sm island-go ${here ? 'island-here' : 'gold'}`} aria-hidden="true">
+                {here ? '★ You’re here' : 'Set sail'}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

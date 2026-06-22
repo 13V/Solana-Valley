@@ -1257,3 +1257,26 @@ body {
   color: var(--ink-soft);
   opacity: 0.95;
 }
+
+/* "You're here" — the current zone reads as a recessed, non-actionable tile. */
+.island-card.here {
+  cursor: default;
+}
+.island-card.here:hover {
+  transform: none;
+}
+.island-here {
+  pointer-events: none;
+  margin-top: 7px;
+  color: #2f7d2e;
+}
+.ui-skin .island-card.here {
+  border-image: var(--slot-active) 8 fill stretch;
+}
+.ui-skin .island-card.here:hover {
+  border-image: var(--slot-active) 8 fill stretch;
+}
+.ui-skin .island-here {
+  color: #2f7d2e;
+  font-weight: 700;
+}

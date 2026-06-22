@@ -620,6 +620,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyExpansion', () => this.buyExpansion()),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
+      bus.on('ui:openTravel', () => bus.emit('boat:open', { current: this.currentZone() })),
       bus.on('ui:travel', (id) => this.travelTo(id)),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
       bus.on('mp:assigned', ({ id, island, plot }) => { this.myMpId = id; this.island = island; this.onAssigned(plot); this.rollShopWindow(this.currentEpoch()); }),
@@ -2684,8 +2685,22 @@ export class FarmScene extends Phaser.Scene {
   private tryBoardBoat(wx: number, wy: number): boolean {
     if (!this.boat) return false;
     if (Phaser.Math.Distance.Between(wx, wy, this.boat.x, this.boat.y) > 36) return false;
-    bus.emit('boat:open', undefined);
+    bus.emit('boat:open', { current: this.currentZone() });
     return true;
+  }
+
+  // Which island/zone the player is currently standing in (for the "You're
+  // here" marker in the travel UI). '' when out in the open / between zones.
+  private currentZone(): string {
+    const tx = Math.floor(this.player.x / TILE);
+    const ty = Math.floor(this.player.y / TILE);
+    const inR = (r: Rect) => tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1;
+    if (inR(PLAZA)) return 'hub';
+    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
+    if (inR(h.chickenPen)) return 'chicken';
+    if (inR(h.cowPen)) return 'cow';
+    if (inR(h.farm)) return 'farm';
+    return '';
   }
 
   // Set sail: teleport the player (camera follows) to one of the four island
@@ -2702,12 +2717,25 @@ export class FarmScene extends Phaser.Scene {
       case 'farm':
       default: t = center(h.farm); label = 'your Farm'; break;
     }
-    this.player.setPosition(t.tx * TILE + TILE / 2, t.ty * TILE + TILE / 2);
-    this.player.setVelocity(0, 0);
-    this.facing = 'down';
-    this.player.anims.play('idle-down', true);
-    this.cameras.main.flash(260, 255, 246, 224);
+    const arrive = () => {
+      this.player.setPosition(t.tx * TILE + TILE / 2, t.ty * TILE + TILE / 2);
+      this.player.setVelocity(0, 0);
+      this.facing = 'down';
+      this.player.anims.play('idle-down', true);
+    };
     bus.emit('toast', `⛵ Set sail to ${label}!`);
+    // A short "sailing" dip to deep-water blue, teleport mid-fade, then back —
+    // unless reduced motion is on, in which case jump there instantly.
+    const cam = this.cameras.main;
+    if (document.documentElement.classList.contains('reduce-motion')) {
+      arrive();
+      return;
+    }
+    cam.fadeOut(240, 18, 42, 64);
+    cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      arrive();
+      cam.fadeIn(300, 18, 42, 64);
+    });
   }
 
   // Click a water tile within reach → cast. Works on the inland pond and on the

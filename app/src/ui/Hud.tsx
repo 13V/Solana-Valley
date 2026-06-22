@@ -118,6 +118,13 @@ export function Hud({
           );
         })}
         <button
+          className={`iconbtn ${panel === 'travel' ? 'active' : ''}`}
+          title="Travel by boat"
+          onClick={() => (panel === 'travel' ? onToggle('travel') : bus.emit('ui:openTravel', undefined))}
+        >
+          <img className="btn-ico" src="assets/sprout-ui/ic_boat.png" alt="⛵" />
+        </button>
+        <button
           className="iconbtn"
           title={muted ? 'Unmute' : 'Mute'}
           onClick={() => {

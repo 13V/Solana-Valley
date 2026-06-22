@@ -11,7 +11,7 @@ export interface GameEvents {
   toast: string;
   saved: string; // the save JSON string, emitted right after it's written to localStorage (for cloud sync)
   action: 'till' | 'plant' | 'water' | 'harvest' | 'sell'; // a core gameplay action just succeeded (for onboarding)
-  'boat:open': void; // FarmScene -> UI: the player clicked the boat; open the travel UI
+  'boat:open': { current: string }; // FarmScene -> UI: open the travel UI ('current' = the zone the player is standing in, or '')
   'ui:selectTool': string; // 'hoe' | 'can' | 'seed'
   'ui:selectSeed': string; // plant id -> also switches to the seed tool
   'ui:buySeed': string; // plant id
@@ -23,6 +23,7 @@ export interface GameEvents {
   'ui:buyExpansion': void; // buy the next crop-bed expansion column
   'ui:choosePerk': { skill: SkillId; level: number; perk: string }; // pick a milestone perk
   'ui:respecPerks': void; // clear all chosen perks (escalating coin cost) to re-pick milestones
+  'ui:openTravel': void; // UI (HUD boat button) -> FarmScene: please open the travel UI (game replies with boat:open + current zone)
   'ui:travel': string; // UI -> FarmScene: set sail to an island/zone ('farm' | 'chicken' | 'cow' | 'hub')
 
   // --- Real-time multiplayer bridge (ids are wallet base58 addresses) ---
