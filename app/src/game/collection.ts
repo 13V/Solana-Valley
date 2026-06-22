@@ -9,9 +9,12 @@
 
 import {
   PLANTS,
+  PLANT_BY_ID,
   RARITY_ORDER,
   RARITY_UNLOCK,
   MUTATIONS,
+  plantFamily,
+  familyName,
   type Rarity,
 } from './economy';
 import { ACHIEVEMENTS, UPGRADES } from './progression';
@@ -143,4 +146,47 @@ export function masterGardenerPct(input: MasterGardenerInput): number {
     W_ACHIEVEMENTS * achFrac;
 
   return Math.round(score * 100);
+}
+
+// ---- family set bonuses -------------------------------------------------
+// Discovering EVERY plant in a family permanently boosts THAT family's crop
+// sale value. Unlike the global collection bonus above, this is per-family and
+// applies only to that family's crops — turning the Almanac into a set of
+// concrete chases (à la Stardew bundles / ACNH critterpedia rewards).
+export const FAMILY_SET_BONUS = 0.12; // +12% sale value for a completed family
+
+// Tally found/total per family from the discovered-plant set.
+function familyTally(discoveredPlants: Iterable<string>): Map<string, { found: number; total: number }> {
+  const dp = discoveredPlants instanceof Set ? discoveredPlants : new Set(discoveredPlants);
+  const counts = new Map<string, { found: number; total: number }>();
+  for (const p of PLANTS) {
+    const f = plantFamily(p);
+    const e = counts.get(f) ?? { found: 0, total: 0 };
+    e.total++;
+    if (dp.has(p.id)) e.found++;
+    counts.set(f, e);
+  }
+  return counts;
+}
+
+// Which families are fully discovered.
+export function completedFamilies(discoveredPlants: Iterable<string>): Set<string> {
+  const done = new Set<string>();
+  for (const [f, e] of familyTally(discoveredPlants)) if (e.total > 0 && e.found === e.total) done.add(f);
+  return done;
+}
+
+// Sale multiplier for one plant given the set of completed families (1 = none).
+export function familyBonusFor(plantId: string, completed: Set<string>): number {
+  const p = PLANT_BY_ID[plantId];
+  if (!p) return 1;
+  return completed.has(plantFamily(p)) ? 1 + FAMILY_SET_BONUS : 1;
+}
+
+// Per-family discovery progress for the Almanac (sorted most-complete first).
+export type FamilyProgress = { key: string; name: string; found: number; total: number; complete: boolean };
+export function familyProgress(discoveredPlants: Iterable<string>): FamilyProgress[] {
+  return [...familyTally(discoveredPlants).entries()]
+    .map(([key, e]) => ({ key, name: familyName(key), found: e.found, total: e.total, complete: e.found === e.total }))
+    .sort((a, b) => b.found / b.total - a.found / a.total || a.name.localeCompare(b.name));
 }

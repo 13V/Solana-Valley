@@ -52,6 +52,9 @@ export type Plant = {
   // If set, the crop REGROWS this many seconds after harvest instead of being
   // removed (multi-harvest). ~50% of growthSeconds keeps the follow-up cycle snappy.
   regrow?: number;
+  // Optional explicit family key for collection set bonuses. Usually derived from
+  // the id prefix (see plantFamily); set only to override.
+  family?: string;
 };
 
 // Roster mapped to the premium "Farming Plants" sprite rows (r2..r14), tiered
@@ -294,6 +297,48 @@ export const RARITY_UNLOCK: Record<Rarity, number> = {
   Prismatic: 25,
   Celestial: 30,
 };
+
+// ---- plant families (collection set bonuses) ----------------------------
+
+// Display names for each plant "family". Families group thematically-related
+// crops; discovering EVERY plant in a family grants a permanent sale bonus on
+// that family's crops (see collection.ts). Most plant ids carry their family as
+// an id prefix (e.g. 'berry_*', 'cit_*'); the original/early crops predate that
+// scheme and are mapped explicitly in LEGACY_FAMILY below.
+export const FAMILY_NAMES: Record<string, string> = {
+  root: 'Root Vegetables', leaf: 'Leafy Greens', herb: 'Herbs', grain: 'Grains & Legumes',
+  berry: 'Berries', melon: 'Melons & Gourds', pep: 'Peppers & Nightshades',
+  orch: 'Orchard Fruits', stf: 'Stone Fruits', trop: 'Tropical Fruits', cit: 'Citrus',
+  nut: 'Nuts & Seeds', vine: 'Vine Fruits', heir: 'Heirloom Veg', aut: 'Autumn Harvest',
+  cac: 'Cacti & Succulents', flwr: 'Flowers', cnf: 'Confections', myth: 'Magical Botanicals',
+  cry: 'Crystalline Crops', emb: 'Volcanic Crops', cos: 'Cosmic Harvest',
+  aqua: 'Aquatic Plants', misc: 'Sundry',
+};
+
+// Family for crops that predate the id-prefix scheme (original 19 + early drops).
+const LEGACY_FAMILY: Record<string, string> = {
+  carrot: 'root', potato: 'root', radish: 'root', turnip: 'root', beet: 'root',
+  spinach: 'leaf', lettuce: 'leaf', pinkcabbage: 'leaf', cauliflower: 'leaf',
+  tomato: 'pep', eggplant: 'pep', strawberry: 'berry',
+  cucumber: 'melon', watermelon: 'melon', pumpkin: 'melon', frostpumpkin: 'melon',
+  corn: 'grain', goldencorn: 'grain',
+  bluerose: 'flwr', sunpetal: 'flwr', moonpetal: 'flwr',
+  dragonfruit: 'trop', starfruit: 'trop',
+  nebula: 'cos', galaxyfruit: 'cos', voidbloom: 'cos',
+};
+
+// The family key for a plant: explicit `family`, else the id prefix before '_',
+// else the legacy map, else 'misc'.
+export function plantFamily(p: Plant): string {
+  if (p.family) return p.family;
+  const i = p.id.indexOf('_');
+  if (i > 0) return p.id.slice(0, i);
+  return LEGACY_FAMILY[p.id] ?? 'misc';
+}
+
+export function familyName(key: string): string {
+  return FAMILY_NAMES[key] ?? key;
+}
 
 // ---- mutations ----------------------------------------------------------
 

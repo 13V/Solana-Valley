@@ -51,7 +51,8 @@ import {
   type Upgrades,
   type UpgradeForks,
 } from '../progression';
-import { collectionBonus } from '../collection';
+import { collectionBonus, completedFamilies, familyBonusFor, FAMILY_SET_BONUS } from '../collection';
+import { plantFamily, familyName } from '../economy';
 import { GOALS, GOAL_MILESTONES, rewardLabel, type GoalStats } from '../goals';
 import { fetchShopBought, buySeedRemote } from '../../chain/shopSync';
 import { ANIMAL_BY_ID, ANIMALS, type AnimalDef } from '../animals';
@@ -1738,7 +1739,16 @@ export class FarmScene extends Phaser.Scene {
     }
 
     this.harvested += 1;
+    const newPlant = !this.discoveredPlants.has(plant.id);
     this.discoveredPlants.add(plant.id);
+    if (newPlant) {
+      // If this discovery completes a plant family, celebrate the permanent set bonus.
+      const fam = plantFamily(plant);
+      if (PLANTS.every((p) => plantFamily(p) !== fam || this.discoveredPlants.has(p.id))) {
+        sfx.play('achievement');
+        this.toast(`🌾 ${familyName(fam)} family complete! +${Math.round(FAMILY_SET_BONUS * 100)}% sale value on ${familyName(fam)} crops`);
+      }
+    }
     if (m.id !== 'normal') {
       this.mutationsFound += 1;
       this.discoveredMutations.add(m.id);
@@ -1941,12 +1951,14 @@ export class FarmScene extends Phaser.Scene {
     // Tolerant parse: legacy 3-/4-part keys default quality 'none', withered '0'.
     const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
     const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
+    const famMult = familyBonusFor(plantId, completedFamilies(this.discoveredPlants));
     const value = Math.round(
       this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') *
         count *
         marketBonus(this.upgrades.market) *
         this.mods().cropValueMult *
-        this.collectionMult(),
+        this.collectionMult() *
+        famMult,
     );
     delete this.harvestInv[key];
     this.coins += value;
@@ -1954,7 +1966,8 @@ export class FarmScene extends Phaser.Scene {
     sfx.play('sell');
     bus.emit('action', 'sell');
     this.checkAchievements();
-    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}`);
+    const famTag = famMult > 1 ? ` · +${Math.round(FAMILY_SET_BONUS * 100)}% ${familyName(plantFamily(PLANT_BY_ID[plantId]))} set` : '';
+    this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}${famTag}`);
     this.emitState();
   }
 
@@ -1981,6 +1994,7 @@ export class FarmScene extends Phaser.Scene {
     let cropTotal = 0;
     let fishTotal = 0;
     const fishValueMult = this.mods().fishValueMult;
+    const fams = completedFamilies(this.discoveredPlants);
     for (const [key, count] of Object.entries(this.harvestInv)) {
       // Fish stacks are valued on their own track (species value × Fishing mult),
       // outside the crop market/collection multipliers. Branch BEFORE the crop
@@ -1992,7 +2006,7 @@ export class FarmScene extends Phaser.Scene {
       }
       const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
       const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
-      cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count;
+      cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count * familyBonusFor(plantId, fams);
     }
     const total = Math.round(
       cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() + fishTotal,

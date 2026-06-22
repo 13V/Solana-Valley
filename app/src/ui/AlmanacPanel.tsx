@@ -3,7 +3,7 @@ import { FISH } from '../game/fishing';
 import { FORAGE } from '../game/forage';
 import { loreFor } from '../game/lore';
 import { ACHIEVEMENTS } from '../game/progression';
-import { collectionBonus, completedTiers, masterGardenerPct } from '../game/collection';
+import { collectionBonus, completedTiers, masterGardenerPct, familyProgress, FAMILY_SET_BONUS } from '../game/collection';
 import { useGameState } from './useGameState';
 import { CropIcon } from './CropIcon';
 import { Tooltip, PlantTipBody } from './Tooltip';
@@ -22,6 +22,8 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
   // persisted state needed.
   const bonus = collectionBonus(dp, dm);
   const tiersDone = completedTiers(dp);
+  const fams = familyProgress(dp);
+  const famsComplete = fams.filter((f) => f.complete).length;
   const masterPct = masterGardenerPct({
     discoveredPlants: dp,
     discoveredMutations: dm,
@@ -66,6 +68,24 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
             })}
           </div>
           {bonus.allPlants && <p className="alm-note" style={{ color: '#ffd21a' }}>★ Full collection — finale bonus active!</p>}
+
+          <h4 style={{ marginTop: 10 }}>
+            Plant Families — complete one for +{Math.round(FAMILY_SET_BONUS * 100)}% on its crops
+            <span className="muted"> · {famsComplete}/{fams.length} done</span>
+          </h4>
+          <p className="muted alm-note">Discover every plant in a family and that family's crops permanently sell for more.</p>
+          <div className="alm-tier-grid">
+            {fams.map((f) => (
+              <span
+                key={f.key}
+                className={`alm-tier ${f.complete ? 'done' : ''}`}
+                style={{ color: f.complete ? '#7bd66a' : undefined, borderColor: f.complete ? '#7bd66a' : '#3a4250' }}
+                title={f.complete ? `+${Math.round(FAMILY_SET_BONUS * 100)}% sale value on ${f.name}` : `${f.total - f.found} more to complete`}
+              >
+                {f.complete ? '✓ ' : ''}{f.name} {f.found}/{f.total}
+              </span>
+            ))}
+          </div>
         </div>
 
         <h4>Plants — {plantPct}% discovered</h4>
