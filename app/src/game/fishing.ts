@@ -95,6 +95,27 @@ export const FISH: Fish[] = [
   { id: 'nf_starweave', name: 'Starweave Eel', rarity: 'Celestial', value: 88000, frame: 35, weight: 2.5, water: 'any' },
   { id: 'nf_void_carp', name: 'Void Carp', rarity: 'Celestial', value: 125000, frame: 36, weight: 2.5, water: 'fresh' },
   { id: 'nf_sol_leviathan', name: 'Sol Leviathan', rarity: 'Celestial', value: 138000, frame: 37, weight: 2.5, water: 'salt' },
+  // --- Wave 2: The Deep ---
+  { id: 'nf2_mudskipper', name: 'Silt Skipper', rarity: 'Common', value: 14, frame: 39, weight: 80, water: 'fresh' },
+  { id: 'nf2_silverling', name: 'Silverling', rarity: 'Common', value: 22, frame: 40, weight: 80, water: 'fresh' },
+  { id: 'nf2_sandperch', name: 'Sand Perch', rarity: 'Common', value: 18, frame: 42, weight: 80, water: 'salt' },
+  { id: 'nf2_tideguppy', name: 'Tide Guppy', rarity: 'Common', value: 28, frame: 43, weight: 80, water: 'salt' },
+  { id: 'nf2_brookdarter', name: 'Brook Darter', rarity: 'Uncommon', value: 62, frame: 44, weight: 70, water: 'fresh' },
+  { id: 'nf2_coralsnapper', name: 'Coral Snapper', rarity: 'Uncommon', value: 85, frame: 46, weight: 70, water: 'salt' },
+  { id: 'nf2_fenneltrout', name: 'Fennel Trout', rarity: 'Uncommon', value: 74, frame: 47, weight: 70, water: 'fresh' },
+  { id: 'nf2_saltwhisker', name: 'Saltwhisker', rarity: 'Rare', value: 210, frame: 49, weight: 55, water: 'salt' },
+  { id: 'nf2_glasseel', name: 'Glass Eel', rarity: 'Rare', value: 275, frame: 50, weight: 55, water: 'any' },
+  { id: 'nf2_moonbream', name: 'Moon Bream', rarity: 'Rare', value: 340, frame: 51, weight: 55, water: 'fresh' },
+  { id: 'nf2_vaultpike', name: 'Vault Pike', rarity: 'Legendary', value: 590, frame: 52, weight: 36, water: 'fresh' },
+  { id: 'nf2_deepcrown', name: 'Deep Crown', rarity: 'Legendary', value: 730, frame: 53, weight: 36, water: 'salt' },
+  { id: 'nf2_emberfin', name: 'Emberfin', rarity: 'Mythical', value: 1750, frame: 54, weight: 22, water: 'any' },
+  { id: 'nf2_abyssalray', name: 'Abyssal Ray', rarity: 'Mythical', value: 2300, frame: 55, weight: 22, water: 'salt' },
+  { id: 'nf2_solarshark', name: 'Solar Shark', rarity: 'Divine', value: 6400, frame: 56, weight: 13, water: 'salt' },
+  { id: 'nf2_dawnloach', name: 'Dawn Loach', rarity: 'Divine', value: 7800, frame: 58, weight: 13, water: 'fresh' },
+  { id: 'nf2_spectralsalmon', name: 'Spectral Salmon', rarity: 'Prismatic', value: 22000, frame: 63, weight: 6, water: 'any' },
+  { id: 'nf2_voidleviathan', name: 'Void Leviathan', rarity: 'Prismatic', value: 27500, frame: 65, weight: 6, water: 'salt' },
+  { id: 'nf2_starweaverfish', name: 'Starweaver Fish', rarity: 'Celestial', value: 88000, frame: 66, weight: 2.5, water: 'any' },
+  { id: 'nf2_eternaltide', name: 'Eternal Tide', rarity: 'Celestial', value: 125000, frame: 67, weight: 2.5, water: 'fresh' },
 ];
 
 export const FISH_BY_ID: Record<string, Fish> = Object.fromEntries(FISH.map((f) => [f.id, f]));

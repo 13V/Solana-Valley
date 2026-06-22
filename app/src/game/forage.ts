@@ -33,6 +33,13 @@ export const FORAGE: Forage[] = [
   { id: 'nfg_ghostbell', name: 'Ghostbell Flower', value: 300, weight: 10, sheet: 'mfs', frame: 13, css: '#d0eeff' },
   { id: 'nfg_crimsonwort', name: 'Crimsonwort Herb', value: 550, weight: 5, sheet: 'nature', frame: 41, css: '#c94040' },
   { id: 'nfg_voidcrystal', name: 'Voidcrystal Shard', value: 1000, weight: 1.5, sheet: 'mfs', frame: 17, css: '#6a3dff' },
+  // --- Wave 2: more wild finds ---
+  { id: 'nfg2_speckled_cap', name: 'Speckled Cap', value: 30, weight: 85, sheet: 'mfs', frame: 2, css: '#c8a97e' },
+  { id: 'nfg2_dusk_petal', name: 'Dusk Petal', value: 75, weight: 60, sheet: 'mfs', frame: 5, css: '#d97fbf' },
+  { id: 'nfg2_mossy_cobble', name: 'Mossy Cobble', value: 140, weight: 35, sheet: 'mfs', frame: 7, css: '#7ab87a' },
+  { id: 'nfg2_glimmer_shard', name: 'Glimmer Shard', value: 310, weight: 18, sheet: 'mfs', frame: 9, css: '#a8c5ff' },
+  { id: 'nfg2_ember_bloom', name: 'Ember Bloom', value: 560, weight: 7, sheet: 'mfs', frame: 10, css: '#e8824a' },
+  { id: 'nfg2_voidheart_gem', name: 'Voidheart Gem', value: 900, weight: 2, sheet: 'mfs', frame: 11, css: '#8b52cc' },
 ];
 
 // Pick a forage type; `luck` (>=1, from the Foraging skill) favours rarer finds.
