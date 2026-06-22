@@ -1,8 +1,10 @@
-import { PLANTS, RARITY } from '../game/economy';
+import { useState } from 'react';
+import { PLANTS, RARITY, RARITY_ORDER, type Rarity } from '../game/economy';
 import { useGameState, useClock } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
 import { Tooltip, PlantTipBody } from './Tooltip';
+import { RarityFilterBar, matchesFilter } from './RarityFilterBar';
 
 export function Shop({ onClose }: { onClose: () => void }) {
   const { coins, shop, progress } = useGameState();
@@ -10,6 +12,9 @@ export function Shop({ onClose }: { onClose: () => void }) {
   const stockById: Record<string, number> = Object.fromEntries(shop.map((s) => [s.plantId, s.stock]));
   const mm = String(Math.floor(restockIn / 60)).padStart(2, '0');
   const ss = String(restockIn % 60).padStart(2, '0');
+  const [rarity, setRarity] = useState<Rarity | 'All'>('All');
+  const [q, setQ] = useState('');
+  const list = PLANTS.filter((p) => matchesFilter(p, rarity, q));
 
   return (
     <div className="panel">
@@ -18,8 +23,10 @@ export function Shop({ onClose }: { onClose: () => void }) {
         <span className="muted">restock in {mm}:{ss}</span>
         <button className="x" onClick={onClose}><img className="ui-x" src="assets/sprout-ui/ui_x.png" alt="✕" /></button>
       </div>
+      <RarityFilterBar rarity={rarity} setRarity={setRarity} q={q} setQ={setQ} rarities={RARITY_ORDER} colorOf={(r) => RARITY[r].css} />
       <div className="rows">
-        {PLANTS.map((p) => {
+        {list.length === 0 && <p className="empty">No seeds match your filter.</p>}
+        {list.map((p) => {
           const r = RARITY[p.rarity];
           const stock = stockById[p.id] ?? 0;
           const afford = coins >= p.seedCost;

@@ -1,12 +1,17 @@
-import { PLANTS, RARITY } from '../game/economy';
+import { useState } from 'react';
+import { PLANTS, RARITY, RARITY_ORDER, type Rarity } from '../game/economy';
 import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
 import { Tooltip, PlantTipBody } from './Tooltip';
+import { RarityFilterBar, matchesFilter } from './RarityFilterBar';
 
 export function SeedsPanel({ onClose }: { onClose: () => void }) {
   const { seeds, selectedSeed, progress } = useGameState();
+  const [rarity, setRarity] = useState<Rarity | 'All'>('All');
+  const [q, setQ] = useState('');
   const owned = PLANTS.filter((p) => (seeds[p.id] ?? 0) > 0);
+  const list = owned.filter((p) => matchesFilter(p, rarity, q));
 
   return (
     <div className="panel">
@@ -18,8 +23,13 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
       {owned.length === 0 ? (
         <p className="empty">No seeds yet — buy some at the shop.</p>
       ) : (
-        <div className="rows">
-          {owned.map((p) => {
+        <>
+          {owned.length > 8 && (
+            <RarityFilterBar rarity={rarity} setRarity={setRarity} q={q} setQ={setQ} rarities={RARITY_ORDER} colorOf={(r) => RARITY[r].css} />
+          )}
+          <div className="rows">
+            {list.length === 0 && <p className="empty">No seeds match your filter.</p>}
+            {list.map((p) => {
             const r = RARITY[p.rarity];
             return (
               <div className={`row ${selectedSeed === p.id ? 'sel' : ''}`} key={p.id} style={{ borderLeftColor: r.css }}>
@@ -38,7 +48,8 @@ export function SeedsPanel({ onClose }: { onClose: () => void }) {
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
