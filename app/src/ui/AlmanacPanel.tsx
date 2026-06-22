@@ -1,4 +1,7 @@
 import { PLANTS, RARITY, RARITY_ORDER, MUTATIONS } from '../game/economy';
+import { FISH } from '../game/fishing';
+import { FORAGE } from '../game/forage';
+import { loreFor } from '../game/lore';
 import { ACHIEVEMENTS } from '../game/progression';
 import { collectionBonus, completedTiers, masterGardenerPct } from '../game/collection';
 import { useGameState } from './useGameState';
@@ -108,6 +111,44 @@ export function AlmanacPanel({ onClose }: { onClose: () => void }) {
               >
                 {found ? `${m.name} ×${m.mult}` : '???'}
               </span>
+            );
+          })}
+        </div>
+
+        <h4>Fish — Bestiary ({FISH.length})</h4>
+        <div className="rows">
+          {FISH.map((f) => {
+            const r = RARITY[f.rarity];
+            const lore = loreFor(f.id);
+            return (
+              <div className="row" key={f.id} style={{ borderLeftColor: r.css }}>
+                <span className="row-name">
+                  {f.name}
+                  <span className="rarity" style={{ color: r.css }}> {f.rarity}</span>
+                  {lore && (
+                    <span className="row-sub muted" style={{ display: 'block', fontStyle: 'italic' }}>{lore}</span>
+                  )}
+                </span>
+                <span className="row-meta">{f.value.toLocaleString()}🪙</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <h4>Foraging — Field Guide ({FORAGE.length})</h4>
+        <div className="rows">
+          {FORAGE.map((n) => {
+            const lore = loreFor(n.id);
+            return (
+              <div className="row" key={n.id} style={{ borderLeftColor: n.css }}>
+                <span className="row-name">
+                  {n.name}
+                  {lore && (
+                    <span className="row-sub muted" style={{ display: 'block', fontStyle: 'italic' }}>{lore}</span>
+                  )}
+                </span>
+                <span className="row-meta">{n.value.toLocaleString()}🪙</span>
+              </div>
             );
           })}
         </div>
