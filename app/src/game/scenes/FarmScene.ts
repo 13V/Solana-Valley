@@ -2867,8 +2867,8 @@ export class FarmScene extends Phaser.Scene {
       type: def.id,
       color,
       layAt: this.time.now + def.layMs / this.growthMult / m.prodSpeedMult,
-      nextWander: this.time.now + 1500 + Math.random() * 3000,
-      nextFidget: this.time.now + 4000 + Math.random() * 9000,
+      nextWander: this.time.now + 1200 + Math.random() * 2400,
+      nextFidget: this.time.now + 1500 + Math.random() * 3500,
       breedAt: def.breeding
         ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult / m.breedSpeedMult
         : undefined,
@@ -2978,7 +2978,7 @@ export class FarmScene extends Phaser.Scene {
     for (const a of this.animals) {
       const def = ANIMAL_BY_ID[a.type];
       if (!def.stationary && time > a.nextWander && !this.tweens.isTweening(a.sprite)) {
-        a.nextWander = time + 2500 + Math.random() * 3500;
+        a.nextWander = time + 1800 + Math.random() * 2600;
         const pen = this.producerArea(def); // clamp each animal to its own pen
         const nx = Phaser.Math.Clamp(a.sprite.x + (Math.random() * 2 - 1) * 48, pen.x0 + 30, pen.x1 - 30);
         const ny = Phaser.Math.Clamp(a.sprite.y + (Math.random() * 2 - 1) * 48, pen.y0 + 38, pen.y1 - 28);
@@ -2993,7 +2993,7 @@ export class FarmScene extends Phaser.Scene {
         !def.stationary && !a.baby && def.fidgetFrames &&
         time > (a.nextFidget ?? 0) && !this.tweens.isTweening(a.sprite)
       ) {
-        a.nextFidget = time + 7000 + Math.random() * 9000;
+        a.nextFidget = time + 3500 + Math.random() * 5000;
         a.nextWander = Math.max(a.nextWander, time + 2800); // don't wander mid-fidget
         a.sprite.play(`${a.color}-fidget`, true);
         a.sprite.once('animationcomplete', () => {
