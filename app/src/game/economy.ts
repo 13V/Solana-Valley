@@ -91,6 +91,21 @@ export const PLANTS: Plant[] = [
   // Celestial
   { id: 'galaxyfruit', name: 'Galaxy Fruit', rarity: 'Celestial', seedCost: 6500, baseValue: 32000, growthSeconds: 330, cropRow: 13, color: 0xb98aff, cropTint: 0xc6a3ff },
   { id: 'voidbloom', name: 'Voidbloom', rarity: 'Celestial', seedCost: 13000, baseValue: 72500, growthSeconds: 400, cropRow: 11, color: 0x8a4fd0, cropTint: 0x9a6ad0 },
+  // --- Drop 12: Tropical Fruits & Garden Flowers ---
+  { id: 'trop_mango_gold', name: 'Golden Mango', rarity: 'Rare', seedCost: 48, baseValue: 115, growthSeconds: 70, cropRow: 1, color: 0xffd700, cropTint: 0xffa500, regrow: 35 },
+  { id: 'trop_papaya_sunset', name: 'Sunset Papaya', rarity: 'Rare', seedCost: 52, baseValue: 128, growthSeconds: 75, cropRow: 2, color: 0xff6347, cropTint: 0xff8c00, regrow: 38 },
+  { id: 'trop_guava_emerald', name: 'Emerald Guava', rarity: 'Uncommon', seedCost: 28, baseValue: 65, growthSeconds: 45, cropRow: 3, color: 0x32cd32, cropTint: 0x228b22, regrow: 22 },
+  { id: 'trop_passionfruit_royal', name: 'Royal Passionfruit', rarity: 'Legendary', seedCost: 125, baseValue: 340, growthSeconds: 115, cropRow: 4, color: 0x8b008b, cropTint: 0xb01060, regrow: 58 },
+  { id: 'trop_rambutan_crimson', name: 'Crimson Rambutan', rarity: 'Legendary', seedCost: 140, baseValue: 385, growthSeconds: 120, cropRow: 5, color: 0xdc143c, cropTint: 0xff4500, regrow: 60 },
+  { id: 'trop_jackfruit_amber', name: 'Amber Jackfruit', rarity: 'Mythical', seedCost: 320, baseValue: 950, growthSeconds: 165, cropRow: 6, color: 0xffb347, cropTint: 0xff8c00, regrow: 83 },
+  { id: 'trop_soursop_moonlight', name: 'Moonlight Soursop', rarity: 'Mythical', seedCost: 380, baseValue: 1100, growthSeconds: 170, cropRow: 7, color: 0xe0ffff, cropTint: 0x9fe0d0, regrow: 85 },
+  { id: 'flwr_crimson_tulip', name: 'Crimson Tulip', rarity: 'Rare', seedCost: 48, baseValue: 110, growthSeconds: 68, cropRow: 2, color: 0xdc143c, cropTint: 0xff1744 },
+  { id: 'flwr_golden_sunflower', name: 'Golden Sunflower', rarity: 'Rare', seedCost: 55, baseValue: 128, growthSeconds: 75, cropRow: 3, color: 0xffd700, cropTint: 0xffc300 },
+  { id: 'flwr_midnight_orchid', name: 'Midnight Orchid', rarity: 'Legendary', seedCost: 125, baseValue: 315, growthSeconds: 112, cropRow: 5, color: 0x2d1b4e, cropTint: 0x8a4bd0 },
+  { id: 'flwr_celestial_lotus', name: 'Celestial Lotus', rarity: 'Legendary', seedCost: 142, baseValue: 380, growthSeconds: 118, cropRow: 6, color: 0xe0b0ff, cropTint: 0x9d4edd },
+  { id: 'flwr_royal_peony', name: 'Royal Peony', rarity: 'Divine', seedCost: 820, baseValue: 3100, growthSeconds: 215, cropRow: 8, color: 0xff69b4, cropTint: 0xff1493 },
+  { id: 'flwr_twilight_dahlia', name: 'Twilight Dahlia', rarity: 'Divine', seedCost: 950, baseValue: 3750, growthSeconds: 228, cropRow: 9, color: 0x8b008b, cropTint: 0xda70d6 },
+  { id: 'flwr_sapphire_iris', name: 'Sapphire Iris', rarity: 'Legendary', seedCost: 115, baseValue: 290, growthSeconds: 105, cropRow: 4, color: 0x0a7ba1, cropTint: 0x00bfff },
   // --- Drop 11: Berries, Melons & Peppers ---
   { id: 'berry_crimson_raspberry', name: 'Crimson Raspberry', rarity: 'Uncommon', seedCost: 22, baseValue: 51, growthSeconds: 48, cropRow: 3, color: 0xff1493, cropTint: 0xc41e3a, regrow: 24 },
   { id: 'berry_shadow_blackberry', name: 'Shadow Blackberry', rarity: 'Uncommon', seedCost: 18, baseValue: 42, growthSeconds: 44, cropRow: 5, color: 0x2f1b3c, cropTint: 0x4a2d5e, regrow: 22 },
