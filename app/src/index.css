@@ -1079,6 +1079,89 @@ body {
   opacity: 0.55;
 }
 
+/* Island chat + contract-address pill: pull them into the wood/parchment skin
+   so the secondary surfaces match the rest of the chrome. */
+.ui-skin .chat-toggle {
+  background: none;
+  border: 9px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  filter: drop-shadow(0 3px 4px rgba(40, 24, 8, 0.35));
+}
+.ui-skin .chat-toggle:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+.ui-skin .chat-panel {
+  background: none;
+  border: 16px solid transparent;
+  border-image: var(--ui-frame) 28 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+.ui-skin .chat-head {
+  background: rgba(120, 82, 45, 0.14);
+  border-bottom: 2px solid rgba(108, 74, 43, 0.4);
+  color: #5a3a18;
+  font-family: var(--display-font);
+}
+.ui-skin .chat-x {
+  color: var(--ink);
+}
+.ui-skin .chat-empty,
+.ui-skin .chat-msg {
+  color: var(--ink);
+}
+.ui-skin .chat-name {
+  color: #2f7d2e;
+}
+.ui-skin .chat-msg.is-self .chat-name {
+  color: #7a4a06;
+}
+.ui-skin .chat-input-row {
+  border-top: 2px solid rgba(108, 74, 43, 0.3);
+}
+.ui-skin .chat-input {
+  background: var(--parchment);
+  border: 2px solid var(--wood-mid);
+  border-radius: 4px;
+  color: var(--ink);
+  box-shadow: inset 0 1px 2px rgba(74, 53, 38, 0.35);
+}
+.ui-skin .chat-input:focus {
+  border-color: var(--wood-dark);
+}
+.ui-skin .chat-send {
+  background: none;
+  border: 9px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  font-family: var(--display-font);
+}
+.ui-skin .chat-send:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+
+.ui-skin .ca-pill {
+  background: none;
+  border: 8px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+  filter: drop-shadow(0 3px 4px rgba(40, 24, 8, 0.3));
+}
+.ui-skin .ca-pill:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+}
+.ui-skin .ca-label {
+  color: #7a4a06;
+}
+.ui-skin .ca-copy {
+  color: var(--ink-soft);
+}
+
 .hud-icon {
   width: 16px;
   height: 16px;
