@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from '../constants';
+import { usedTilesetKeys } from '../mapLoader';
 
 // Loads the Sprout Lands art (ground, water, character, crops, decorations) and
 // generates only the FX bits procedurally (particles, glow, vignette), then
@@ -41,6 +42,14 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('watering_spray', `${A}watering_spray.png`, { frameWidth: 48, frameHeight: 48 });
     // Ambient pond fish (Ocean Pack): a 15-frame swim-wobble loop (16px).
     this.load.spritesheet('fish_small', `${A}fish_small.png`, { frameWidth: 16, frameHeight: 16 });
+    // Hand-authored start-island map tilesets (startIsland.json). Each PNG in
+    // public/assets/tilesets/ is a 16×16 spritesheet keyed by its filename (sans
+    // .png); the map's frame indices already match these sheets. Auto-synced to
+    // whatever the map references (mapLoader.usedTilesetKeys).
+    const TS = 'assets/tilesets/';
+    for (const key of usedTilesetKeys) {
+      this.load.spritesheet(key, `${TS}${key}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
     this.load.spritesheet('fences', `${A}fences.png`, { frameWidth: 16, frameHeight: 16 });
     // Chickens (16px) and cows (32px) come in several palette swaps; one is
     // picked per animal for variety.

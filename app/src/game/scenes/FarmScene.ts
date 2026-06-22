@@ -62,7 +62,6 @@ import {
   bandRect,
   PLAZA,
   homesteadPlot,
-  isInPlot,
   homesteadGateTile,
   plazaCenterTile,
   MAX_PLOT_EXPANSION,
@@ -100,6 +99,7 @@ import { FishingCast, type CastPhase } from '../fishingCast';
 import { pickForage, forageXp, type Forage } from '../forage';
 import { bus, type GameEvents } from '../EventBus';
 import { sfx } from '../audio';
+import { map as islandMap, classify, isBoatKey } from '../mapLoader';
 import { virtualMove, getKeyBinds, onKeyBindsChange, type MoveAction } from '../input';
 
 type Tile = { tilled: boolean; wetUntil: number; obstacle: boolean };
@@ -179,6 +179,14 @@ type RemoteFarm = {
 // appear on the plot you actually own — not a fixed one.
 const px = (r: Rect) => ({ x0: r.x0 * TILE, y0: r.y0 * TILE, x1: (r.x1 + 1) * TILE, y1: (r.y1 + 1) * TILE });
 
+// The world is the hand-authored startIsland.json map (40×30). The player's
+// spawn and the animal pens/orchard are fixed open-grass rectangles near the
+// island centre (the procedural 20-plot valley is no longer built).
+const ISLAND_SPAWN = { x: 24, y: 12 };
+const CHICKEN_PEN = px({ x0: 14, y0: 9, x1: 19, y1: 13 });
+const COW_PEN = px({ x0: 27, y0: 9, x1: 33, y1: 14 });
+const ORCHARD = px({ x0: 14, y0: 4, x1: 20, y1: 6 });
+
 // Hard cap on how many of each producer (chickens / cows / each tree type) a
 // player may own, via buying or breeding.
 const MAX_PRODUCERS = 50;
@@ -216,7 +224,7 @@ type Animal = {
 };
 
 const SAVE_KEY = 'solana-valley:save';
-const SAVE_VERSION = 16; // bumped: added claimedGoals (rewarded goal-ladder); defaults preserve older saves (legacy saves retro-claim satisfied goals without payout)
+const SAVE_VERSION = 17; // bumped: world is now the hand-authored island (farm tiles changed); old plot-valley saves reset cleanly
 
 // Max global XP a single watering action can grant (1 per newly-wet tile), so a
 // large watering/sprinkler radius can't be spammed into a big XP payout.
@@ -372,6 +380,9 @@ export class FarmScene extends Phaser.Scene {
   private pond!: Rect; // pond rect in tile coords (inclusive)
   private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
   private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
+  private farmTiles = new Set<string>(); // tillable/plantable tiles from the island map's dirt cells
+  private boatTiles = new Set<string>(); // rowboat tiles on the island (future hub portal)
+  private islandFarm: PlotRect = { px: 0, py: 0, pw: 0, ph: 0 }; // bounding rect of farmTiles
   private casting = false; // only one cast at a time
   private fishingCast!: FishingCast; // rod/line/bobber cast choreography
   // foraging
@@ -426,20 +437,32 @@ export class FarmScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
-    this.buildWorld();
-    this.addOceanBoats(); // a few bobbing boats just off the shore (cosmetic)
-    this.buildTerraces(); // raise the two plot bands into plateaus (cliffs + stairs)
-    this.buildPlaza(); // sunken valley floor: cobble paths, pond + bridge, markets
-    this.buildPlots(); // fenced homesteads; fences open toward the central plaza
-    this.placeDecorations(); // scatter nature across the remaining open grass
-
-    const spawn = this.myFarmRect();
-    this.player = this.physics.add.sprite(
-      (spawn.px + spawn.pw / 2) * TILE,
-      (spawn.py + spawn.ph - 1) * TILE,
-      'pchar',
-      0,
-    );
+    // The world is now the hand-authored island. The procedural 20-plot valley
+    // builders are kept behind this flag so the old world can be restored.
+    const USE_ISLAND: boolean = true;
+    if (USE_ISLAND) {
+      this.buildFromMap(); // render the hand-authored start island (startIsland.json)
+      this.player = this.physics.add.sprite(
+        ISLAND_SPAWN.x * TILE + TILE / 2,
+        ISLAND_SPAWN.y * TILE + TILE / 2,
+        'pchar',
+        0,
+      );
+    } else {
+      this.buildWorld();
+      this.addOceanBoats();
+      this.buildTerraces();
+      this.buildPlaza();
+      this.buildPlots();
+      this.placeDecorations();
+      const spawn = this.myFarmRect();
+      this.player = this.physics.add.sprite(
+        (spawn.px + spawn.pw / 2) * TILE,
+        (spawn.py + spawn.ph - 1) * TILE,
+        'pchar',
+        0,
+      );
+    }
     this.player.setCollideWorldBounds(true);
     this.player.setOrigin(0.5, 0.72).setScale(1.85);
     this.player.body!.setSize(13, 9).setOffset(17, 33);
@@ -696,7 +719,7 @@ export class FarmScene extends Phaser.Scene {
   // used the old MY_PLOT constant reads this so it follows a multiplayer
   // assignment. Defaults to homestead #0 in single-player.
   private myFarmRect(): PlotRect {
-    return homesteadPlot(this.myPlotIndex);
+    return this.islandFarm; // the island map's dirt-field bounding rect
   }
 
   // The full farmable crop-bed rect: the base bed widened by however many
@@ -712,12 +735,12 @@ export class FarmScene extends Phaser.Scene {
 
   // True for any farmable tile (base bed OR a purchased expansion column).
   private isInMyFarm(tx: number, ty: number): boolean {
-    return isInPlot(this.expandedFarmRect(), tx, ty);
+    return this.farmTiles.has(this.key(tx, ty));
   }
 
   // The walkable gate tile of the player's current homestead.
   private myGateTile(): { tx: number; ty: number } {
-    return homesteadGateTile(this.myPlotIndex);
+    return { tx: ISLAND_SPAWN.x, ty: ISLAND_SPAWN.y };
   }
 
   // Debug snapshot used by the screenshot harness.
@@ -1025,6 +1048,122 @@ export class FarmScene extends Phaser.Scene {
     if (d < SHORE) return 'ocean';
     if (d < SHORE + BEACH) return 'beach';
     return 'land';
+  }
+
+  // ---- data-driven island map --------------------------------------------
+
+  // Build the world from the hand-authored startIsland.json. The Ground layer
+  // paints base terrain (depth 0); overlay layers paint flat decals (depth 1)
+  // and tall objects (per-row depth so they y-sort with the player). Cells are
+  // classified into behaviour sets: water (solid + fishable), solidObj (solid),
+  // farm (tillable/plantable) and walkable grass/flat. Replaces the procedural
+  // valley (buildWorld/buildTerraces/buildPlaza/buildPlots/placeDecorations).
+  private buildFromMap() {
+    // Dense tile grid so farming/collisions/saves can index [y][x] freely.
+    for (let y = 0; y < GRID_H; y++) {
+      this.tiles[y] = [];
+      this.ground[y] = [];
+      this.overlay[y] = [];
+      for (let x = 0; x < GRID_W; x++) {
+        this.tiles[y][x] = { tilled: false, wetUntil: 0, obstacle: false };
+      }
+    }
+
+    // Opaque base fills under the partly-transparent authored autotiles, so a
+    // tile's transparent edges reveal matching ground, not the sea backdrop.
+    const GRASS_BASE_KEY = 'sorry_early_access_plant_update_2_ground_tilesets_blue_tint_grass_tile_layers';
+    const GRASS_BASE_FRAME = 12;
+    const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
+    const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
+    const dirtFrame = (x: number, y: number) => DIRT_VARIANTS[((x * 73856 + y * 19349) >>> 0) % DIRT_VARIANTS.length];
+    const hasGrass = this.textures.exists(GRASS_BASE_KEY);
+    const hasDirt = this.textures.exists(DIRT_BASE_KEY);
+
+    const ground = islandMap.layers.find((l) => l.name === 'Ground');
+    const overlays = islandMap.layers.filter((l) => l.name !== 'Ground');
+
+    // Ground layer first (depth 0).
+    if (ground && ground.visible !== false) {
+      for (const k in ground.cells) {
+        const [key, frame] = ground.cells[k];
+        const [gx, gy] = k.split(',').map(Number);
+        if (!this.inBounds(gx, gy)) continue;
+        const cx = gx * TILE + TILE / 2;
+        const cy = gy * TILE + TILE / 2;
+        const cat = classify(key);
+        if (cat === 'farm' && hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(gx, gy)).setScale(2).setDepth(-1);
+        else if (cat !== 'water' && hasGrass) this.add.image(cx, cy, GRASS_BASE_KEY, GRASS_BASE_FRAME).setScale(2).setDepth(-1);
+        if (this.textures.exists(key)) this.ground[gy][gx] = this.add.image(cx, cy, key, frame).setScale(2).setDepth(0);
+        if (cat === 'water') {
+          this.tiles[gy][gx].obstacle = true;
+          this.pondTiles.add(k); // fishable water
+          this.addCollider(cx, cy, TILE, TILE);
+        } else if (cat === 'farm') {
+          this.farmTiles.add(k); // tillable/plantable
+        }
+      }
+    }
+
+    // Overlay layers in array order.
+    for (const layer of overlays) {
+      if (layer.visible === false) continue;
+      for (const k in layer.cells) {
+        const [key, frame] = layer.cells[k];
+        const [lx, ly] = k.split(',').map(Number);
+        if (!this.inBounds(lx, ly) || !this.textures.exists(key)) continue;
+        const cx = lx * TILE + TILE / 2;
+        const cy = ly * TILE + TILE / 2;
+        const cat = classify(key);
+        if (cat === 'solidObj') {
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(cy);
+          this.tiles[ly][lx].obstacle = true;
+          this.addCollider(cx, cy, TILE, TILE);
+          if (isBoatKey(key)) this.boatTiles.add(k);
+        } else if (cat === 'farm') {
+          if (hasDirt) this.add.image(cx, cy, DIRT_BASE_KEY, dirtFrame(lx, ly)).setScale(2).setDepth(0.5);
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
+          this.farmTiles.add(k);
+        } else {
+          this.add.image(cx, cy, key, frame).setScale(2).setDepth(1);
+          if (cat === 'flat') this.pathTiles.add(k);
+        }
+      }
+    }
+
+    // A tilled-soil overlay sprite per farm tile (hidden until hoed; the existing
+    // autotile/wet logic in setGroundTexture drives these).
+    for (const k of this.farmTiles) {
+      const [fx, fy] = k.split(',').map(Number);
+      this.overlay[fy][fx] = this.add
+        .image(fx * TILE + TILE / 2, fy * TILE + TILE / 2, 'tilled', 42)
+        .setScale(2).setDepth(1).setVisible(false);
+    }
+
+    this.pond = this.waterBounds();
+    this.islandFarm = this.farmBounds();
+    this.spawnPondLife(); // a few small fish drifting under the island's water
+  }
+
+  // Bounding rect (inclusive tile coords) over all fishable water cells.
+  private waterBounds(): Rect {
+    let x0 = GRID_W, y0 = GRID_H, x1 = 0, y1 = 0;
+    for (const k of this.pondTiles) {
+      const [x, y] = k.split(',').map(Number);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    if (this.pondTiles.size === 0) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+    return { x0, y0, x1, y1 };
+  }
+
+  // The farmable area as a PlotRect (bounding box of the map's dirt cells).
+  private farmBounds(): PlotRect {
+    let x0 = GRID_W, y0 = GRID_H, x1 = 0, y1 = 0;
+    for (const k of this.farmTiles) {
+      const [x, y] = k.split(',').map(Number);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    if (this.farmTiles.size === 0) return { px: 0, py: 0, pw: 0, ph: 0 };
+    return { px: x0, py: y0, pw: x1 - x0 + 1, ph: y1 - y0 + 1 };
   }
 
   private buildWorld() {
@@ -1397,9 +1536,8 @@ export class FarmScene extends Phaser.Scene {
   // expansion columns) AND within the level-unlocked rows. Expansion columns use
   // the SAME row gate as the base bed, so buying width never grants extra rows.
   private isUnlockedFarm(tx: number, ty: number): boolean {
-    const f = this.expandedFarmRect();
-    if (!isInPlot(f, tx, ty)) return false;
-    return ty >= f.py + f.ph - this.unlockedFarmRows();
+    // On the hand-authored island, farmable land is exactly the map's dirt cells.
+    return this.farmTiles.has(this.key(tx, ty));
   }
 
   // Player's crop bed: tint the grass so the cultivated plot reads clearly against
@@ -2444,10 +2582,9 @@ export class FarmScene extends Phaser.Scene {
   // chickens (and any other small animal) in the chicken pen. Used both to spawn
   // a new producer and to clamp its wandering.
   private producerArea(def: AnimalDef) {
-    // Use the pens of the plot we currently own, so animals spawn where we are.
-    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
-    if (def.category === 'tree') return px(h.orchard);
-    return def.id === 'cow' ? px(h.cowPen) : px(h.chickenPen);
+    // Fixed open-grass pens/orchard near the island centre.
+    if (def.category === 'tree') return ORCHARD;
+    return def.id === 'cow' ? COW_PEN : CHICKEN_PEN;
   }
 
   // Pick a palette swap: the rare colour shows up ~1 in 9, the rest are even.
