@@ -103,6 +103,7 @@ import {
   type Fish,
 } from '../fishing';
 import { FishingCast, type CastPhase } from '../fishingCast';
+import { drainHubCatches as readHubCatches } from '../hubCatches';
 import {
   applyFishTree,
   fishPointsForCatch,
@@ -673,6 +674,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.rollShopWindow(this.currentEpoch());
     if (this.persist) this.loadSave();
+    this.drainHubCatches(); // bank any fish caught over at the social hub
 
     // Scatter forage nodes across the open world (after any save load so they
     // never land on restored crops).
@@ -1131,7 +1133,11 @@ export class FarmScene extends Phaser.Scene {
     // tile's transparent edges reveal matching ground, not the sea backdrop. This
     // island's ground is the darker-grass-hills set, so the base is the matching
     // darker-grass interior fill (frame 12, like the hub's grass base).
-    const GRASS_BASE_KEY = 'premium_tilesets_ground_tiles_new_tiles_darker_grass_tile_layers';
+    // Base-fill must MATCH the authored ground tileset so transparent autotile
+    // edges bleed to the same grass, not a different shade. The island's ground is
+    // darker_grass_hills_tiles_v2 (frame 12 = the opaque interior fill, used 265×),
+    // so the base uses the same — keeps the map rendering faithful to the editor.
+    const GRASS_BASE_KEY = 'premium_tilesets_ground_tiles_new_tiles_darker_grass_hills_tiles_v2';
     const GRASS_BASE_FRAME = 12;
     const DIRT_BASE_KEY = 'premium_tilesets_ground_tiles_old_tiles_tilled_dirt';
     const DIRT_VARIANTS = [55, 56, 57, 66, 67, 68];
@@ -3372,6 +3378,33 @@ export class FarmScene extends Phaser.Scene {
     this.popCatch(cx, cy, f, legendary);
     this.checkAchievements();
     this.emitState();
+  }
+
+  // Bank fish caught over at the social hub. The hub scene can't touch the bag
+  // (FarmScene owns it), so it buffers catches; on the next island load we award
+  // each like a normal catch — bag stack + fishing XP + global XP + points +
+  // daily — then persist so the haul can't be lost.
+  private drainHubCatches() {
+    const ids = readHubCatches();
+    if (ids.length === 0) return;
+    const m = this.mods();
+    let banked = 0;
+    for (const id of ids) {
+      const f = FISH_BY_ID[id];
+      if (!f) continue;
+      this.harvestInv[`fish|${f.id}`] = (this.harvestInv[`fish|${f.id}`] ?? 0) + 1;
+      this.addSkillXp('fishing', fishXp(f));
+      this.gainXp(harvestXp(f.value));
+      this.fishPts += Math.max(1, Math.round(fishPointsForCatch(f.rarity) * m.fishPtMult));
+      this.bumpDaily('fish');
+      banked++;
+    }
+    if (banked > 0) {
+      this.toast(`🎣 ${banked} hub ${banked === 1 ? 'catch' : 'catches'} landed in your bag!`);
+      this.checkAchievements();
+      this.saveState();
+      this.emitState();
+    }
   }
 
   // The catch animation: the real Fish-Sheet sprite pops up out of the water,

@@ -10,6 +10,9 @@ import { hubMap, classify, isBoatKey } from '../mapLoader';
 import { virtualMove, getKeyBinds, type MoveAction } from '../input';
 import { bus } from '../EventBus';
 import { currentSelfId } from '../../chain/multiplayer';
+import { FishingCast } from '../fishingCast';
+import { catchFish, fishCss } from '../fishing';
+import { pushHubCatch } from '../hubCatches';
 
 type Dir = 'down' | 'up' | 'left' | 'right';
 
@@ -43,7 +46,10 @@ export class HubScene extends Phaser.Scene {
   private moveKeys: Partial<Record<MoveAction, Phaser.Input.Keyboard.Key>> = {};
   private facing: Dir = 'down';
   private boatTiles = new Set<string>();
+  private waterTiles = new Set<string>(); // fishable water cells on the hub map
   private spawn = { x: 20, y: 15 };
+  private fishingCast!: FishingCast;
+  private casting = false;
 
   // ---- multiplayer (no-ops until joinHub connects the shared channel) -------
   private remotePlayers = new Map<string, RemotePlayer>();
@@ -84,16 +90,24 @@ export class HubScene extends Phaser.Scene {
     this.cameras.main.setZoom(1.65);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
+    // Fishing works at the hub too: click nearby water to cast (same minigame as
+    // the island). Catches buffer to localStorage and land in your island bag.
+    this.fishingCast = new FishingCast(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.fishingCast.destroy());
+
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
     const binds = getKeyBinds();
     for (const a of ['up', 'down', 'left', 'right'] as MoveAction[]) this.moveKeys[a] = kb.addKey(binds[a]);
 
-    // Click a boat to sail back to your home island.
+    // Click a boat to sail home; click nearby water to fish.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      // A click during the bite window hooks the fish.
+      if (this.fishingCast.active) { this.fishingCast.onPointer(); return; }
       const tx = Math.floor(p.worldX / TILE);
       const ty = Math.floor(p.worldY / TILE);
-      if (this.boatTiles.has(`${tx},${ty}`)) this.scene.start('Farm');
+      if (this.boatTiles.has(`${tx},${ty}`)) { this.scene.start('Farm'); return; }
+      if (this.waterTiles.has(`${tx},${ty}`)) this.tryFish(tx, ty);
     });
 
     // Join the shared hub channel (MultiplayerSync listens for this and connects
@@ -119,6 +133,17 @@ export class HubScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    // While a cast is in flight the player is rooted to the spot (mirrors the
+    // island): freeze movement, hold the idle pose, and let the cast animate.
+    if (this.casting) {
+      this.player.setVelocity(0, 0);
+      this.player.anims.play(`idle-${this.facing}`, true);
+      this.fishingCast.update();
+      this.broadcastSelf(time);
+      this.updateRemotes(delta);
+      return;
+    }
+
     let vx = 0;
     let vy = 0;
     const mk = this.moveKeys;
@@ -151,6 +176,52 @@ export class HubScene extends Phaser.Scene {
   // Small floating status line (the hub has no HUD of its own).
   private toast(text: string) {
     bus.emit('toast', text);
+  }
+
+  // Cast a line at a nearby hub-water tile. Same minigame as the island; on a
+  // hooked catch the fish is buffered (hubCatches) and lands in the player's bag
+  // when they next sail home and FarmScene drains it.
+  private tryFish(tx: number, ty: number) {
+    if (this.casting) return;
+    const ptx = Math.floor(this.player.x / TILE);
+    const pty = Math.floor(this.player.y / TILE);
+    if (Math.abs(tx - ptx) > 5 || Math.abs(ty - pty) > 5) {
+      this.toast('Too far to cast — step closer to the water.');
+      return;
+    }
+    const cx = tx * TILE + TILE / 2;
+    const cy = ty * TILE + TILE / 2;
+    this.facing =
+      Math.abs(cx - this.player.x) > Math.abs(cy - this.player.y)
+        ? cx < this.player.x ? 'left' : 'right'
+        : cy < this.player.y ? 'up' : 'down';
+    this.casting = true;
+    this.fishingCast.begin({
+      origin: () => ({ x: this.player.x, y: this.player.y - 12 }),
+      target: { x: cx, y: cy },
+      onResolve: (o) => {
+        this.casting = false;
+        if (o.hooked) {
+          const f = catchFish(1, 'any');
+          pushHubCatch(f.id);
+          this.floatText(cx, cy - 38, `🎣 ${f.rarity}`, fishCss(f));
+          this.toast(`🎣 Caught a ${f.name} (${f.rarity})! It's waiting in your island bag.`);
+        } else if (o.reason === 'early') {
+          this.toast('🎣 Reeled in early — nothing was biting yet.');
+        } else {
+          this.toast('🎣 It got away! Click the moment it bites.');
+        }
+      },
+    });
+  }
+
+  // A brief floating label that drifts up and fades (catch rarity / status).
+  private floatText(x: number, y: number, text: string, color: string) {
+    const t = this.add
+      .text(x, y, text, { fontFamily: 'monospace', fontSize: '12px', color, stroke: '#1c2b1a', strokeThickness: 3 })
+      .setOrigin(0.5)
+      .setDepth(100000);
+    this.tweens.add({ targets: t, y: y - 22, alpha: 0, duration: 1100, ease: 'Sine.out', onComplete: () => t.destroy() });
   }
 
   private createAnims() {
@@ -203,6 +274,7 @@ export class HubScene extends Phaser.Scene {
           this.addCollider(cx, cy, TILE, TILE);
           blocked.add(k);
         }
+        if (cat === 'water') this.waterTiles.add(k); // click nearby to fish
         if (isBoatKey(key)) this.boatTiles.add(k);
         if (base && cat === 'grass') groundGrass.add(k);
       }
