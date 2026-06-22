@@ -52,17 +52,21 @@ export const FISH: Fish[] = [
   { id: 'perch', name: 'Perch', rarity: 'Uncommon', value: 55, frame: 13, weight: 70, water: 'fresh' },
   { id: 'goldfish', name: 'Goldfish', rarity: 'Uncommon', value: 75, frame: 0, weight: 70, water: 'fresh' },
   { id: 'shrimp', name: 'Pond Shrimp', rarity: 'Uncommon', value: 95, frame: 9, weight: 70, water: 'any' },
+  { id: 'koi', name: 'Spotted Koi', rarity: 'Uncommon', value: 85, frame: 4, weight: 70, water: 'fresh' },
   // Rare
   { id: 'bass', name: 'Largemouth Bass', rarity: 'Rare', value: 150, frame: 21, weight: 55, water: 'fresh' },
   { id: 'trout', name: 'Rainbow Trout', rarity: 'Rare', value: 230, frame: 20, weight: 55, water: 'any' },
   { id: 'catfish', name: 'Catfish', rarity: 'Rare', value: 380, frame: 59, weight: 55, water: 'fresh' },
   { id: 'snapper', name: 'Red Snapper', rarity: 'Rare', value: 300, frame: 11, weight: 55, water: 'salt' },
+  { id: 'mahimahi', name: 'Mahi-Mahi', rarity: 'Rare', value: 340, frame: 5, weight: 55, water: 'salt' },
   // Legendary
   { id: 'pufferfish', name: 'Pufferfish', rarity: 'Legendary', value: 520, frame: 38, weight: 36, water: 'salt' },
   { id: 'angelfish', name: 'Blue Angelfish', rarity: 'Legendary', value: 780, frame: 68, weight: 36, water: 'salt' },
+  { id: 'moonfish', name: 'Moonfish', rarity: 'Legendary', value: 720, frame: 7, weight: 36, water: 'any' },
   // Mythical
   { id: 'manta', name: 'Manta Ray', rarity: 'Mythical', value: 1500, frame: 41, weight: 22, water: 'salt' },
   { id: 'betta', name: 'Crimson Betta', rarity: 'Mythical', value: 2400, frame: 10, weight: 22, water: 'fresh' },
+  { id: 'coelacanth', name: 'Coelacanth', rarity: 'Mythical', value: 2000, frame: 14, weight: 22, water: 'salt' },
   // Divine
   { id: 'swordfish', name: 'Swordfish', rarity: 'Divine', value: 5200, frame: 57, weight: 13, water: 'salt' },
   { id: 'ghostshark', name: 'Ghost Shark', rarity: 'Divine', value: 8500, frame: 29, weight: 13, water: 'salt' },
