@@ -161,10 +161,13 @@ export function Hud({
           <span
             className="badge"
             style={{ fontFamily: 'var(--pixel-font)', opacity: 0.85 }}
-            title="Multiplayer needs a connected devnet wallet — every player must connect AND approve the signature to see each other"
+            title="Multiplayer lives at the social hub — sail there on the boat to see other players. Your home island is private."
           >
             {addr ? (
-              '🌐 Connecting…'
+              <>
+                🌐 <span className="only-wide">Sail to the hub to meet players</span>
+                <span className="only-narrow">Hub = multiplayer</span>
+              </>
             ) : (
               <>
                 🌐 <span className="only-wide">Connect wallet for multiplayer</span>

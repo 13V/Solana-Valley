@@ -24,7 +24,6 @@ import { MerkleClaim } from '../chain/MerkleClaim';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
 import { WhatsNew } from './WhatsNew';
-import { ContractAddress } from './ContractAddress';
 import { Chat } from './Chat';
 import { UpdatePill } from './UpdatePill';
 import './settings'; // self-applies saved accessibility/volume settings on load
@@ -95,7 +94,6 @@ export function App() {
           <WhatsNew />
           <RewardsClaim />
           <MerkleClaim />
-          <ContractAddress />
           <Chat />
           <UpdatePill />
         </div>
