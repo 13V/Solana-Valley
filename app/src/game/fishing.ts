@@ -76,6 +76,25 @@ export const FISH: Fish[] = [
   // Celestial — the white whales.
   { id: 'kraken', name: 'Void Kraken', rarity: 'Celestial', value: 66000, frame: 24, weight: 2.5, water: 'salt' },
   { id: 'eel', name: 'Leviathan Eel', rarity: 'Celestial', value: 140000, frame: 64, weight: 2.5, water: 'any' },
+  // --- Drop 14: Big Catch Update ---
+  { id: 'nf_sunfish', name: 'Sunfish', rarity: 'Common', value: 18, frame: 2, weight: 80, water: 'fresh' },
+  { id: 'nf_mudskipper', name: 'Mudskipper', rarity: 'Common', value: 25, frame: 15, weight: 80, water: 'fresh' },
+  { id: 'nf_saltherring', name: 'Salt Herring', rarity: 'Common', value: 14, frame: 16, weight: 80, water: 'salt' },
+  { id: 'nf_speckled_perch', name: 'Speckled Perch', rarity: 'Uncommon', value: 72, frame: 17, weight: 70, water: 'fresh' },
+  { id: 'nf_ribbon_eel', name: 'Ribbon Eel', rarity: 'Uncommon', value: 88, frame: 18, weight: 70, water: 'salt' },
+  { id: 'nf_copperfin', name: 'Copperfin Trout', rarity: 'Rare', value: 210, frame: 19, weight: 55, water: 'fresh' },
+  { id: 'nf_duskray', name: 'Dusk Ray', rarity: 'Rare', value: 340, frame: 22, weight: 55, water: 'salt' },
+  { id: 'nf_ironjaw', name: 'Ironjaw Pike', rarity: 'Legendary', value: 650, frame: 23, weight: 36, water: 'fresh' },
+  { id: 'nf_abyssal_barb', name: 'Abyssal Barb', rarity: 'Legendary', value: 740, frame: 26, weight: 36, water: 'any' },
+  { id: 'nf_veilfish', name: 'Veilfish', rarity: 'Mythical', value: 1800, frame: 28, weight: 22, water: 'salt' },
+  { id: 'nf_moonwhisker', name: 'Moonwhisker Catfish', rarity: 'Mythical', value: 2200, frame: 30, weight: 22, water: 'fresh' },
+  { id: 'nf_gilded_sturgeon', name: 'Gilded Sturgeon', rarity: 'Divine', value: 6400, frame: 31, weight: 13, water: 'any' },
+  { id: 'nf_tempest_shark', name: 'Tempest Shark', rarity: 'Divine', value: 7800, frame: 32, weight: 13, water: 'salt' },
+  { id: 'nf_prism_lantern', name: 'Prism Lanternfish', rarity: 'Prismatic', value: 22000, frame: 33, weight: 6, water: 'salt' },
+  { id: 'nf_aurora_koi', name: 'Aurora Koi', rarity: 'Prismatic', value: 28000, frame: 34, weight: 6, water: 'fresh' },
+  { id: 'nf_starweave', name: 'Starweave Eel', rarity: 'Celestial', value: 88000, frame: 35, weight: 2.5, water: 'any' },
+  { id: 'nf_void_carp', name: 'Void Carp', rarity: 'Celestial', value: 125000, frame: 36, weight: 2.5, water: 'fresh' },
+  { id: 'nf_sol_leviathan', name: 'Sol Leviathan', rarity: 'Celestial', value: 138000, frame: 37, weight: 2.5, water: 'salt' },
 ];
 
 export const FISH_BY_ID: Record<string, Fish> = Object.fromEntries(FISH.map((f) => [f.id, f]));
