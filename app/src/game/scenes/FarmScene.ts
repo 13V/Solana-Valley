@@ -208,6 +208,7 @@ type Animal = {
   color: string; // texture/anim key of the chosen palette swap
   layAt: number;
   nextWander: number;
+  nextFidget?: number; // when this adult next plays its idle fidget (peck/graze)
   product?: Phaser.GameObjects.Image;
   baby?: boolean; // a young animal that grows into an adult
   growUpAt?: number; // when a baby becomes an adult
@@ -351,6 +352,8 @@ export class FarmScene extends Phaser.Scene {
   private animals: Animal[] = [];
   private gate?: Phaser.GameObjects.Sprite;
   private gateOpen = false;
+  private chest?: Phaser.GameObjects.Sprite;
+  private chestOpen = false;
   private animalCounts: Record<string, number> = {};
 
   // skill progression (xp per skill) + chosen milestone perks
@@ -424,6 +427,7 @@ export class FarmScene extends Phaser.Scene {
     this.obstacles = this.physics.add.staticGroup();
     this.createAnims();
     this.buildWorld();
+    this.addOceanBoats(); // a few bobbing boats just off the shore (cosmetic)
     this.buildTerraces(); // raise the two plot bands into plateaus (cliffs + stairs)
     this.buildPlaza(); // sunken valley floor: cobble paths, pond + bridge, markets
     this.buildPlots(); // fenced homesteads; fences open toward the central plaza
@@ -893,6 +897,21 @@ export class FarmScene extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers('watering_spray', { start: 0, end: 8 }),
       });
     }
+    // Ambient pond fish: a slow 15-frame swim-wobble loop.
+    if (this.textures.exists('fish_small') && !this.anims.exists('fish_swim')) {
+      this.anims.create({ key: 'fish_swim', frames: this.anims.generateFrameNumbers('fish_small', { start: 0, end: 14 }), frameRate: 7, repeat: -1 });
+    }
+    // Gate + chest open arcs (premium building-parts; frame 0 = closed → 4 = open).
+    if (this.textures.exists('gate') && !this.anims.exists('gate-open')) {
+      this.anims.create({ key: 'gate-open', frames: this.anims.generateFrameNumbers('gate', { start: 0, end: 4 }), frameRate: 14, repeat: 0 });
+    }
+    if (this.textures.exists('chest') && !this.anims.exists('chest-open')) {
+      this.anims.create({ key: 'chest-open', frames: this.anims.generateFrameNumbers('chest', { start: 0, end: 4 }), frameRate: 10, repeat: 0 });
+    }
+    // Idle boat bob (the no-rope hull frames; a slow rock).
+    if (this.textures.exists('boats') && !this.anims.exists('boat_bob')) {
+      this.anims.create({ key: 'boat_bob', frames: this.anims.generateFrameNumbers('boats', { frames: [3, 4] }), frameRate: 2, repeat: -1 });
+    }
     // Animations are keyed by sheet so every palette swap gets its own pair.
     for (const a of ANIMALS) {
       for (const sheet of a.colorways ?? [a.sheet]) {
@@ -901,6 +920,9 @@ export class FarmScene extends Phaser.Scene {
         }
         if (!this.anims.exists(`${sheet}-walk`)) {
           this.anims.create({ key: `${sheet}-walk`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.walkFrames }), frameRate: 6, repeat: -1 });
+        }
+        if (a.fidgetFrames && !this.anims.exists(`${sheet}-fidget`)) {
+          this.anims.create({ key: `${sheet}-fidget`, frames: this.anims.generateFrameNumbers(sheet, { frames: a.fidgetFrames }), frameRate: a.fidgetRate ?? 6, repeat: 1 });
         }
       }
       // Baby palette swaps for breedable animals.
@@ -1136,7 +1158,13 @@ export class FarmScene extends Phaser.Scene {
     }
     // Cosy props below the avenue.
     prop(cx - 16, avY + 4, 'workstation');
-    prop(cx + 16, avY + 5, 'chest', 0);
+    // Treasure chest (premium 48×48 sheet) that opens when the farmer is near.
+    {
+      const chx = (cx + 16) * TILE + TILE / 2;
+      const chy = (avY + 5) * TILE + TILE;
+      this.chest = this.add.sprite(chx, chy, 'chest', 0).setOrigin(0.5, 1).setScale(1.1).setDepth(chy);
+      this.addCollider(chx, chy - 10, TILE, 14);
+    }
     // A picnic blanket (flat on the ground) with a basket.
     this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'picnic').setScale(2).setDepth((avY + 5) * TILE - 20);
     this.add.image((cx + 8) * TILE, (avY + 5) * TILE, 'basket').setOrigin(0.5, 1).setScale(2).setDepth((avY + 5) * TILE + 10);
@@ -1302,9 +1330,9 @@ export class FarmScene extends Phaser.Scene {
     // Working front gate that swings open on approach.
     const gx = gateCx * TILE + TILE / 2;
     const gy = gateY * TILE + TILE / 2;
-    // Static closed frame (the swing is a scale tween — the spritesheet's swing
-    // frames don't slice cleanly and looked like a spin).
-    this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+    // Closed frame 0 of the premium gate sheet (32×48); the open/close swing
+    // plays the real 5-frame `gate-open` animation on approach (see update()).
+    this.gate = this.add.sprite(gx, gy, 'gate', 0).setOrigin(0.5, 0.8).setScale(1.4).setDepth(gy + 6);
   }
 
   // A little staircase bridging the plateau cliff just outside a gate, so each
@@ -2453,6 +2481,7 @@ export class FarmScene extends Phaser.Scene {
       color,
       layAt: this.time.now + def.layMs / this.growthMult / m.prodSpeedMult,
       nextWander: this.time.now + 1500 + Math.random() * 3000,
+      nextFidget: this.time.now + 4000 + Math.random() * 9000,
       breedAt: def.breeding
         ? this.time.now + (def.breeding.ms * (0.6 + Math.random() * 0.8)) / this.growthMult / m.breedSpeedMult
         : undefined,
@@ -2572,6 +2601,17 @@ export class FarmScene extends Phaser.Scene {
           targets: a.sprite, x: nx, y: ny, duration: 1100, ease: 'Sine.inOut',
           onComplete: () => a.sprite.play(`${a.color}-idle`, true),
         });
+      } else if (
+        // Occasional idle fidget while standing still (chicken pecks, cow grazes).
+        !def.stationary && !a.baby && def.fidgetFrames &&
+        time > (a.nextFidget ?? 0) && !this.tweens.isTweening(a.sprite)
+      ) {
+        a.nextFidget = time + 7000 + Math.random() * 9000;
+        a.nextWander = Math.max(a.nextWander, time + 2800); // don't wander mid-fidget
+        a.sprite.play(`${a.color}-fidget`, true);
+        a.sprite.once('animationcomplete', () => {
+          if (a.sprite.active) a.sprite.play(`${a.color}-idle`, true);
+        });
       }
       if (a.baby) {
         if (a.growUpAt !== undefined && time >= a.growUpAt) grown.push(a);
@@ -2665,10 +2705,17 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    // Faint surface ripples (waterobj 12–17).
+    // Faint surface ripples (waterobj 12–17), each twinkling with a soft
+    // alpha/scale pulse so the water surface shimmers (the frames don't form a
+    // clean cycle, so we shimmer one frame rather than flip-book them).
     for (const [tx, ty] of [[cx - 2, cyc - 1], [cx + 2, cyc + 1], [cx, cyc]] as Array<[number, number]>) {
       if (this.pondTiles.has(this.key(tx, ty))) {
-        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
+        const ripple = this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'waterobj', 12 + ((tx + ty) % 6)).setScale(2).setDepth(4).setAlpha(0.5);
+        this.tweens.add({
+          targets: ripple, alpha: 0.2, scaleX: 2.2, scaleY: 2.2,
+          duration: 1500 + Math.random() * 800, delay: Math.random() * 1200,
+          yoyo: true, repeat: -1, ease: 'Sine.inOut',
+        });
       }
     }
 
@@ -2693,10 +2740,76 @@ export class FarmScene extends Phaser.Scene {
       if (!this.inBounds(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
     }
+
+    this.spawnPondLife(); // a few small fish drifting under the surface
   }
 
   private isPondTile(tx: number, ty: number): boolean {
     return this.pondTiles.has(this.key(tx, ty));
+  }
+
+  // Ambient pond life: a handful of small fish that lazily drift between water
+  // tiles (purely cosmetic; they sit just under the surface, below the lilies).
+  private pondTileCoords(): Array<[number, number]> {
+    return [...this.pondTiles].map((k) => k.split(',').map(Number) as [number, number]);
+  }
+
+  private spawnPondLife() {
+    if (!this.anims.exists('fish_swim') || this.pondTiles.size === 0) return;
+    const tiles = this.pondTileCoords();
+    const n = Phaser.Math.Clamp(Math.floor(tiles.length / 6), 2, 4);
+    for (let i = 0; i < n; i++) {
+      const [tx, ty] = Phaser.Utils.Array.GetRandom(tiles);
+      const fish = this.add
+        .sprite(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'fish_small', 0)
+        .setScale(1.5)
+        .setAlpha(0.85)
+        .setDepth(4.1)
+        .play('fish_swim');
+      this.driftFish(fish);
+    }
+  }
+
+  private driftFish(fish: Phaser.GameObjects.Sprite) {
+    const tiles = this.pondTileCoords();
+    if (tiles.length === 0) return;
+    const [tx, ty] = Phaser.Utils.Array.GetRandom(tiles);
+    const nx = tx * TILE + TILE / 2 + Phaser.Math.Between(-6, 6);
+    const ny = ty * TILE + TILE / 2 + Phaser.Math.Between(-6, 6);
+    fish.setFlipX(nx < fish.x);
+    const dist = Phaser.Math.Distance.Between(fish.x, fish.y, nx, ny);
+    this.tweens.add({
+      targets: fish, x: nx, y: ny,
+      duration: 1600 + dist * 14, delay: Math.random() * 1400, ease: 'Sine.inOut',
+      onComplete: () => { if (fish.active) this.driftFish(fish); },
+    });
+  }
+
+  // A few idle boats bobbing just off the island's shore (cosmetic ambiance).
+  // Boats had no placement before — only a (mis-sized) loader — so they were
+  // never visible; this puts them on ocean tiles that touch the beach.
+  private addOceanBoats() {
+    if (!this.anims.exists('boat_bob')) return;
+    const shore: Array<[number, number]> = [];
+    for (let y = 1; y < GRID_H - 1; y++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        if (this.tileZone(x, y) !== 'ocean') continue;
+        if (
+          this.tileZone(x + 1, y) === 'beach' || this.tileZone(x - 1, y) === 'beach' ||
+          this.tileZone(x, y + 1) === 'beach' || this.tileZone(x, y - 1) === 'beach'
+        ) shore.push([x, y]);
+      }
+    }
+    if (shore.length === 0) return;
+    Phaser.Utils.Array.Shuffle(shore);
+    const n = Math.min(3, shore.length);
+    for (let i = 0; i < n; i++) {
+      const [tx, ty] = shore[Math.floor((i / n) * shore.length)];
+      const px = tx * TILE + TILE / 2, py = ty * TILE + TILE / 2;
+      const boat = this.add.sprite(px, py, 'boats', 3).setOrigin(0.5, 0.6).setScale(2).setDepth(py).play('boat_bob');
+      boat.setFlipX(Math.random() < 0.5);
+      this.tweens.add({ targets: boat, y: py + 3, duration: 1700 + Math.random() * 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
   }
 
   // Click a water tile within reach → cast. Works on the inland pond and on the
@@ -4053,7 +4166,7 @@ export class FarmScene extends Phaser.Scene {
     const gx = tx * TILE + TILE / 2;
     const gy = ty * TILE + TILE / 2;
     if (!this.gate) {
-      this.gate = this.add.sprite(gx, gy, 'gate', 0).setScale(2).setDepth(gy + 6);
+      this.gate = this.add.sprite(gx, gy, 'gate', 0).setOrigin(0.5, 0.8).setScale(1.4).setDepth(gy + 6);
     } else {
       this.gate.setPosition(gx, gy).setDepth(gy + 6).setFrame(0).setScale(2);
     }
@@ -4208,16 +4321,28 @@ export class FarmScene extends Phaser.Scene {
     this.updateRemoteFarms(delta); // smoothly simulate peers' crop growth
     this.updateGuide();
 
-    // Swing the gate open when the farmer is near — a quick scaleX tween (gate
-    // turns edge-on) instead of the goofy spritesheet spin.
+    // Swing the gate open when the farmer is near, playing the pack's real
+    // 5-frame open arc (and reversing it to close).
     if (this.gate) {
       const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.gate.x, this.gate.y) < 56;
       if (near && !this.gateOpen) {
         this.gateOpen = true;
-        this.tweens.add({ targets: this.gate, scaleX: 0.4, duration: 220, ease: 'Quad.easeOut' });
+        this.gate.play('gate-open');
       } else if (!near && this.gateOpen) {
         this.gateOpen = false;
-        this.tweens.add({ targets: this.gate, scaleX: 2, duration: 220, ease: 'Quad.easeIn' });
+        this.gate.playReverse('gate-open');
+      }
+    }
+
+    // Pop the treasure chest open when the farmer stands near it (cosmetic).
+    if (this.chest) {
+      const near = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.chest.x, this.chest.y) < 48;
+      if (near && !this.chestOpen) {
+        this.chestOpen = true;
+        this.chest.play('chest-open');
+      } else if (!near && this.chestOpen) {
+        this.chestOpen = false;
+        this.chest.playReverse('chest-open');
       }
     }
 

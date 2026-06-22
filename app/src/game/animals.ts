@@ -18,6 +18,10 @@ export type AnimalDef = {
   sheet: string;
   idleFrames: number[];
   walkFrames: number[];
+  // Optional "idle fidget" the animal occasionally plays while standing (a
+  // chicken pecks the ground, a cow grazes head-down). Adult sheets only.
+  fidgetFrames?: number[];
+  fidgetRate?: number;
   scale: number;
   originY: number; // sprite origin Y (trees anchor near their base)
   stationary: boolean; // trees don't wander
@@ -60,6 +64,7 @@ export const ANIMALS: AnimalDef[] = [
     id: 'chicken', name: 'Chicken', category: 'animal', cost: 10_000, unlockLevel: 3,
     productName: 'Egg', productValue: 100, layMs: 30_000, xp: 6,
     sheet: 'chick_white', idleFrames: [0, 1, 2, 3], walkFrames: [16, 17, 18, 19, 20, 21, 22, 23],
+    fidgetFrames: [88, 89, 90, 91, 92, 93], fidgetRate: 8, // pecks the ground (row 11)
     scale: 2.4, originY: 0.72, stationary: false,
     productSheet: 'eggitem', productFrame: 0, productOffsetY: -20, productScale: 1.4,
     icon: 'assets/sprout-ui/icon_chicken.png',
@@ -74,6 +79,7 @@ export const ANIMALS: AnimalDef[] = [
     id: 'cow', name: 'Cow', category: 'animal', cost: 25_000, unlockLevel: 6,
     productName: 'Milk', productValue: 500, layMs: 60_000, xp: 16,
     sheet: 'cow_light', idleFrames: [0, 1, 2], walkFrames: [8, 9, 10, 11, 12, 13, 14, 15],
+    fidgetFrames: [16, 17, 18, 19, 20, 21, 22], fidgetRate: 6, // grazes head-down (row 2)
     scale: 1.7, originY: 0.78, stationary: false,
     productSheet: 'milkitem', productFrame: 0, productOffsetY: -30, productScale: 1.4,
     icon: 'assets/sprout-ui/icon_cow.png',
