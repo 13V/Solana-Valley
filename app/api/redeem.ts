@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const value = Math.floor(rawValue);
 
   const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
-  const symbol = process.env.REWARD_SYMBOL ?? '$SPROUT';
+  const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
 
   try {
     const resp = await fetch(`${getSupabaseUrl()}/rest/v1/rpc/redeem_items`, {

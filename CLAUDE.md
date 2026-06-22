@@ -49,7 +49,7 @@ app/
 ├── api/                 # Vercel serverless functions (Node) — wallet-auth'd cloud save + rewards
 │   ├── _auth.ts         #   ed25519 signature verification (service-role key, server-only)
 │   ├── join.ts · save.ts · load.ts
-│   ├── rewards.ts · claim.ts · redeem.ts  # custodial $SPROUT payouts + on-demand item redemption — docs/REWARDS.md
+│   ├── rewards.ts · claim.ts · redeem.ts  # custodial $LANDS payouts + on-demand item redemption — docs/REWARDS.md
 ├── src/
 │   ├── game/            # Phaser game logic (authoritative state)
 │   │   ├── scenes/FarmScene.ts   # the big one: gameplay, growth, FX, save/load
@@ -64,7 +64,7 @@ app/
 │       ├── WalletProvider.tsx · useSolBalance.ts · walletAuth.ts
 │       ├── supabase.ts (public anon client, realtime) · multiplayer.ts
 │       ├── cloudSave.ts · CloudSaveSync.tsx · MultiplayerSync.tsx
-│       ├── rewards.ts · RewardsClaim.tsx · redeem.ts  # claim $SPROUT (Option A) + on-demand item redeem (🌱 in BagPanel)
+│       ├── rewards.ts · RewardsClaim.tsx · redeem.ts  # claim $LANDS (Option A) + on-demand item redeem (🌱 in BagPanel)
 │       └── merkleClaim.ts · MerkleClaim.tsx  # trustless on-chain self-claim (Option B)
 docs/   # ARCHITECTURE.md, ROADMAP.md, MARKETPLACE.md, REWARDS.md
 programs/   # Anchor programs (written, not built here): marketplace · reward-distributor (merkle claims)
@@ -121,7 +121,7 @@ Useful dev URL params (they disable autosave so they don't touch a real save):
 - Cloud save auth: the browser signs a message once per session with the Solana
   wallet; `api/_auth.ts` verifies that ed25519 signature server-side before
   reading/writing a save. Don't weaken this path.
-- **Treasury key (rewards):** `TREASURY_SECRET_KEY` signs real $SPROUT payouts in
+- **Treasury key (rewards):** `TREASURY_SECRET_KEY` signs real $LANDS payouts in
   `api/claim.ts` and is a **server-only secret** — never in client code or commits.
   Reward *entitlements* must be credited from server-verified signals, never the
   client coin balance (which `api/save.ts` stores verbatim). See `docs/REWARDS.md`.

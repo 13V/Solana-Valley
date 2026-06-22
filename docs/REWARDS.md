@@ -1,6 +1,6 @@
-# Rewards & claims — custodial $SPROUT payouts
+# Rewards & claims — custodial $LANDS payouts
 
-How players turn in-game contribution into **real $SPROUT** they can withdraw,
+How players turn in-game contribution into **real $LANDS** they can withdraw,
 without a smart contract. This is "Option A" from the P2E discussion: a
 **custodial** claim backend. The treasury is a normal wallet; our server signs
 the payout transfer after verifying the player's wallet signature.
@@ -17,7 +17,7 @@ the payout transfer after verifying the player's wallet signature.
  pump.fun creator fees / marketplace fees  (REAL revenue in)
         │   (off-chain bot: claim → swap on Jupiter → transfer)
         ▼
-   Treasury wallet  ───────────────►  holds $SPROUT
+   Treasury wallet  ───────────────►  holds $LANDS
         │
         │  player clicks "Claim"  (wallet-signed)
         ▼
@@ -69,11 +69,11 @@ verbatim). See [Crediting rewards](#crediting-rewards-seasons--contribution-scor
 | `supabase/seasons.sql` | `seasons` + `season_scores` tables + atomic `distribute_season` RPC (capped-pool-by-share). Run after `rewards.sql`. |
 | `scripts/lib/contribution.mjs` | Pure contribution scorer + largest-remainder pool allocator. |
 | `scripts/reward-season.mjs` | Ops CLI: open a season, score all saves, split the pool, credit everyone in one atomic call. |
-| `scripts/buyback.mjs` | Ops CLI: fund the treasury by swapping SOL → $SPROUT on Jupiter. |
+| `scripts/buyback.mjs` | Ops CLI: fund the treasury by swapping SOL → $LANDS on Jupiter. |
 | `scripts/rewards-setup.mjs` | Devnet mint creation, treasury funding, and crediting test wallets. |
-| `supabase/redemption.sql` | On-demand item→$SPROUT pool: config + daily caps + atomic `redeem_items` RPC (credits `claimable`). |
+| `supabase/redemption.sql` | On-demand item→$LANDS pool: config + daily caps + atomic `redeem_items` RPC (credits `claimable`). |
 | `app/api/redeem.ts` | `POST /api/redeem` — wallet-signed; credits claimable from the capped pool. |
-| `app/src/chain/redeem.ts` + 🌱 button in `BagPanel.tsx` | Redeem a bag item for $SPROUT on demand. |
+| `app/src/chain/redeem.ts` + 🌱 button in `BagPanel.tsx` | Redeem a bag item for $LANDS on demand. |
 
 Amounts are stored and transferred in **base units** (integer = whole tokens ×
 10^decimals) so a payout never has float rounding.
@@ -90,18 +90,19 @@ Set these in the Vercel project (and locally for the script). They are **secrets
 | `SUPABASE_SERVICE_ROLE_KEY` | both API routes | already used by save/load |
 | `SUPABASE_URL` | the script | defaults to the project URL in the API routes |
 | `SOLANA_RPC_URL` | `claim.ts`, script | required; use a paid RPC (Helius/QuickNode) on mainnet |
-| `REWARD_MINT` | `claim.ts`, script | the $SPROUT mint address |
+| `REWARD_MINT` | `claim.ts`, script | the $LANDS mint address |
 | `TREASURY_SECRET_KEY` | `claim.ts`, script | base58 64-byte secret key of the treasury wallet |
 | `REWARD_DECIMALS` | `rewards.ts`, scripts | display/units; default `6` (pump.fun standard) |
-| `REWARD_SYMBOL` | `rewards.ts` | default `$SPROUT` |
+| `REWARD_SYMBOL` | `rewards.ts` | default `$LANDS` |
 | `JUPITER_API` | `buyback.mjs` | swap API base; default `https://quote-api.jup.ag/v6` |
 
 A `.env.example` at the repo root lists every variable.
 
-The live $SPROUT mint is in `app/src/ui/ContractAddress.tsx`
-(`3sPxGyKxwCrAebxZsFb56GsNd7mjK7jZAng5uJtPpump`). **Test on devnet first** with a
-throwaway mint (below) before pointing `REWARD_MINT`/`TREASURY_SECRET_KEY` at
-anything on mainnet.
+After the pump.fun launch, set `REWARD_MINT` + `VITE_TOKEN_CA` to your **$LANDS**
+mint. Until then the copy-pill falls back to the old $SPROUT mint
+(`3sPxGyKxwCrAebxZsFb56GsNd7mjK7jZAng5uJtPpump`) in
+`app/src/ui/ContractAddress.tsx`. **Test on devnet first** with a throwaway mint
+(below) before pointing `REWARD_MINT`/`TREASURY_SECRET_KEY` at anything on mainnet.
 
 ---
 
@@ -120,7 +121,7 @@ node scripts/rewards-setup.mjs create-mint
 node scripts/rewards-setup.mjs credit <YOUR_WALLET> 250
 
 # 5. Run the app, connect that wallet, approve the signature → the claim widget
-#    shows "250 $SPROUT" → Claim → the tokens land in your wallet.
+#    shows "250 $LANDS" → Claim → the tokens land in your wallet.
 
 node scripts/rewards-setup.mjs balance   # sanity-check the treasury balance
 ```
@@ -130,7 +131,7 @@ node scripts/rewards-setup.mjs balance   # sanity-check the treasury balance
 ## Crediting rewards: seasons & contribution score
 
 Entitlements are credited per **season** using the capped-pool-by-share model: a
-season has a fixed $SPROUT pool, and it's split across wallets *proportionally to
+season has a fixed $LANDS pool, and it's split across wallets *proportionally to
 each wallet's contribution score*. No fixed "rate × coins" — your payout is your
 share of a fixed pot, so it can never exceed the pool and inflating one number
 can't game it.
@@ -163,14 +164,14 @@ directly.
 
 ## Instant item redemption (capped pool)
 
-Harvest a **top-tier crop**, and a 🌱 $SPROUT button appears on it in the Harvest
-panel — trade it for real $SPROUT on demand (no waiting for a season). Only
+Harvest a **top-tier crop**, and a 🌱 $LANDS button appears on it in the Harvest
+panel — trade it for real $LANDS on demand (no waiting for a season). Only
 top-tier crops qualify (`TRADEABLE_MIN_RARITY` in `economy.ts`, default
 **Legendary+**); commons/fish stay coins-only. To keep this from becoming an open
 tap that drains the treasury, payouts draw from a **capped daily pool**
 (`supabase/redemption.sql`):
 
-- **`daily_budget`** — how much $SPROUT you fund the pool with per UTC day; total
+- **`daily_budget`** — how much $LANDS you fund the pool with per UTC day; total
   payouts can never exceed it (the hard cap that protects the treasury).
 - **`wallet_daily_cap`** — most one wallet can take per day.
 - **flat rate by default** (`rate_floor_bps = 10000`) — payout is simply item
@@ -178,7 +179,7 @@ tap that drains the treasury, payouts draw from a **capped daily pool**
   with the budget instead of staying flat.)
 
 Flow: 🌱 → `POST /api/redeem` → `redeem_items` RPC converts the item's coin value
-to $SPROUT at the current rate, clamps to both caps, and credits the wallet's
+to $LANDS at the current rate, clamps to both caps, and credits the wallet's
 `claimable`. The item is removed from the bag, and the player withdraws the
 `claimable` via the same claim widget. It **reuses the whole claim rail** — no new
 payout path.
@@ -191,9 +192,9 @@ payout path.
 
 ```sql
 update public.redemption_config set
-  base_rate        = 100,        -- $SPROUT base units per 1 coin of item value (tune!)
-  daily_budget     = 50000000000, -- 50,000 $SPROUT/day at 6 decimals (how much you fund)
-  wallet_daily_cap = 1000000000,  -- 1,000 $SPROUT/wallet/day
+  base_rate        = 100,        -- $LANDS base units per 1 coin of item value (tune!)
+  daily_budget     = 50000000000, -- 50,000 $LANDS/day at 6 decimals (how much you fund)
+  wallet_daily_cap = 1000000000,  -- 1,000 $LANDS/wallet/day
   rate_floor_bps   = 10000,       -- 10000 = flat rate (simple trade)
   enabled          = true
 where id = 1;
@@ -203,26 +204,27 @@ where id = 1;
 
 ## Funding the treasury (the buyback bot)
 
-The payout loop is complete; *filling* the treasury from revenue is an off-chain
-job, no smart contract needed. `scripts/buyback.mjs` does the buy-back: the
-treasury wallet swaps its SOL → $SPROUT on **Jupiter**, so tokens land straight
-in the treasury's account, ready to claim.
+$LANDS launches on **pump.fun**, so the treasury fills itself from **creator
+fees** — no smart contract needed. **Launch $LANDS from the treasury wallet** so
+creator fees accrue straight to it. The loop (`scripts/buyback.mjs`):
 
 ```bash
-node scripts/buyback.mjs balance          # treasury SOL + $SPROUT
-node scripts/buyback.mjs quote 1.0        # dry-run: expected $SPROUT for 1 SOL
-node scripts/buyback.mjs run 1.0          # execute (keeps 0.05 SOL reserve)
-node scripts/buyback.mjs run 1.0 --slippage 150 --reserve 0.1
+node scripts/buyback.mjs claim-fees --auto   # collect pump.fun creator fees → SOL in treasury
+node scripts/buyback.mjs run 1.0             # swap that SOL → $LANDS into the treasury
+node scripts/buyback.mjs balance             # treasury SOL + $LANDS
+node scripts/buyback.mjs quote 1.0           # dry-run a swap (no send)
 ```
 
-The one venue-specific step is getting SOL *into* the treasury — claiming
-**pump.fun creator fees** (via PumpPortal's `collectCreatorFee` / the pump SDK),
-LP fees (Raydium/Orca SDK), or Token-2022 withheld fees. `buyback.mjs claim-fees`
-documents this; implement it for your launch venue so it deposits SOL into the
-treasury wallet, then `run` swaps it. Drive the whole loop (claim → `run`, and
-`reward-season.mjs distribute` each season) from a keeper/cron — GitHub Actions,
-Vercel cron, or a small server. Solana has no native cron, so "auto" = a
-scheduled job.
+- **`claim-fees`** (no flag) prints the runbook; **`--auto`** collects via
+  PumpPortal (verify the endpoint/action at https://pumpportal.fun, or just claim
+  in the pump.fun UI — either way the SOL lands in the treasury).
+- **`run`** swaps SOL → $LANDS on **Jupiter** into the treasury (keeps a 0.05 SOL
+  reserve; `--slippage <bps>` / `--reserve <sol>` to tune). Needs a live $LANDS
+  market for Jupiter to route — pump.fun gives you that immediately.
+
+Drive the loop (`claim-fees --auto` → `run`, plus `reward-season.mjs distribute`
+each season) from a keeper/cron — GitHub Actions, Vercel cron, or a small server.
+Solana has no native cron, so "auto" = a scheduled job.
 
 ---
 

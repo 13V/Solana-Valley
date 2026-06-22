@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Display-only metadata; the real transfer in /api/claim uses the mint's own
   // units, so a wrong decimals here can never mis-pay — it only affects rendering.
   const decimals = Number(process.env.REWARD_DECIMALS ?? 6);
-  const symbol = process.env.REWARD_SYMBOL ?? '$SPROUT';
+  const symbol = process.env.REWARD_SYMBOL ?? '$LANDS';
 
   const url =
     `${getSupabaseUrl()}/rest/v1/rewards` +

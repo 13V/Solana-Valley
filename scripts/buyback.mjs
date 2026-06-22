@@ -1,8 +1,8 @@
-// Buyback bot for the custodial $SPROUT reward system (see docs/REWARDS.md,
+// Buyback bot for the custodial $LANDS reward system (see docs/REWARDS.md,
 // "Funding the treasury (the buyback bot)").
 //
 // The treasury wallet (TREASURY_SECRET_KEY) holds SOL deposited from claimed
-// fees and is BOTH the swapper and the holder: it swaps SOL → $SPROUT on
+// fees and is BOTH the swapper and the holder: it swaps SOL → $LANDS on
 // Jupiter, so the bought tokens land directly in the treasury's token account,
 // ready for player claims. No separate dev wallet or extra transfer needed.
 //
@@ -10,12 +10,12 @@
 //   quote <solAmount> [--slippage <bps>]
 //                          Dry-run: fetch a Jupiter v6 quote for swapping
 //                          <solAmount> SOL → REWARD_MINT and print the expected
-//                          $SPROUT out + price impact. DOES NOT SEND.
+//                          $LANDS out + price impact. DOES NOT SEND.
 //   run <solAmount> [--slippage <bps>] [--reserve <sol>]
 //                          Execute the swap (quote → /swap → sign → send →
 //                          confirm). Keeps --reserve SOL (default 0.05) for
 //                          rent/fees; requires balance - reserve >= solAmount.
-//   balance                Print the treasury's SOL balance and $SPROUT balance.
+//   balance                Print the treasury's SOL balance and $LANDS balance.
 //   claim-fees             Documented stub — claiming creator/LP/withheld fees is
 //                          venue-specific; its job is just to deposit SOL into the
 //                          treasury, after which `run` swaps it.
@@ -45,6 +45,10 @@ import bs58 from 'bs58';
 const RPC = process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
 const DECIMALS = Number(process.env.REWARD_DECIMALS ?? 6);
 const JUPITER_API = process.env.JUPITER_API || 'https://quote-api.jup.ag/v6';
+// PumpPortal local-transaction API, used by `claim-fees --auto` to collect
+// pump.fun creator fees. VERIFY the endpoint + action against current docs
+// (https://pumpportal.fun) before relying on it — the manual path always works.
+const PUMPPORTAL_API = process.env.PUMPPORTAL_API || 'https://pumpportal.fun/api/trade-local';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const DEFAULT_SLIPPAGE_BPS = 100; // 1%
 const DEFAULT_RESERVE_SOL = 0.05; // kept for rent/fees
@@ -158,7 +162,7 @@ async function quoteCmd() {
 
   console.log(`Quote (dry-run, nothing sent):`);
   console.log(`  In:            ${solAmount} SOL`);
-  console.log(`  Expected out:  ${outHuman.toLocaleString()} $SPROUT (${quote.outAmount} base units)`);
+  console.log(`  Expected out:  ${outHuman.toLocaleString()} $LANDS (${quote.outAmount} base units)`);
   console.log(`  Price impact:  ${impact.toFixed(4)}%`);
   console.log(`  Slippage:      ${slippageBps} bps`);
 }
@@ -183,9 +187,9 @@ async function runCmd() {
     );
   }
 
-  console.log(`Fetching quote for ${solAmount} SOL → $SPROUT (slippage ${slippageBps} bps)…`);
+  console.log(`Fetching quote for ${solAmount} SOL → $LANDS (slippage ${slippageBps} bps)…`);
   const quote = await fetchQuote(outputMint, solAmount, slippageBps);
-  console.log(`Expected out: ${humanFromBaseUnits(quote.outAmount).toLocaleString()} $SPROUT`);
+  console.log(`Expected out: ${humanFromBaseUnits(quote.outAmount).toLocaleString()} $LANDS`);
 
   console.log('Requesting swap transaction from Jupiter…');
   let swapResp;
@@ -231,7 +235,7 @@ async function runCmd() {
     return die(`confirmation failed: ${e.message || e} (check the signature on-chain: ${signature})`);
   }
 
-  console.log(`\n✓ Swapped ${solAmount} SOL → $SPROUT into the treasury.`);
+  console.log(`\n✓ Swapped ${solAmount} SOL → $LANDS into the treasury.`);
   console.log(`  Signature: ${signature}`);
   console.log(`  Solscan:   https://solscan.io/tx/${signature}`);
 }
@@ -252,36 +256,78 @@ async function balanceCmd() {
   } catch (e) {
     // ATA not created yet (or owned by another program) → treat as 0.
     if (!(e instanceof TokenAccountNotFoundError) && !(e instanceof TokenInvalidAccountOwnerError)) {
-      return die(`failed to read $SPROUT token account: ${e.message || e}`);
+      return die(`failed to read $LANDS token account: ${e.message || e}`);
     }
   }
   const sproutHuman = Number(sproutBase) / 10 ** DECIMALS;
 
   console.log(`Treasury ${treasury.publicKey.toBase58()}:`);
   console.log(`  SOL:     ${sol} SOL`);
-  console.log(`  $SPROUT: ${sproutHuman.toLocaleString()} (${sproutBase} base units)`);
+  console.log(`  $LANDS: ${sproutHuman.toLocaleString()} (${sproutBase} base units)`);
 }
 
-function claimFeesCmd() {
-  console.log(`claim-fees is an intentional stub — claiming revenue is venue-specific.
+// Collect pump.fun creator fees into the treasury. Default prints the runbook;
+// `--auto` attempts an automated collect via PumpPortal, signed by the treasury
+// (which should ALSO be the token's creator wallet, so fees accrue here).
+async function claimFeesCmd() {
+  if (!process.argv.includes('--auto')) {
+    console.log(`pump.fun creator-fee collection
+================================
+$LANDS creator fees (SOL) accrue to the wallet that LAUNCHED the token on
+pump.fun — so launch $LANDS FROM the treasury wallet and they land right here.
 
-This bot's job is only to swap SOL already sitting in the treasury into $SPROUT
-(via \`run\`) and hold it for player claims. Getting SOL *into* the treasury
-depends on how $SPROUT was launched and where the fees accrue:
+Turn fees into claimable $LANDS in two steps:
+  1. Collect creator fees → SOL in the treasury, EITHER:
+       • pump.fun UI: your coin page → "claim creator rewards", OR
+       • automated:   node scripts/buyback.mjs claim-fees --auto
+  2. Swap that SOL → $LANDS into the treasury:
+       node scripts/buyback.mjs run <solAmount>
 
-  • pump.fun creator fees — collect via PumpPortal's \`collectCreatorFee\` action
-    or the pump SDK, withdrawing to the treasury wallet.
-  • LP fees — collect via the Raydium or Orca SDK from your LP position.
-  • Token-2022 withheld transfer fees — withdraw the withheld amount from the
-    mint/accounts to the treasury.
+Treasury key: ${process.env.TREASURY_SECRET_KEY ? 'configured' : 'TREASURY_SECRET_KEY not set'}
+(Run this loop on a cron to keep the treasury funded from real revenue.)`);
+    process.exit(0);
+  }
 
-Whichever applies, the only requirement is that it deposits SOL into the
-treasury wallet (${process.env.TREASURY_SECRET_KEY ? 'configured' : 'TREASURY_SECRET_KEY not set'}).
-After that:
-
-  node scripts/buyback.mjs quote <solAmount>   # dry-run the buyback
-  node scripts/buyback.mjs run   <solAmount>   # execute it`);
-  process.exit(0);
+  // --auto: best-effort automated collect via PumpPortal's local-tx API.
+  const treasury = treasuryFromEnv();
+  const connection = new Connection(RPC, 'confirmed');
+  console.log('Collecting pump.fun creator fees via PumpPortal (best-effort)…');
+  let resp;
+  try {
+    resp = await fetch(PUMPPORTAL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicKey: treasury.publicKey.toBase58(),
+        action: 'collectCreatorFee',
+        priorityFee: 0.00001,
+      }),
+    });
+  } catch (e) {
+    return die(
+      `PumpPortal request failed: ${e.message || e}\n` +
+        'Claim manually in the pump.fun UI, then: node scripts/buyback.mjs run <solAmount>',
+    );
+  }
+  if (!resp.ok) {
+    return die(
+      `PumpPortal collectCreatorFee failed: ${resp.status} ${await resp.text().catch(() => '')}\n` +
+        'Verify the action/endpoint at https://pumpportal.fun, or claim manually in the pump.fun UI ' +
+        'then: node scripts/buyback.mjs run <solAmount>',
+    );
+  }
+  let sig;
+  try {
+    const raw = new Uint8Array(await resp.arrayBuffer());
+    const tx = VersionedTransaction.deserialize(raw);
+    tx.sign([treasury]);
+    sig = await connection.sendRawTransaction(tx.serialize(), { maxRetries: 3 });
+    await connection.confirmTransaction(sig, 'confirmed');
+  } catch (e) {
+    return die(`collect transaction failed: ${e.message || e}`);
+  }
+  console.log(`✓ Collected creator fees to the treasury. Sig: ${sig}`);
+  console.log('Now swap that SOL into $LANDS:  node scripts/buyback.mjs run <solAmount>');
 }
 
 switch (cmd) {
@@ -295,7 +341,7 @@ switch (cmd) {
     await balanceCmd();
     break;
   case 'claim-fees':
-    claimFeesCmd();
+    await claimFeesCmd();
     break;
   default:
     console.log(
