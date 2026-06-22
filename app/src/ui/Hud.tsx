@@ -17,7 +17,7 @@ const PHASE_ICON: Record<string, { emoji: string; img?: string }> = {
   night: { emoji: '🌙', img: 'assets/sprout-ui/phase_night.png' },
 };
 
-export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | 'settings' | null;
+export type Panel = 'shop' | 'seeds' | 'bag' | 'animals' | 'upgrades' | 'skills' | 'almanac' | 'help' | 'settings' | 'travel' | null;
 
 // `emoji` is the original glyph (kept as img alt, or rendered as-is when no
 // pixel icon exists — almanac has no clean book sprite in the pack).

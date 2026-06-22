@@ -1169,3 +1169,91 @@ body {
   vertical-align: -2px;
   margin-right: 2px;
 }
+
+/* ===================================================================== */
+/* Boat travel — island destination cards (TravelPanel)                   */
+/* ===================================================================== */
+.travel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.island-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.island-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.island-thumb {
+  width: 100%;
+  height: 84px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.island-thumb img {
+  /* Uniform render height so small sprites (cow/well) and big ones (cottage/
+     coop) read at a balanced size; nearest-neighbour keeps the upscale crisp. */
+  height: 72px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.3));
+}
+
+.island-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.island-blurb {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.25;
+  min-height: 26px;
+}
+.island-go {
+  margin-top: 7px;
+  pointer-events: none; /* the whole card is the button */
+}
+
+/* Premium skin: each card is a raised parchment tile that lifts on hover. */
+.ui-skin .island-card {
+  background: none;
+  border: 13px solid transparent;
+  border-image: var(--ui-btn) 8 fill stretch;
+  border-radius: 0;
+  color: var(--ink);
+}
+.ui-skin .island-card:hover {
+  border-image: var(--ui-btn-light) 8 fill stretch;
+  background: none;
+}
+.ui-skin .island-card:active {
+  border-image: var(--ui-btn-press) 8 fill stretch;
+}
+.ui-skin .island-name {
+  color: #4a3015;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.45);
+}
+.ui-skin .island-blurb {
+  color: var(--ink-soft);
+  opacity: 0.95;
+}

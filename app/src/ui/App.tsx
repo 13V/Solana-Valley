@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WalletProvider } from '../chain/WalletProvider';
 import { createGame } from '../game/createGame';
+import { bus } from '../game/EventBus';
 import { Hud, type Panel } from './Hud';
 import { Hotbar } from './Hotbar';
 import { Shop } from './Shop';
@@ -12,6 +13,7 @@ import { SkillsPanel } from './SkillsPanel';
 import { AlmanacPanel } from './AlmanacPanel';
 import { HelpPanel } from './HelpPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { TravelPanel } from './TravelPanel';
 import { GoalsHud } from './GoalsHud';
 import { TutorialCoach } from './TutorialCoach';
 import { TouchControls } from './TouchControls';
@@ -53,6 +55,9 @@ export function App() {
     img.src = 'assets/sprout-ui/ui_panel.png';
   }, []);
 
+  // Clicking the boat in the world opens the island travel UI.
+  useEffect(() => bus.on('boat:open', () => setPanel('travel')), []);
+
   const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));
   const close = () => setPanel(null);
   const closeHelp = () => {
@@ -79,6 +84,7 @@ export function App() {
           {panel === 'almanac' && <AlmanacPanel onClose={close} />}
           {panel === 'help' && <HelpPanel onClose={closeHelp} />}
           {panel === 'settings' && <SettingsPanel onClose={close} />}
+          {panel === 'travel' && <TravelPanel onClose={close} />}
           {helpSeen && <GoalsHud />}
           <Hotbar />
           <TouchControls />

@@ -362,6 +362,7 @@ export class FarmScene extends Phaser.Scene {
   // fishing
   private pond!: Rect; // pond rect in tile coords (inclusive)
   private pondTiles = new Set<string>(); // fast "is this a water tile" lookup
+  private boat?: Phaser.GameObjects.Sprite; // little rowboat moored on the pond — click to open the travel UI
   private pathTiles = new Set<string>(); // cobble/dirt path tiles (kept clear of scatter)
   private casting = false; // only one cast at a time
   private fishingCast!: FishingCast; // rod/line/bobber cast choreography
@@ -585,6 +586,9 @@ export class FarmScene extends Phaser.Scene {
         this.fishingCast.onPointer();
         return;
       }
+      // Clicking the moored boat opens the travel UI — checked before fishing so
+      // it wins over a cast on the pond tile the boat sits on.
+      if (this.tryBoardBoat(p.worldX, p.worldY)) return;
       // Gathering interactions take priority over the held tool so clicking the
       // pond fishes (never tills/plants) and clicking a node forages.
       if (this.tryCollectAnimal(p.worldX, p.worldY)) return;
@@ -616,6 +620,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buyExpansion', () => this.buyExpansion()),
       bus.on('ui:choosePerk', ({ skill, level, perk }) => this.choosePerk(skill, level, perk)),
       bus.on('ui:respecPerks', () => this.respecPerks()),
+      bus.on('ui:travel', (id) => this.travelTo(id)),
       // ---- multiplayer (no-ops in single-player: these never fire) ----------
       bus.on('mp:assigned', ({ id, island, plot }) => { this.myMpId = id; this.island = island; this.onAssigned(plot); this.rollShopWindow(this.currentEpoch()); }),
       bus.on('mp:roster', (players) => this.onRoster(players)),
@@ -2652,10 +2657,57 @@ export class FarmScene extends Phaser.Scene {
       if (!this.inBounds(tx, ty)) continue;
       this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE, 'waterobj', f).setOrigin(0.5, 1).setScale(2).setDepth(ty * TILE + TILE);
     }
+
+    // A little rowboat moored toward the front of the pond. Clicking it opens
+    // the travel UI (handled in tryBoardBoat, ahead of fishing). It bobs gently
+    // and lifts on hover so it reads as interactive.
+    if (this.textures.exists('boats')) {
+      const bx = (cx - 1) * TILE + TILE / 2;
+      const by = (cyc + ry - 1) * TILE + TILE / 2;
+      const boat = this.add
+        .sprite(bx, by, 'boats', 4)
+        .setScale(1.6)
+        .setDepth(by)
+        .setInteractive({ useHandCursor: true });
+      boat.on('pointerover', () => boat.setScale(1.72));
+      boat.on('pointerout', () => boat.setScale(1.6));
+      this.tweens.add({ targets: boat, y: by + 3, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      this.boat = boat;
+    }
   }
 
   private isPondTile(tx: number, ty: number): boolean {
     return this.pondTiles.has(this.key(tx, ty));
+  }
+
+  // Click within reach of the moored boat → open the travel UI.
+  private tryBoardBoat(wx: number, wy: number): boolean {
+    if (!this.boat) return false;
+    if (Phaser.Math.Distance.Between(wx, wy, this.boat.x, this.boat.y) > 36) return false;
+    bus.emit('boat:open', undefined);
+    return true;
+  }
+
+  // Set sail: teleport the player (camera follows) to one of the four island
+  // zones, mapped onto the current homestead's areas + the central plaza (hub).
+  private travelTo(islandId: string) {
+    const h = HOMESTEADS[this.myPlotIndex] ?? HOMESTEADS[0];
+    const center = (r: Rect) => ({ tx: Math.floor((r.x0 + r.x1) / 2), ty: Math.floor((r.y0 + r.y1) / 2) });
+    let t: { tx: number; ty: number };
+    let label: string;
+    switch (islandId) {
+      case 'chicken': t = center(h.chickenPen); label = 'the Chicken Coop'; break;
+      case 'cow': t = center(h.cowPen); label = 'the Cow Pasture'; break;
+      case 'hub': t = plazaCenterTile(); label = 'the Hub'; break;
+      case 'farm':
+      default: t = center(h.farm); label = 'your Farm'; break;
+    }
+    this.player.setPosition(t.tx * TILE + TILE / 2, t.ty * TILE + TILE / 2);
+    this.player.setVelocity(0, 0);
+    this.facing = 'down';
+    this.player.anims.play('idle-down', true);
+    this.cameras.main.flash(260, 255, 246, 224);
+    bus.emit('toast', `⛵ Set sail to ${label}!`);
   }
 
   // Click a water tile within reach → cast. Works on the inland pond and on the
