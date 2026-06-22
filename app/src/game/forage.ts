@@ -24,6 +24,15 @@ export const FORAGE: Forage[] = [
   { id: 'crystal', name: 'Crystal Shard', value: 420, weight: 5, sheet: 'mfs', frame: 25, css: '#b56bff' },
   { id: 'geode', name: 'Amber Geode', value: 650, weight: 3.5, sheet: 'mfs', frame: 15, css: '#ffb347' },
   { id: 'goldcap', name: 'Golden Truffle', value: 1100, weight: 1.5, sheet: 'mfs', frame: 3, css: '#ffd21a' },
+  // --- Drop 15: Wild Bounty ---
+  { id: 'nfg_pebblecap', name: 'Pebblecap Mushroom', value: 25, weight: 90, sheet: 'mfs', frame: 1, css: '#c8a87a' },
+  { id: 'nfg_cloverbloom', name: 'Cloverbloom', value: 40, weight: 75, sheet: 'nature', frame: 36, css: '#7ec87e' },
+  { id: 'nfg_duskshroom', name: 'Duskshroom', value: 70, weight: 55, sheet: 'mfs', frame: 4, css: '#9b7fc4' },
+  { id: 'nfg_sunpetal', name: 'Sunpetal Bloom', value: 110, weight: 38, sheet: 'nature', frame: 38, css: '#f5c842' },
+  { id: 'nfg_ironflint', name: 'Ironflint Stone', value: 175, weight: 22, sheet: 'mfs', frame: 8, css: '#8a9aaa' },
+  { id: 'nfg_ghostbell', name: 'Ghostbell Flower', value: 300, weight: 10, sheet: 'mfs', frame: 13, css: '#d0eeff' },
+  { id: 'nfg_crimsonwort', name: 'Crimsonwort Herb', value: 550, weight: 5, sheet: 'nature', frame: 41, css: '#c94040' },
+  { id: 'nfg_voidcrystal', name: 'Voidcrystal Shard', value: 1000, weight: 1.5, sheet: 'mfs', frame: 17, css: '#6a3dff' },
 ];
 
 // Pick a forage type; `luck` (>=1, from the Foraging skill) favours rarer finds.
