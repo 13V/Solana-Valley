@@ -26,6 +26,7 @@ import {
   rollQuality,
   QUALITY,
   MUTATION_BY_ID,
+  isTokenTradeable,
   type Plant,
   type Mutation,
   type Quality,
@@ -338,7 +339,6 @@ export class FarmScene extends Phaser.Scene {
   // drained by everyone's purchases. `shopBought` tracks units taken this window
   // (local + peers via mp:shopBought); remaining = pool − bought.
   private island = 0;
-  private onlineCount = 1;
   private shopEpoch = 0;
   private shopPool: Record<string, number> = {};
   private shopBought: Record<string, number> = {};
@@ -647,6 +647,7 @@ export class FarmScene extends Phaser.Scene {
       bus.on('ui:buySeed', (id) => this.buySeed(id)),
       bus.on('ui:sellStack', (key) => this.sellStack(key)),
       bus.on('ui:sellAll', () => this.sellAll()),
+      bus.on('ui:redeemStack', ({ key, count }) => this.redeemStack(key, count)),
       bus.on('ui:buyUpgrade', (id) => this.buyUpgrade(id)),
       bus.on('ui:chooseUpgradeFork', ({ id, fork }) => this.chooseUpgradeFork(id, fork)),
       bus.on('ui:buyAnimal', (id) => this.buyAnimal(id)),
@@ -1993,6 +1994,13 @@ export class FarmScene extends Phaser.Scene {
     }
     // Tolerant parse: legacy 3-/4-part keys default quality 'none', withered '0'.
     const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+    const plant = PLANT_BY_ID[plantId];
+    // Divine+ crops are NOT sellable for coins — they can only be traded for
+    // $LANDS (the 🌱 button). Refuse a coin sale here as a backstop to the UI.
+    if (plant && isTokenTradeable(plant)) {
+      this.toast(`${plant.name} can only be traded for $LANDS (🌱)`);
+      return;
+    }
     const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
     const famMult = familyBonusFor(plantId, completedFamilies(this.discoveredPlants));
     const evMult = this.activeEventEffect().cropValueMult ?? 1;
@@ -2016,6 +2024,21 @@ export class FarmScene extends Phaser.Scene {
     const evTag = evMult > 1 ? ` · 🎉 +${Math.round((evMult - 1) * 100)}% festival` : '';
     this.toast(`Sold ${count}× ${PLANT_BY_ID[plantId].name} (+${value}🪙)${this.marketBonusTag()}${famTag}${evTag}`);
     this.emitState();
+  }
+
+  // Remove a redeemed stack from the bag. The real $SPROUT credit happens
+  // server-side (api/redeem.ts → rewards.claimable); this only consumes the item
+  // locally once that succeeded, so it's emitted by the UI AFTER the credit lands.
+  // No coins/XP are awarded — redemption converts the item into a claimable
+  // $SPROUT entitlement, not coins.
+  private redeemStack(key: string, count: number) {
+    const have = this.harvestInv[key] ?? 0;
+    const take = Math.min(have, Math.max(0, Math.floor(count)));
+    if (take <= 0) return;
+    if (take >= have) delete this.harvestInv[key];
+    else this.harvestInv[key] = have - take;
+    this.emitState();
+    this.saveState();
   }
 
   // Permanent Collection Bonus multiplier, derived live from cumulative
@@ -2101,6 +2124,7 @@ export class FarmScene extends Phaser.Scene {
     const fishValueMult = this.mods().fishValueMult;
     const fams = completedFamilies(this.discoveredPlants);
     const evMult = this.activeEventEffect().cropValueMult ?? 1;
+    const soldKeys: string[] = [];
     for (const [key, count] of Object.entries(this.harvestInv)) {
       // Fish stacks are valued on their own track (species value × Fishing mult),
       // outside the crop market/collection multipliers. Branch BEFORE the crop
@@ -2108,11 +2132,16 @@ export class FarmScene extends Phaser.Scene {
       if (key.startsWith('fish|')) {
         const fish = FISH_BY_ID[key.slice(5)];
         if (fish) fishTotal += fish.value * count * fishValueMult;
+        soldKeys.push(key);
         continue;
       }
       const [plantId, mutId, wet, q = 'none', wth = '0'] = key.split('|');
+      const plant = PLANT_BY_ID[plantId];
+      // Divine+ crops are $LANDS-only — never swept into a coin sale. Leave them.
+      if (plant && isTokenTradeable(plant)) continue;
       const quality: Quality = q in QUALITY ? (q as Quality) : 'none';
-      cropTotal += this.cropSaleUnit(PLANT_BY_ID[plantId], MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count * familyBonusFor(plantId, fams);
+      cropTotal += this.cropSaleUnit(plant, MUTATION_BY_ID[mutId], wet === '1', quality, wth === '1') * count * familyBonusFor(plantId, fams);
+      soldKeys.push(key);
     }
     const total = Math.round(
       cropTotal * marketBonus(this.upgrades.market) * this.mods().cropValueMult * this.collectionMult() * evMult + fishTotal,
@@ -2121,7 +2150,7 @@ export class FarmScene extends Phaser.Scene {
       this.toast('Nothing to sell');
       return;
     }
-    this.harvestInv = {};
+    for (const key of soldKeys) delete this.harvestInv[key];
     this.coins += total;
     this.earned += total;
     this.bumpDaily('sell', total);
@@ -2228,11 +2257,11 @@ export class FarmScene extends Phaser.Scene {
     return Math.max(0, (this.shopPool[id] ?? 0) - (this.shopBought[id] ?? 0));
   }
 
-  // (Re)roll the shared pool for the current island/window/online-count, keeping
-  // this window's purchases. Called on join, on roster change (count changes the
-  // ×players multiplier), and at the start of each window.
+  // (Re)roll the shared pool for the current island/window, keeping this window's
+  // purchases. Called on join and at the start of each window. Stock is sized for
+  // a single player and no longer scales with the online headcount.
   private refreshShopPool() {
-    this.shopPool = rollShopAt(this.island, this.shopEpoch, this.onlineCount);
+    this.shopPool = rollShopAt(this.island, this.shopEpoch);
   }
 
   // Start a fresh restock window: reset purchases and re-roll the shared pool.
@@ -3674,15 +3703,6 @@ export class FarmScene extends Phaser.Scene {
         rp.name = p.name;
         rp.label.setText(p.name);
       }
-    }
-
-    // The shared shop pool scales with how many players are on the island, so
-    // re-roll (keeping this window's purchases) whenever the headcount changes.
-    const count = Math.max(1, players.length);
-    if (count !== this.onlineCount) {
-      this.onlineCount = count;
-      this.refreshShopPool();
-      this.emitState();
     }
 
     // Update each plot's holographic nameplate to whoever is on it (Available if

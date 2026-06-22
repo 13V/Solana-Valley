@@ -4,6 +4,8 @@ import {
   cropValue,
   PLANT_BY_ID,
   MUTATION_BY_ID,
+  isTokenTradeable,
+  claimTokensFor,
   type Quality,
 } from '../game/economy';
 import { FISH_BY_ID, fishCss } from '../game/fishing';
@@ -11,6 +13,11 @@ import { useGameState } from './useGameState';
 import { bus } from '../game/EventBus';
 import { CropIcon } from './CropIcon';
 import { Tooltip, StackTipBody, makeStackStats } from './Tooltip';
+import { useCallback, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { getWalletAuth } from '../chain/walletAuth';
+import { redeemPlant } from '../chain/redeem';
+import { formatAmount } from '../chain/rewards';
 
 // Quality stars rendered next to a crop's name (e.g. ★★ for gold). The glyph is
 // repeated `stars` times and tinted with the quality's colour. `none` shows
@@ -49,8 +56,67 @@ type FishRow = {
 const plantOf = (id: string) => PLANT_BY_ID[id];
 const mutationOf = (id: string) => MUTATION_BY_ID[id];
 
+// Compact whole-token amount for the trade button, e.g. 100000→"100K", 1000000→"1M".
+function compactTokens(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 export function BagPanel({ onClose }: { onClose: () => void }) {
   const { harvest, progress } = useGameState();
+  const { publicKey, signMessage, connected } = useWallet();
+  // Guards against a double-click firing two /api/redeem calls for the same
+  // stack (which would double-credit). Holds the in-flight stack key, or null.
+  const [redeemingKey, setRedeemingKey] = useState<string | null>(null);
+
+  // Trade a bag stack of a top-tier crop for real $LANDS (credited to claimable,
+  // withdrawn via the reward widget). The server pays a flat USD value per tier
+  // from the `plantId`; `key` is the stack we remove locally AFTER the credit
+  // lands. `count` is the whole stack.
+  const redeem = useCallback(
+    async (key: string, plantId: string, mutationId: string, count: number, name: string) => {
+      if (redeemingKey) return;
+      if (!connected || !publicKey || !signMessage) {
+        bus.emit('toast', 'Connect your wallet to trade for $LANDS');
+        return;
+      }
+      if (
+        !window.confirm(
+          `Trade ${count}× ${name} for $LANDS?\n\nThe crop is converted to $LANDS and added to your claimable balance — withdraw it from the reward widget.`,
+        )
+      ) {
+        return;
+      }
+      setRedeemingKey(key);
+      try {
+        const session = await getWalletAuth(publicKey, signMessage);
+        if (!session) {
+          bus.emit('toast', 'Wallet signature needed to trade');
+          return;
+        }
+        bus.emit('toast', '🌱 Trading…');
+        const result = await redeemPlant(session, plantId, mutationId, count);
+        if (!result) {
+          bus.emit('toast', 'Trade failed — try again');
+          return;
+        }
+        if (!result.credited || result.credited === '0') {
+          bus.emit('toast', "Can't trade right now (daily limit reached or not enabled yet)");
+          return;
+        }
+        bus.emit('ui:redeemStack', { key, count });
+        bus.emit(
+          'toast',
+          `✓ Traded for ${formatAmount(result.credited, result.decimals)} ${result.symbol} — claim it from the reward widget`,
+        );
+      } finally {
+        setRedeemingKey(null);
+      }
+    },
+    [connected, publicKey, signMessage, redeemingKey],
+  );
+
   let total = 0;
   const rows: Array<CropRow | FishRow> = [];
   for (const k of Object.keys(harvest)) {
@@ -73,7 +139,8 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
     const quality = q as Quality;
     const withered = wth === '1';
     const unit = cropValue(plant, mutation, isWet, quality, withered);
-    total += unit * count;
+    // Divine+ crops aren't coin-sellable, so they don't count toward "Sell all".
+    if (!isTokenTradeable(plant)) total += unit * count;
     rows.push({ kind: 'crop', k, plant, mutation, wet: isWet, quality, withered, count, unit });
   }
 
@@ -137,7 +204,20 @@ export function BagPanel({ onClose }: { onClose: () => void }) {
                   <span className="row-meta">{unit.toLocaleString()}🪙 ea</span>
                 </Tooltip>
                 <span className="stock">×{count}</span>
-                <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
+                {/* Divine+ crops are $LANDS-only — no coin "Sell" button for them. */}
+                {!isTokenTradeable(plant) && (
+                  <button className="btn sm" onClick={() => bus.emit('ui:sellStack', k)}>Sell</button>
+                )}
+                {isTokenTradeable(plant) && (
+                  <button
+                    className="btn sm gold"
+                    disabled={redeemingKey !== null}
+                    title={`Trade this ${mutation.id !== 'normal' ? `${mutation.name} ` : ''}${plant.rarity} crop for ${compactTokens(claimTokensFor(plant, mutation.id) ?? 0)} $LANDS (can't be sold for coins)`}
+                    onClick={() => redeem(k, plant.id, mutation.id, count, plant.name)}
+                  >
+                    🌱 {compactTokens(claimTokensFor(plant, mutation.id) ?? 0)}
+                  </button>
+                )}
               </div>
             );
           })}

@@ -77,10 +77,18 @@ export function verifyAuth(body: AuthInput): AuthResult {
     return { ok: false, status: 400, error: 'wallet, message and signature are required' };
   }
 
-  // The message must reference the same wallet it claims to be signed by, so a
-  // signature for wallet A cannot be replayed as wallet B.
-  if (!message.includes(wallet)) {
-    return { ok: false, status: 401, error: 'message does not reference wallet' };
+  // The message must match the exact canonical format the client signs
+  // (app/src/chain/walletAuth.ts buildAuthMessage):
+  //   Solana Valley\nwallet: <wallet>\nts: <ISO8601>
+  // Anchoring it (instead of a loose substring) binds the signature to this
+  // wallet and prevents a signature for wallet A being replayed as wallet B.
+  const expected = new RegExp(
+    '^Solana Valley\\nwallet: ' +
+      wallet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+      '\\nts: \\d{4}-\\d{2}-\\d{2}T[0-9:.]+(?:Z|[+-]\\d{2}:\\d{2})$',
+  );
+  if (!expected.test(message)) {
+    return { ok: false, status: 401, error: 'message format invalid' };
   }
 
   const tsError = checkTimestamp(message);

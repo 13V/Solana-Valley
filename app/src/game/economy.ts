@@ -311,6 +311,48 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r);
 }
 
+// Whole-$LANDS payout for trading a top-tier crop. FIXED token amounts (not
+// USD-pegged — a fresh token's price is far too volatile to peg to). ONLY these
+// tiers are tradeable: Divine 50K, Prismatic 125K, Celestial 250K $LANDS. A
+// capped special-variant multiplier (CLAIM_MUT_MULT) applies on top; quality
+// stars do NOT. The redeem API keeps a matching plant→tokens copy; keep in sync.
+export const CLAIM_TOKENS: Partial<Record<Rarity, number>> = {
+  Divine: 50_000,
+  Prismatic: 125_000,
+  Celestial: 250_000,
+};
+
+export function claimTokens(plant: Plant): number | null {
+  return CLAIM_TOKENS[plant.rarity] ?? null;
+}
+
+export function isTokenTradeable(plant: Plant): boolean {
+  return claimTokens(plant) !== null;
+}
+
+// Token-payout multiplier for the special variants (mutations), CAPPED at 2× so
+// real-money payouts stay sane — deliberately separate from the in-game value
+// multipliers in MUTATIONS (which run up to ×25 for Rainbow). Normal pays the
+// flat tier value. The redeem API keeps a matching copy; keep them in sync.
+export const CLAIM_MUT_MULT: Record<string, number> = {
+  normal: 1,
+  shiny: 1.25,
+  frosted: 1.5,
+  gold: 1.75,
+  rainbow: 2,
+};
+
+export function claimMult(mutationId: string): number {
+  return CLAIM_MUT_MULT[mutationId] ?? 1;
+}
+
+// Effective whole-$LANDS payout for a stack: fixed tier amount × variant
+// multiplier, or null if the plant isn't tradeable for tokens.
+export function claimTokensFor(plant: Plant, mutationId: string): number | null {
+  const base = claimTokens(plant);
+  return base === null ? null : base * claimMult(mutationId);
+}
+
 // Player level at which each rarity tier becomes available in the shop. Re-tuned
 // to spread unlocks more evenly across the mid-game: the old curve front-loaded
 // the early tiers then left long dead zones (Legendary→Divine→Celestial spanned
@@ -323,8 +365,8 @@ export const RARITY_UNLOCK: Record<Rarity, number> = {
   Legendary: 11,
   Mythical: 15,
   Divine: 20,
-  Prismatic: 25,
-  Celestial: 30,
+  Prismatic: 28,
+  Celestial: 36,
 };
 
 // ---- plant families (collection set bonuses) ----------------------------
@@ -500,12 +542,12 @@ function mulberry32(seed: number): () => number {
 
 // Roll the SHARED island seed-shop stock for a given (island, restock window).
 // Deterministic (seeded PRNG, not Math.random) so every player on the island
-// sees identical stock, and each tier's quantity is multiplied by the number of
-// players online — the shared pool (10 players ⇒ 10× stock, drained by everyone
-// on the island). Purely RARITY-based with NO level gating: commons in bulk down
-// to the occasional lone Celestial; the seed PRICE is the only gate.
-export function rollShopAt(island: number, window: number, players = 1): Record<string, number> {
-  const count = Math.max(1, Math.floor(players));
+// sees identical stock. Stock is sized for a SINGLE player and does NOT scale
+// with how many players are online: the shared pool holds just one player's worth
+// of seeds per window, so everyone on the island competes over the same scarce
+// stock. Purely RARITY-based with NO level gating: commons in bulk down to the
+// occasional lone Celestial; the seed PRICE is the only gate.
+export function rollShopAt(island: number, window: number): Record<string, number> {
   const rand = mulberry32(((island | 0) * 0x9e3779b1) ^ ((window | 0) * 0x85ebca77));
   const stock: Record<string, number> = {};
   for (const p of PLANTS) {
@@ -514,7 +556,7 @@ export function rollShopAt(island: number, window: number, players = 1): Record<
     // stays aligned across clients regardless of outcomes.
     const present = rand() < r.present;
     const qty = r.qty[0] + Math.floor(rand() * (r.qty[1] - r.qty[0] + 1));
-    stock[p.id] = present ? qty * count : 0;
+    stock[p.id] = present ? qty : 0;
   }
   return stock;
 }

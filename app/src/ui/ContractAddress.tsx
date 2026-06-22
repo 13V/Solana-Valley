@@ -1,10 +1,14 @@
 import { useState } from 'react';
 
-// $SPROUT token contract address, shown bottom-right so players can copy it.
-const CA = '3sPxGyKxwCrAebxZsFb56GsNd7mjK7jZAng5uJtPpump';
+// The reward token's contract address, shown bottom-right so players can copy it.
+// Env-driven so swapping to a new token is config-only (set VITE_TOKEN_CA at
+// build time); falls back to the original $SPROUT mint if unset. If set to an
+// empty string the pill hides itself (e.g. before the new token launches).
+const CA = import.meta.env.VITE_TOKEN_CA ?? '3sPxGyKxwCrAebxZsFb56GsNd7mjK7jZAng5uJtPpump';
 
 export function ContractAddress() {
   const [copied, setCopied] = useState(false);
+  if (!CA) return null;
 
   const copy = () => {
     try {

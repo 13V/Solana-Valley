@@ -19,6 +19,8 @@ import { TutorialCoach } from './TutorialCoach';
 import { TouchControls } from './TouchControls';
 import { CloudSaveSync } from '../chain/CloudSaveSync';
 import { MultiplayerSync } from '../chain/MultiplayerSync';
+import { RewardsClaim } from '../chain/RewardsClaim';
+import { MerkleClaim } from '../chain/MerkleClaim';
 import { UsernamePrompt } from './UsernamePrompt';
 import { Toasts } from './Toasts';
 import { WhatsNew } from './WhatsNew';
@@ -91,6 +93,8 @@ export function App() {
           {helpSeen && <TutorialCoach />}
           <Toasts />
           <WhatsNew />
+          <RewardsClaim />
+          <MerkleClaim />
           <ContractAddress />
           <Chat />
           <UpdatePill />
