@@ -240,11 +240,13 @@ function handlePresenceSync(): void {
   knownRemote = nowRemote;
 }
 
-// Join an island channel as `self`. Idempotent-ish: any existing connection is
-// torn down first. Best-effort; never throws.
-export function joinIsland(island: number, self: Self): void {
+// Open a realtime channel (`topic`) as `self` and wire all presence/broadcast
+// handlers + the local bus listeners. Idempotent-ish: any existing connection is
+// torn down first. Best-effort; never throws. Both the per-island channels and
+// the single shared hub channel go through here so they behave identically.
+function openChannel(topic: string, self: Self): void {
   try {
-    // Drop any prior connection so switching islands is clean.
+    // Drop any prior connection so switching channels is clean.
     leaveIsland();
 
     current = self;
@@ -255,7 +257,7 @@ export function joinIsland(island: number, self: Self): void {
     lastFarmSentAt = 0;
     pendingFarm = null;
 
-    const ch = supabase.channel(`island:${island}`, {
+    const ch = supabase.channel(topic, {
       config: {
         presence: { key: self.id },
         broadcast: { self: false },
@@ -373,8 +375,29 @@ export function joinIsland(island: number, self: Self): void {
   }
 }
 
-// Leave the current island: untrack presence, remove the channel, and clear all
-// listeners/state. Safe to call when not connected.
+// The local player's id on the active channel (null when disconnected). Lets a
+// scene tell its OWN presence entry apart from peers' in the roster (presence
+// includes self, but broadcast is self:false so 'pos' never echoes back).
+export function currentSelfId(): string | null {
+  return current ? current.id : null;
+}
+
+// Join a per-island channel as `self` (the legacy shared-world path). Best-effort.
+export function joinIsland(island: number, self: Self): void {
+  openChannel(`island:${island}`, self);
+}
+
+// Join the single SHARED social-hub channel as `self`. Everyone who steps onto
+// the hub lands on the same `hub:shared` topic (plot is irrelevant here, so it's
+// ignored), so they all see each other. Best-effort.
+export function joinHub(self: Self): void {
+  openChannel('hub:shared', self);
+}
+
+// Leave whatever channel is currently open (island or hub): untrack presence,
+// remove the channel, and clear all listeners/state. Safe to call when not
+// connected. (Named `leaveIsland` for historical reasons; it's the universal
+// teardown — `leaveHub` is an alias for clarity at hub call sites.)
 export function leaveIsland(): void {
   if (offSelf) {
     try {
@@ -463,3 +486,6 @@ export function leaveIsland(): void {
     }
   }
 }
+
+// Alias: leaving the hub is the same universal teardown as leaving an island.
+export const leaveHub = leaveIsland;

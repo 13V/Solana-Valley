@@ -1,14 +1,30 @@
 // The shared social hub island (sproutmap_3 / socialHub.json). The player
 // reaches it by clicking the boat on their home island; clicking a boat here
 // hops back. It renders the hand-authored hub map faithfully (each cell with
-// its own tileset + frame), gives the player free movement, and is where
-// multiplayer presence lives (wired separately) so players see each other.
+// its own tileset + frame), gives the player free movement, and — unlike the
+// PRIVATE home island — is multiplayer: everyone who sails here lands on the
+// same `hub:shared` realtime channel, so they see each other walking around.
 import Phaser from 'phaser';
 import { TILE, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_SPEED } from '../constants';
 import { hubMap, classify, isBoatKey } from '../mapLoader';
 import { virtualMove, getKeyBinds, type MoveAction } from '../input';
+import { bus } from '../EventBus';
+import { currentSelfId } from '../../chain/multiplayer';
 
 type Dir = 'down' | 'up' | 'left' | 'right';
+
+// A remote player's avatar on the hub: the shared 'pchar' sprite (animated like
+// the local player), a floating name label, and the target pose we lerp toward
+// each frame as `mp:move` updates stream in. Mirrors FarmScene's RemotePlayer,
+// minus the tool/fishing pose flags (the hub is walk-around only).
+type RemotePlayer = {
+  sprite: Phaser.GameObjects.Sprite;
+  label: Phaser.GameObjects.Text;
+  targetX: number;
+  targetY: number;
+  facing: Dir;
+  name: string;
+};
 
 // Object key fragments that should be solid (block the player) and y-sorted.
 const SOLID = [
@@ -29,6 +45,13 @@ export class HubScene extends Phaser.Scene {
   private boatTiles = new Set<string>();
   private spawn = { x: 20, y: 15 };
 
+  // ---- multiplayer (no-ops until joinHub connects the shared channel) -------
+  private remotePlayers = new Map<string, RemotePlayer>();
+  private unsubs: Array<() => void> = [];
+  // Last pose we broadcast, so `mp:self` only fires on change + throttled.
+  private lastSelfPose = { x: 0, y: 0, facing: 'down' as Dir };
+  private lastSelfEmit = 0;
+
   private static IDLE_ROW: Record<Dir, number> = { down: 0, up: 8, left: 24, right: 16 };
   private static WALK_ROW: Record<Dir, number> = { down: 32, up: 40, left: 56, right: 48 };
 
@@ -39,6 +62,7 @@ export class HubScene extends Phaser.Scene {
   create() {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.obstacles = this.physics.add.staticGroup();
+    this.remotePlayers.clear();
     this.createAnims();
     this.buildHub();
 
@@ -71,9 +95,30 @@ export class HubScene extends Phaser.Scene {
       const ty = Math.floor(p.worldY / TILE);
       if (this.boatTiles.has(`${tx},${ty}`)) this.scene.start('Farm');
     });
+
+    // Join the shared hub channel (MultiplayerSync listens for this and connects
+    // the wallet to `hub:shared`) and start listening for peers. All of this is a
+    // no-op when no wallet is connected — the hub just stays single-player.
+    bus.emit('mp:enterHub', undefined);
+    this.unsubs.push(
+      bus.on('mp:roster', (players) => this.onRoster(players)),
+      bus.on('mp:move', (m) => this.onRemoteMove(m)),
+      bus.on('mp:leave', ({ id }) => this.removeRemote(id)),
+    );
+
+    // Leave the channel and tear down every avatar + listener when we sail away.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      bus.emit('mp:exitHub', undefined);
+      this.unsubs.forEach((u) => u());
+      this.unsubs = [];
+      this.remotePlayers.forEach((rp) => { rp.sprite.destroy(); rp.label.destroy(); });
+      this.remotePlayers.clear();
+    });
+
+    this.toast('🏝️ Welcome to the social hub! Other players appear here.');
   }
 
-  update() {
+  update(time: number, delta: number) {
     let vx = 0;
     let vy = 0;
     const mk = this.moveKeys;
@@ -96,6 +141,16 @@ export class HubScene extends Phaser.Scene {
       this.player.anims.play(`idle-${this.facing}`, true);
     }
     this.player.setDepth(this.player.y + 18);
+
+    // Broadcast our pose so peers see us, then interpolate their avatars. Both are
+    // no-ops when nobody else is connected (the bus has no `mp:self` subscriber).
+    this.broadcastSelf(time);
+    this.updateRemotes(delta);
+  }
+
+  // Small floating status line (the hub has no HUD of its own).
+  private toast(text: string) {
+    bus.emit('toast', text);
   }
 
   private createAnims() {
@@ -162,5 +217,137 @@ export class HubScene extends Phaser.Scene {
       if (d < bestD) { bestD = d; best = { x, y }; }
     }
     if (best) this.spawn = best;
+  }
+
+  // ---- multiplayer: remote avatars ----------------------------------------
+
+  // Throttle (~10/sec) and only when the pose actually changed, tell the net
+  // layer where the local player is so it can broadcast (world pixel coords, to
+  // match how createRemote/onRemoteMove place avatars). Mirrors FarmScene.
+  private broadcastSelf(time: number) {
+    if (time - this.lastSelfEmit < 100) return;
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    const last = this.lastSelfPose;
+    if (x === last.x && y === last.y && this.facing === last.facing) return;
+    this.lastSelfEmit = time;
+    this.lastSelfPose = { x, y, facing: this.facing };
+    bus.emit('mp:self', { x, y, facing: this.facing });
+  }
+
+  // Deterministic pastel hue per player id so remote avatars are distinct
+  // (identical scheme to FarmScene so a player looks the same on island + hub).
+  private tintForId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const hue = (h >>> 0) % 360;
+    return Phaser.Display.Color.HSVToRGB(hue / 360, 0.45, 1).color;
+  }
+
+  // Narrow the bus's loose `facing: string` into our strict Dir union.
+  private toDir(facing: string): Dir {
+    return facing === 'up' || facing === 'left' || facing === 'right' ? facing : 'down';
+  }
+
+  // Create a brand-new remote avatar (shared 'pchar' sheet + name label),
+  // distinguished by an id-hashed tint. Visual only — no physics body.
+  private createRemote(id: string, name: string, x: number, y: number, facing: Dir): RemotePlayer {
+    const sprite = this.add.sprite(x, y, 'pchar', HubScene.IDLE_ROW[facing]);
+    sprite.setOrigin(0.5, 0.72).setScale(1.85).setTint(this.tintForId(id));
+    sprite.play(`idle-${facing}`, true);
+    const label = this.add
+      .text(x, y, name, {
+        fontFamily: 'Pixelify Sans, monospace', fontSize: '12px', color: '#ffffff',
+        stroke: '#2a1f12', strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1);
+    const rp: RemotePlayer = { sprite, label, targetX: x, targetY: y, facing, name };
+    this.remotePlayers.set(id, rp);
+    this.depthSortRemote(rp);
+    return rp;
+  }
+
+  // A remote player moved: create their avatar if new, else update the target
+  // pose we interpolate toward each frame (and their facing).
+  private onRemoteMove({ id, x, y, facing }: { id: string; x: number; y: number; facing: string }) {
+    const dir = this.toDir(facing);
+    const rp = this.remotePlayers.get(id);
+    if (!rp) {
+      this.createRemote(id, id.slice(0, 4), x, y, dir);
+      return;
+    }
+    rp.targetX = x;
+    rp.targetY = y;
+    rp.facing = dir;
+  }
+
+  private removeRemote(id: string) {
+    const rp = this.remotePlayers.get(id);
+    if (!rp) return;
+    rp.sprite.destroy();
+    rp.label.destroy();
+    this.remotePlayers.delete(id);
+  }
+
+  // Presence sync: the roster is the full list of who's on the hub (including
+  // us). Spawn an avatar for every OTHER peer right away (at the dock spawn until
+  // their first pose streams in) so idle/just-joined players are visible, refresh
+  // names, and drop avatars for anyone who left.
+  private onRoster(players: Array<{ id: string; name: string; plot: number }>) {
+    const selfId = currentSelfId();
+    const present = new Set(players.map((p) => p.id));
+    for (const id of [...this.remotePlayers.keys()]) {
+      if (!present.has(id)) this.removeRemote(id);
+    }
+    for (const p of players) {
+      if (p.id === selfId) continue; // never spawn an avatar for ourselves
+      let rp = this.remotePlayers.get(p.id);
+      if (!rp) {
+        rp = this.createRemote(
+          p.id,
+          p.name || p.id.slice(0, 4),
+          this.spawn.x * TILE + TILE / 2,
+          this.spawn.y * TILE + TILE / 2,
+          'down',
+        );
+      }
+      if (p.name && rp.name !== p.name) {
+        rp.name = p.name;
+        rp.label.setText(p.name);
+      }
+    }
+  }
+
+  // Keep a remote avatar + its label y-sorted with the world (same scheme the
+  // local player uses) and float the label just above the head.
+  private depthSortRemote(rp: RemotePlayer) {
+    rp.sprite.setDepth(rp.sprite.y + 18);
+    rp.label.setPosition(rp.sprite.x, rp.sprite.y - 26);
+    rp.label.setDepth(rp.sprite.y + 19);
+  }
+
+  // Smoothly move every remote avatar toward its target each frame and play the
+  // matching walk/idle anim (same keys as the local player). Called from update.
+  private updateRemotes(delta: number) {
+    if (!this.remotePlayers.size) return;
+    const t = 1 - Math.pow(0.001, delta / 1000); // frame-rate-independent smoothing
+    for (const rp of this.remotePlayers.values()) {
+      const dx = rp.targetX - rp.sprite.x;
+      const dy = rp.targetY - rp.sprite.y;
+      const moving = Math.hypot(dx, dy) > 1.5;
+      if (moving) {
+        rp.sprite.x += dx * t;
+        rp.sprite.y += dy * t;
+        rp.sprite.play(`walk-${rp.facing}`, true);
+      } else {
+        rp.sprite.x = rp.targetX;
+        rp.sprite.y = rp.targetY;
+        rp.sprite.play(`idle-${rp.facing}`, true);
+      }
+      this.depthSortRemote(rp);
+    }
   }
 }

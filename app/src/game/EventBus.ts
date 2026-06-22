@@ -54,6 +54,13 @@ export interface GameEvents {
   // 'fish-cast' | 'fish-wait' | 'fish-reel' | 'fish-catch' | 'fish-end'.
   'mp:act': { action: string; facing: string }; // FarmScene -> network: a local tool/fishing pose (net stamps our id)
   'mp:remoteAct': { id: string; action: string; facing: string }; // network -> FarmScene: a peer's pose to animate
+  // Hub presence lifecycle. The home island is PRIVATE (it joins no channel, so
+  // its dormant mp:* handlers never fire). The shared social hub is where
+  // multiplayer lives: HubScene emits enterHub on create and exitHub on shutdown
+  // so the network layer connects/disconnects the SHARED hub channel only while
+  // the player is actually standing on the hub.
+  'mp:enterHub': void; // HubScene -> network: connect me to the shared hub channel
+  'mp:exitHub': void; // HubScene -> network: disconnect me from the hub channel
 }
 
 type Handler<T> = (payload: T) => void;
