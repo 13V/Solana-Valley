@@ -867,26 +867,40 @@ body {
   padding: 0;
 }
 
+/* Header = a raised parchment NAMEPLATE banner (9-slice from the pack) that
+   floats just inside the wooden frame, instead of a flat tinted strip. The
+   title + optional subtitle + close button all sit on the banner. */
 .ui-skin .panel-head {
-  background: rgba(120, 82, 45, 0.1);
-  border-bottom: 3px solid rgba(108, 74, 43, 0.45);
-  color: #3a2a1c;
+  background: none;
+  border: solid transparent;
+  border-width: 3px 7px 5px;
+  border-image: url('/assets/sprout-ui/banner.png') 3 7 5 fill stretch;
+  border-radius: 0;
+  margin: 11px 13px 4px;
+  padding: 5px 10px 4px;
+  color: #4a2f15;
+  filter: drop-shadow(0 3px 2px rgba(60, 36, 12, 0.22));
 }
 
 .ui-skin .panel-head h3 {
-  color: #4a3015;
-  text-shadow: 0 1px 0 rgba(255, 248, 224, 0.5);
+  color: #5a3a18;
+  text-shadow: 0 1px 0 rgba(255, 250, 230, 0.55);
 }
 
-/* Close button: the pack's chunky X, sized up with a soft hover pop. */
+/* Close button: the pack's framed wooden X tile, with a soft hover pop +
+   press dip so it reads as a real button. */
 .ui-skin .x {
-  opacity: 0.9;
-  padding: 2px;
-  transition: transform 0.08s ease;
+  opacity: 1;
+  padding: 0;
+  margin-left: 2px;
+  transition: transform 0.08s ease, filter 0.08s ease;
+  filter: drop-shadow(0 2px 1px rgba(60, 36, 12, 0.28));
 }
 .ui-skin .x:hover {
-  opacity: 1;
-  transform: scale(1.14);
+  transform: translateY(-1px) scale(1.08);
+}
+.ui-skin .x:active {
+  transform: translateY(1px) scale(0.96);
 }
 
 /* Progress / XP bars: recessed wood track with a green→gold fill. */
@@ -1028,6 +1042,20 @@ body {
 .ui-skin .btn.active,
 .ui-skin .btn:active {
   border-image: var(--ui-btn-press) 8 fill stretch;
+}
+
+/* Primary CTA (Buy / Sell all / Confirm): warm the parchment button toward
+   gold and add a soft glow so the key action pops on the panel. */
+.ui-skin .btn.gold {
+  filter: saturate(1.55) brightness(1.06) hue-rotate(-14deg)
+    drop-shadow(0 0 5px rgba(255, 196, 80, 0.55));
+  color: #6a3f06;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, 0.5);
+}
+.ui-skin .btn.gold:hover {
+  border-image: var(--ui-btn) 8 fill stretch;
+  filter: saturate(1.75) brightness(1.13) hue-rotate(-14deg)
+    drop-shadow(0 0 9px rgba(255, 206, 92, 0.75));
 }
 
 .ui-skin .slot {

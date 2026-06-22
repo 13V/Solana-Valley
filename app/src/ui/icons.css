@@ -63,11 +63,32 @@
   vertical-align: middle;
 }
 
-/* Panel close-button X. */
+/* Panel close-button X — the framed wooden tile from the pack. */
 .ui-x {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   vertical-align: middle;
+}
+
+/* Spinning gold coin — an 8-frame sprite strip (coin_spin.png, 8×24px cells)
+   played with steps(). Static by default; it spins when you hover the coin
+   badge so the HUD gets a little life without being a constant distraction. */
+.coin-spin {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  vertical-align: -3px;
+  /* Default to the front-facing frame (frame 4 of 8); spin reveals the rest. */
+  background: url('/assets/sprout-ui/coin_spin.png') -64px 0 / 800% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.badge.coins:hover .coin-spin {
+  animation: coin-spin 0.7s steps(8) infinite;
+}
+@keyframes coin-spin {
+  from { background-position-x: 0; }
+  to { background-position-x: -128px; } /* 8 frames × 16px */
 }
 
 /* Crop seed-packet / produce icons in panels and the hotbar. */

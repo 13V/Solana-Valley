@@ -81,7 +81,7 @@ export function Hud({
         </span>
         <div className="hud-stats">
           <span className="badge coins">
-            <img className="hud-icon" src="assets/sprout-ui/icon_coin.png" alt="🪙" />
+            <i className="coin-spin" aria-hidden="true" />
             {coins.toLocaleString()}
           </span>
           <span className="badge lvl" title={`${progress.xpInto}/${progress.xpNeed} XP`}>
