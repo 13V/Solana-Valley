@@ -171,22 +171,22 @@ too volatile to peg to):
 
 | Tier | Plants | Payout (× variant) |
 |---|---|---|
-| Divine | Blue Rose, Frost Pumpkin | **100,000 $LANDS** |
-| Prismatic | Star Fruit, Moonpetal | **250,000 $LANDS** |
-| Celestial | Galaxy Fruit, Voidbloom | **500,000 $LANDS** |
+| Divine | Blue Rose, Frost Pumpkin | **50,000 $LANDS** |
+| Prismatic | Star Fruit, Moonpetal | **125,000 $LANDS** |
+| Celestial | Galaxy Fruit, Voidbloom | **250,000 $LANDS** |
 
 Everything below Divine (and fish) stays coins-only. **Divine and above can't be
 sold for coins at all — the only way to cash them in is trading for $LANDS** (the
 coin "Sell" button is hidden for them, and `sellStack`/`sellAll` refuse them).
 **Special variants** multiply the payout, capped at 2× (`CLAIM_MUT_MULT`): Shiny
 **1.25×**, Frosted **1.5×**, Gold **1.75×**, Rainbow **2×** — so a Rainbow Celestial
-pays **1,000,000 $LANDS** (not the ×25 its in-game value implies). Quality stars
+pays **500,000 $LANDS** (not the ×25 its in-game value implies). Quality stars
 don't affect it. Payouts are clamped to a **capped daily pool**
 (`supabase/redemption.sql`):
 
 - **`daily_budget`** — most $LANDS payable per UTC day (the hard cap).
 - **`wallet_daily_cap`** — most one wallet can take per day. Must be **≥ the
-  largest single payout** (Rainbow Celestial = 1,000,000 $LANDS) or every redeem
+  largest single payout** (Rainbow Celestial = 500,000 $LANDS) or every redeem
   all-or-nothing-fails.
 - **`base_rate = 1`** — the redeem API already computes the $LANDS base-unit
   amount, so the RPC just clamps it to the caps. Keep `rate_floor_bps = 10000`.
@@ -205,8 +205,8 @@ widget — **no new payout path, and no price oracle**.
 ```sql
 update public.redemption_config set
   base_rate        = 1,             -- API computes the amount; RPC just clamps
-  daily_budget     = 50000000000000, -- 50,000,000 $LANDS/day at 6 decimals (how much you fund)
-  wallet_daily_cap = 2000000000000,  -- 2,000,000 $LANDS/wallet/day (≥ 1 Rainbow Celestial)
+  daily_budget     = 25000000000000, -- 25,000,000 $LANDS/day at 6 decimals (how much you fund)
+  wallet_daily_cap = 1000000000000,  -- 1,000,000 $LANDS/wallet/day (≥ 1 Rainbow Celestial)
   rate_floor_bps   = 10000,         -- keep at 10000 (no floating)
   enabled          = true
 where id = 1;

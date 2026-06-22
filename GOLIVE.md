@@ -33,12 +33,12 @@ Full design detail is in `docs/REWARDS.md` — this is the checklist.
    `TREASURY_SECRET_KEY`, `REWARD_DECIMALS=6`, `REWARD_SYMBOL=$LANDS`,
    `VITE_SOLANA_RPC` (devnet), `VITE_TOKEN_CA` (the devnet mint).
 4. **Enable the pool** (SQL — full notes in `docs/REWARDS.md`). Trades pay FIXED
-   token amounts (Divine 100K / Prismatic 250K / Celestial 500K × variant), so
-   caps must be ≥ the largest single payout (Rainbow Celestial = 1,000,000):
+   token amounts (Divine 50K / Prismatic 125K / Celestial 250K × variant), so
+   caps must be ≥ the largest single payout (Rainbow Celestial = 500,000):
    ```sql
    update public.redemption_config set
-     base_rate = 1, daily_budget = 50000000000000,
-     wallet_daily_cap = 2000000000000, rate_floor_bps = 10000, enabled = true
+     base_rate = 1, daily_budget = 25000000000000,
+     wallet_daily_cap = 1000000000000, rate_floor_bps = 10000, enabled = true
    where id = 1;
    ```
 5. **Deploy the preview**, connect a devnet wallet, grab a top-tier crop fast with

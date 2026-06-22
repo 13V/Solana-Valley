@@ -96,13 +96,13 @@ export function rarityRank(r: Rarity): number {
 
 // Whole-$LANDS payout for trading a top-tier crop. FIXED token amounts (not
 // USD-pegged — a fresh token's price is far too volatile to peg to). ONLY these
-// tiers are tradeable: Divine 100K, Prismatic 250K, Celestial 500K $LANDS. A
+// tiers are tradeable: Divine 50K, Prismatic 125K, Celestial 250K $LANDS. A
 // capped special-variant multiplier (CLAIM_MUT_MULT) applies on top; quality
 // stars do NOT. The redeem API keeps a matching plant→tokens copy; keep in sync.
 export const CLAIM_TOKENS: Partial<Record<Rarity, number>> = {
-  Divine: 100_000,
-  Prismatic: 250_000,
-  Celestial: 500_000,
+  Divine: 50_000,
+  Prismatic: 125_000,
+  Celestial: 250_000,
 };
 
 export function claimTokens(plant: Plant): number | null {

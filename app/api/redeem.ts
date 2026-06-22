@@ -4,8 +4,8 @@ import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth
 // POST /api/redeem
 // Body: { wallet, message, signature, plantId, mutationId, count }
 // Trades a TOP-TIER crop (Divine/Prismatic/Celestial only) for real $LANDS, on
-// demand. Payout is a FIXED whole-$LANDS amount per tier (Divine 100K, Prismatic
-// 250K, Celestial 500K) × a capped special-variant multiplier (1×–2×) × count,
+// demand. Payout is a FIXED whole-$LANDS amount per tier (Divine 50K, Prismatic
+// 125K, Celestial 250K) × a capped special-variant multiplier (1×–2×) × count,
 // then CLAMPED to a daily budget + per-wallet cap by the redeem_items RPC (so it
 // can never drain the treasury). NOT USD-pegged — a fresh token's price is too
 // volatile to peg to. Credits `claimable`; the player withdraws via /api/claim.
@@ -14,17 +14,17 @@ import { verifyAuth, readPostBody, getSupabaseUrl, getServiceKey } from './_auth
 // IMPORTANT: set `base_rate = 1` in redemption_config — this route already
 // computes the $LANDS base-unit amount, and the RPC passes it through before
 // clamping to the caps. The caps must be ≥ the largest single payout (a Rainbow
-// Celestial = 1,000,000 $LANDS) or every redeem all-or-nothing-fails.
+// Celestial = 500,000 $LANDS) or every redeem all-or-nothing-fails.
 
 // Fixed whole-$LANDS payout per tradeable plant. KEEP IN SYNC with CLAIM_TOKENS in
 // app/src/game/economy.ts. A plant not listed here is not tradeable for tokens.
 const PLANT_TOKENS: Record<string, number> = {
-  bluerose: 100_000,
-  frostpumpkin: 100_000,
-  starfruit: 250_000,
-  moonpetal: 250_000,
-  galaxyfruit: 500_000,
-  voidbloom: 500_000,
+  bluerose: 50_000,
+  frostpumpkin: 50_000,
+  starfruit: 125_000,
+  moonpetal: 125_000,
+  galaxyfruit: 250_000,
+  voidbloom: 250_000,
 };
 
 // Capped special-variant multiplier (mutations). KEEP IN SYNC with CLAIM_MUT_MULT
